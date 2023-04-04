@@ -1,0 +1,36 @@
+{
+  "name": "smart-contracts",
+  "version": "0.0.1",
+  "contributors": [
+    "ATOR Labs",
+    "Jim Toth <jim@artby.city>"
+  ],
+  "license": "AGPL-3.0-only",
+  "description": "ATOR Protocol Smart Contracts",
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Airtor-Development/smart-contracts"
+  },
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy": "hardhat run --network hardhat scripts/deploy.ts",
+    "node": "hardhat node",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.2",
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.15.11",
+    "chai": "^4.3.7",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.13.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.8.2"
+  }
+}
