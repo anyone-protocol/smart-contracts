@@ -14,7 +14,10 @@ contract RelayRegistry is Ownable {
 
   Claim[] _claims;
 
-  event RelayRegistrationClaim(Claim claim);
+  event RelayRegistrationClaim(
+    address indexed claimedBy,
+    string indexed fingerprint
+  );
 
   constructor(address tokenContract_) {
     tokenContract = tokenContract_;
@@ -23,7 +26,11 @@ contract RelayRegistry is Ownable {
   function registerRelay(string calldata fingerprint) public {
     require(_validFingerprint(fingerprint));
 
-    _claims.push(Claim(msg.sender, fingerprint));
+    Claim memory claim = Claim(msg.sender, fingerprint);
+
+    _claims.push(claim);
+
+    emit RelayRegistrationClaim(claim.claimedBy, claim.fingerprint);
   }
 
   function _validFingerprint(string calldata fingerprint)
@@ -33,7 +40,7 @@ contract RelayRegistry is Ownable {
   {
     bytes calldata fingerprintBytes = bytes(fingerprint);
 
-    require(fingerprintBytes.length == 40);
+    require(fingerprintBytes.length == 40, 'Invalid fingerprint');
 
     return true;
   }

@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from 'hardhat/types'
 import '@nomiclabs/hardhat-ethers'
+import '@nomicfoundation/hardhat-chai-matchers'
 
 const config: HardhatUserConfig = {
   solidity: {
