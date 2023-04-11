@@ -91,6 +91,16 @@ describe('RelayRegistry Contract', () => {
       .to.be.revertedWith('Fingerprint not claimed')
   })
 
+  it('Fires an event on relay verification', async () => {
+    const { registry, alice } = await loadFixture(deploy)
+
+    await registry.connect(alice).registerRelay(fingerprintA)
+
+    await expect(registry.verifyClaim(alice.address, fingerprintA))
+      .to.emit(registry, 'RelayRegistrationVerified')
+      .withArgs(alice.address, fingerprintA)
+  })
+
   // TODO -> restrict to ATOR token holders
   // TODO -> require locking ATOR tokens to make a claim
   // TODO -> release ATOR tokens on de-registration or invalid claim
