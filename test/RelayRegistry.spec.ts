@@ -27,15 +27,12 @@ describe('RelayRegistry Contract', () => {
   })
 
   it('Allows valid relay registration claims', async () => {
-    const { registry } = await loadFixture(deploy)
+    const { registry, owner } = await loadFixture(deploy)
 
-    await registry.registerRelay(fingerprintA)
-    await registry.registerRelay(fingerprintB)
-    const claims = await registry.claims()
+    await registry.connect(owner).registerRelay(fingerprintA)
+    const fingerprint = await registry.claims(owner.address)
 
-    expect(claims.length).to.equal(2)
-    expect(claims[0].fingerprint).to.equal(fingerprintA)
-    expect(claims[1].fingerprint).to.equal(fingerprintB)
+    expect(fingerprint).to.equal(fingerprintA)
   })
 
   it('Fires an event on successful relay registration claims', async () => {
@@ -63,20 +60,38 @@ describe('RelayRegistry Contract', () => {
       .to.be.revertedWith('Invalid fingerprint')
   })
 
-  it('Rejects duplicate registration claims', async () => {
+  it('Allows user to update claim', async () => {
     const { registry, owner, alice } = await loadFixture(deploy)
 
-    await registry.attach(owner.address).registerRelay(fingerprintA)
-    await registry.attach(alice.address).registerRelay(fingerprintA)
-    await registry.attach(owner.address).registerRelay(fingerprintB)
+    await registry.connect(owner).registerRelay(fingerprintA)
+    await registry.connect(alice).registerRelay(fingerprintA)
+    await registry.connect(owner).registerRelay(fingerprintB)
 
-    await expect(registry.attach(owner.address).registerRelay(fingerprintA))
-      .to.be.revertedWith('Duplicate fingerprint')
+    const ownerFingerprintClaim = await registry.claims(owner.address)
+    const aliceFingerprintClaim = await registry.claims(alice.address)
+
+    expect(ownerFingerprintClaim).to.equal(fingerprintB)
+    expect(aliceFingerprintClaim).to.equal(fingerprintA)
+  })
+
+  it('Allows contract owner to verify claims', async () => {
+    const { registry, owner, alice } = await loadFixture(deploy)
+
+    await registry.connect(alice).registerRelay(fingerprintA)
+    await registry.connect(owner).verifyClaim(alice.address, fingerprintA)
+
+    const aliceVerifiedAddress = await registry.verified(fingerprintA)
+    const aliceFingerprintClaim = await registry.claims(alice.address)
+
+    expect(aliceVerifiedAddress).to.equal(alice.address)
+    expect(aliceFingerprintClaim).to.equal('')
+    await expect(registry.verifyClaim(alice.address, 'badfingerprint'))
+      .to.be.revertedWith('Invalid fingerprint')
+    await expect(registry.verifyClaim(alice.address, fingerprintB))
+      .to.be.revertedWith('Fingerprint not claimed')
   })
 
   // TODO -> restrict to ATOR token holders
-
   // TODO -> require locking ATOR tokens to make a claim
-
-  // TODO -> release ATOR tokens when claim is verified/pruned
+  // TODO -> release ATOR tokens on de-registration or invalid claim
 })
