@@ -12,7 +12,6 @@
     "type": "git",
     "url": "git+https://github.com/Airtor-Development/smart-contracts"
   },
-  "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
     "deploy": "hardhat run --network hardhat scripts/deploy.ts",
