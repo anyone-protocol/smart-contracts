@@ -3,8 +3,13 @@ import hardhat from 'hardhat'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const AtorAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
-const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
-const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+const fingerprintA = hardhat.ethers.utils.hexlify(
+  Buffer.from('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', 'hex')
+)
+const fingerprintB = hardhat.ethers.utils.hexlify(
+  Buffer.from('BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', 'hex')
+)
+const emptyBytes20 = hardhat.ethers.utils.hexZeroPad(Buffer.from(''), 20)
 
 describe('RelayRegistry Contract', () => {
   async function deploy() {
@@ -43,23 +48,6 @@ describe('RelayRegistry Contract', () => {
       .withArgs(owner.address, fingerprintA)
   })
 
-  it('Rejects relay registration claims with bad fingerprints', async () => {
-    const { registry } = await loadFixture(deploy)
-
-    const tinyFingerprint = 'AAA'
-    const largeFingerprint = fingerprintA + fingerprintB
-    const badCharsFingerprint = 'VWXYZVWXYZVWXYZVWXYZVWXYZVWXYZVWXYZVWXYZ'
-
-    await expect(registry.registerRelay(tinyFingerprint))
-      .to.be.revertedWith('Invalid fingerprint')
-
-    await expect(registry.registerRelay(largeFingerprint))
-      .to.be.revertedWith('Invalid fingerprint')
-
-    await expect(registry.registerRelay(badCharsFingerprint))
-      .to.be.revertedWith('Invalid fingerprint')
-  })
-
   it('Allows user to update claim', async () => {
     const { registry, owner, alice } = await loadFixture(deploy)
 
@@ -84,9 +72,7 @@ describe('RelayRegistry Contract', () => {
     const aliceFingerprintClaim = await registry.claims(alice.address)
 
     expect(aliceVerifiedAddress).to.equal(alice.address)
-    expect(aliceFingerprintClaim).to.equal('')
-    await expect(registry.verifyClaim(alice.address, 'badfingerprint'))
-      .to.be.revertedWith('Invalid fingerprint')
+    expect(aliceFingerprintClaim).to.equal(emptyBytes20)
     await expect(registry.verifyClaim(alice.address, fingerprintB))
       .to.be.revertedWith('Fingerprint not claimed')
   })
