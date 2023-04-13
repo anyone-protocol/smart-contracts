@@ -91,6 +91,16 @@ describe('RelayRegistry Contract', () => {
       .to.be.revertedWith('Fingerprint not claimed')
   })
 
+  it('Disallows non-owners from verifying claims', async () => {
+    const { registry, alice } = await loadFixture(deploy)
+
+    await registry.connect(alice).registerRelay(fingerprintA)
+
+    await expect(
+      registry.connect(alice).verifyClaim(alice.address, fingerprintA)
+    ).to.be.revertedWith('Ownable: caller is not the owner')
+  })
+
   it('Fires an event on relay verification', async () => {
     const { registry, alice } = await loadFixture(deploy)
 
