@@ -12,7 +12,6 @@
     "type": "git",
     "url": "git+https://github.com/Airtor-Development/smart-contracts"
   },
-  "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
     "deploy": "hardhat run --network hardhat scripts/deploy.ts",
@@ -20,6 +19,8 @@
     "test": "hardhat test"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
     "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@types/chai": "^4.3.4",
     "@types/mocha": "^10.0.1",

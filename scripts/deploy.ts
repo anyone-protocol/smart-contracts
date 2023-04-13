@@ -1,11 +1,12 @@
 import { ethers } from 'hardhat'
 
 async function main () {
-  const ATOR = await ethers.getContractFactory('AirTor')
-  console.log('Deploying AirTor token contract')
-  const ator = await ATOR.deploy()
-  await ator.deployed()
-  console.log('AirTor token contract deployed to:', ator.address)
+  const contract = 'RelayRegistry'
+  const Contract = await ethers.getContractFactory(contract)
+  console.log(`Deploying ${contract} contract`)
+  const deployed = await Contract.deploy('0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199')
+  await deployed.deployed()
+  console.log(`${contract} contract deployed to ${deployed.address}`)
 }
 
 main()
