@@ -14,7 +14,7 @@
   },
   "scripts": {
     "compile": "hardhat compile",
-    "deploy": "hardhat run --network hardhat scripts/deploy.ts",
+    "deploy": "hardhat run --network localhost scripts/deploy.ts",
     "node": "hardhat node",
     "test": "hardhat test"
   },
