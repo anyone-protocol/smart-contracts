@@ -9,6 +9,12 @@ const fingerprintA = hardhat.ethers.utils.hexlify(
 const fingerprintB = hardhat.ethers.utils.hexlify(
   Buffer.from('BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', 'hex')
 )
+const fingerprintC = hardhat.ethers.utils.hexlify(
+  Buffer.from('CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC', 'hex')
+)
+const fingerprintD = hardhat.ethers.utils.hexlify(
+  Buffer.from('DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD', 'hex')
+)
 const emptyBytes20 = hardhat.ethers.utils.hexZeroPad(Buffer.from(''), 20)
 
 describe('RelayRegistry Contract', () => {
@@ -68,10 +74,11 @@ describe('RelayRegistry Contract', () => {
     await registry.connect(alice).registerRelay(fingerprintA)
     await registry.connect(owner).verifyClaim(alice.address, fingerprintA)
 
-    const aliceVerifiedAddress = await registry.verified(fingerprintA)
+    const verified = await registry.verified()
     const aliceFingerprintClaim = await registry.claims(alice.address)
 
-    expect(aliceVerifiedAddress).to.equal(alice.address)
+    expect(verified[0].claimedBy).to.equal(alice.address)
+    expect(verified[0].fingerprint).to.equal(fingerprintA)
     expect(aliceFingerprintClaim).to.equal(emptyBytes20)
     await expect(registry.verifyClaim(alice.address, fingerprintB))
       .to.be.revertedWith('Fingerprint not claimed')
@@ -95,6 +102,30 @@ describe('RelayRegistry Contract', () => {
     await expect(registry.verifyClaim(alice.address, fingerprintA))
       .to.emit(registry, 'RelayRegistrationVerified')
       .withArgs(alice.address, fingerprintA)
+  })
+
+  it('Exposes a collection of verified relays', async () => {
+    const { registry, owner, alice, bob } = await loadFixture(deploy)
+
+    await registry.connect(alice).registerRelay(fingerprintA)
+    await registry.connect(owner).verifyClaim(alice.address, fingerprintA)
+    await registry.connect(bob).registerRelay(fingerprintB)
+    await registry.connect(owner).verifyClaim(bob.address, fingerprintB)
+    await registry.connect(alice).registerRelay(fingerprintC)
+    await registry.connect(owner).verifyClaim(alice.address, fingerprintC)
+    await registry.connect(bob).registerRelay(fingerprintD)
+    await registry.connect(owner).verifyClaim(bob.address, fingerprintD)
+
+    const verified = await registry.verified()
+
+    expect(verified[0].claimedBy).to.equal(alice.address)
+    expect(verified[0].fingerprint).to.equal(fingerprintA)
+    expect(verified[1].claimedBy).to.equal(bob.address)
+    expect(verified[1].fingerprint).to.equal(fingerprintB)
+    expect(verified[2].claimedBy).to.equal(alice.address)
+    expect(verified[2].fingerprint).to.equal(fingerprintC)
+    expect(verified[3].claimedBy).to.equal(bob.address)
+    expect(verified[3].fingerprint).to.equal(fingerprintD)
   })
 
   // TODO -> restrict to ATOR token holders
