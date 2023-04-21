@@ -1,16 +1,16 @@
 {
-  "name": "smart-contracts",
+  "name": "@ator/smart-contracts-evm",
   "version": "0.0.1",
   "contributors": [
     "ATOR Labs",
     "Jim Toth <jim@artby.city>"
   ],
   "license": "AGPL-3.0-only",
-  "description": "ATOR Protocol Smart Contracts",
+  "description": "ATOR Protocol EVM Smart Contracts",
   "keywords": [],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Airtor-Development/smart-contracts"
+    "url": "git+https://github.com/ATOR-Development/smart-contracts"
   },
   "scripts": {
     "compile": "hardhat compile",
