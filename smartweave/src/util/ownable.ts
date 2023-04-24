@@ -26,7 +26,7 @@ export const OnlyOwner = <S extends OwnableState>(
           'This function is only available to the contract owner'
         )
       } else {
-        return originalMethod.apply(this, [state, action])
+        return originalMethod.apply(_target, [state, action])
       }
     }
     descriptor.value = wrapper
