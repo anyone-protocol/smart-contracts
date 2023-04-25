@@ -13,7 +13,7 @@ import {
 } from '../../src/contracts'
 
 const OWNER = '0x1111111111111111111111111111111111111111'
-const ALICE = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+const ALICE = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
 const BOB   = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
@@ -236,6 +236,33 @@ describe('Relay Registry Contract', () => {
     expect(
       () => RelayRegistryHandle(initState, ownerVerifyInteraction)
     ).to.throw(ContractError)
+  })
+
+  it('Requires EVM addresses to be in checksum format', () => {
+    const aliceRegisterInteraction = createRegisterInteraction(
+      ALICE,
+      fingerprintA
+    )
+    const badEvmAddressInputs = [
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', // no leading 0x
+      {},
+      null,
+      undefined,
+      ['', []],
+      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', // not checksum format
+    ]
+
+    RelayRegistryHandle(initState, aliceRegisterInteraction)
+
+    for (let i = 0; i < badEvmAddressInputs.length; i++) {
+      const badEvmAddress = badEvmAddressInputs[i]
+      expect(
+        () => RelayRegistryHandle(
+          initState,
+          createVerifyInteraction(OWNER, badEvmAddress as any, fingerprintA)
+        )
+      ).to.throw(ContractError)
+    }
   })
 
   it('Removes a fingerprint from all claims when it is verified', () => {

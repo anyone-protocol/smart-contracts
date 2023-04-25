@@ -11,7 +11,8 @@ import {
   EvolvableState,
   OnlyOwner,
   OwnableState,
-  PartialFunctionInput
+  PartialFunctionInput,
+  SmartWeave
 } from '../util'
 
 export const FINGERPRINT_REQUIRED = 'Fingerprint required'
@@ -74,13 +75,15 @@ export class RelayRegistryContract extends Evolvable(Object) {
     ContractAssert(!!address, ADDRESS_REQUIRED)
     ContractAssert(typeof address === 'string', INVALID_ADDRESS)
     ContractAssert(address.length === 42, INVALID_ADDRESS)
-    ContractAssert(
-      address
-        .substring(2)
-        .split('')
-        .every(c => UPPER_HEX_CHARS.includes(c)),
-        INVALID_ADDRESS
-    )
+    
+    try {
+      const checksumAddress = SmartWeave.extensions.ethers.utils.getAddress(
+        address
+      )
+      ContractAssert(address === checksumAddress, INVALID_ADDRESS)
+    } catch (error) {
+      throw new ContractError(INVALID_ADDRESS)
+    }
   }
 
   private assertNotAlreadyVerified(
