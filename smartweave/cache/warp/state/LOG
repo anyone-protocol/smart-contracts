@@ -1,0 +1,6 @@
+2023/04/25-20:39:10.258982 7fb51affd640 Recovering log #36
+2023/04/25-20:39:10.259063 7fb51affd640 Level-0 table #38: started
+2023/04/25-20:39:10.262399 7fb51affd640 Level-0 table #38: 916 bytes OK
+2023/04/25-20:39:10.269644 7fb51affd640 Delete type=3 #34
+2023/04/25-20:39:10.269692 7fb51affd640 Delete type=0 #36
+2023/04/25-20:39:10.275792 7fb51a7fc640 Moved #38 to level-1 916 bytes OK: files[ 3 9 0 0 0 0 0 ]
