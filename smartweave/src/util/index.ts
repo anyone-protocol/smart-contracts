@@ -1,5 +1,6 @@
 export * from './ownable'
 export * from './environment'
+export * from './evolvable'
 
 type LengthOfString<
   S extends string,
@@ -74,3 +75,7 @@ export type ContractFunctionInput = {
 
 export type PartialFunctionInput<T extends ContractFunctionInput> =
   Partial<T> & Pick<T, 'function'>
+
+export interface Constructor<T = {}> {
+  new (...args: any[]): T
+}

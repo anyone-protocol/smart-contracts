@@ -1,0 +1,12 @@
+{
+  "presets": ["@babel/preset-typescript"],
+  "plugins": [
+    ["babel-plugin-transform-remove-imports", {
+      // "test": ["environment", "../../../environment"],
+      "removeAll": true
+    }],
+    ["@babel/plugin-proposal-decorators", {
+      "version": "2022-03"
+    }]
+  ]
+}
