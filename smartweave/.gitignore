@@ -90,3 +90,6 @@ sw.*
 
 # arlocal
 .db/
+
+# warp cache
+cache/
