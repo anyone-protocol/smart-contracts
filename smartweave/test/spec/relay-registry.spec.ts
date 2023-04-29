@@ -280,7 +280,7 @@ describe('Relay Registry Contract', () => {
       BOB,
       fingerprintB
     )
-    const charlsInteraction = createRegisterInteraction(
+    const charlsRegisterInteraction = createRegisterInteraction(
       CHARLS,
       fingerprintC
     )
@@ -293,7 +293,7 @@ describe('Relay Registry Contract', () => {
     RelayRegistryHandle(initState, aliceRegisterInteraction)
     RelayRegistryHandle(initState, bobRegisterInteractionB)
     RelayRegistryHandle(initState, bobRegisterInteractionA)
-    RelayRegistryHandle(initState, charlsInteraction)
+    RelayRegistryHandle(initState, charlsRegisterInteraction)
     const { state: { claims, verified } } = RelayRegistryHandle(
       initState,
       ownerVerifyInteraction

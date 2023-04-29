@@ -1,8 +1,4 @@
-import {
-  ContractError,
-  ContractInteraction,
-  HandlerResult
-} from 'warp-contracts'
+import { ContractError, ContractInteraction, HandlerResult } from 'warp-contracts'
 
 import {
   ContractAssert,
@@ -102,7 +98,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     for (const address in state.claims) {
       const claimIndex = state.claims[address].indexOf(cleanupFingerprint)
-      if (claimIndex >= 0) {
+      if (claimIndex > -1) {
         state.claims[address].splice(claimIndex, 1)
       }
     }
