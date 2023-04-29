@@ -12,11 +12,13 @@ import {
   Verify
 } from '../../src/contracts'
 
-const OWNER = '0x1111111111111111111111111111111111111111'
-const ALICE = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
-const BOB   = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+const OWNER  = '0x1111111111111111111111111111111111111111'
+const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
+const BOB    = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+const CHARLS = '0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
 let initState: RelayRegistryState
 function resetState() {
   initState = {
@@ -270,9 +272,17 @@ describe('Relay Registry Contract', () => {
       ALICE,
       fingerprintA
     )
-    const bobRegisterInteraction = createRegisterInteraction(
+    const bobRegisterInteractionA = createRegisterInteraction(
       BOB,
       fingerprintA
+    )
+    const bobRegisterInteractionB = createRegisterInteraction(
+      BOB,
+      fingerprintB
+    )
+    const charlsRegisterInteraction = createRegisterInteraction(
+      CHARLS,
+      fingerprintC
     )
     const ownerVerifyInteraction = createVerifyInteraction(
       OWNER,
@@ -281,13 +291,19 @@ describe('Relay Registry Contract', () => {
     )
 
     RelayRegistryHandle(initState, aliceRegisterInteraction)
-    RelayRegistryHandle(initState, bobRegisterInteraction)
+    RelayRegistryHandle(initState, bobRegisterInteractionB)
+    RelayRegistryHandle(initState, bobRegisterInteractionA)
+    RelayRegistryHandle(initState, charlsRegisterInteraction)
     const { state: { claims, verified } } = RelayRegistryHandle(
       initState,
       ownerVerifyInteraction
     )
 
-    expect(claims).to.deep.equal({ [ALICE]: [], [BOB]: [] })
+    expect(claims).to.deep.equal({
+      [ALICE]: [],
+      [BOB]: [ fingerprintB ],
+      [CHARLS]: [ fingerprintC ]
+    })
     expect(verified).to.deep.equal({ [fingerprintA]: ALICE })
   })
 
