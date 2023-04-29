@@ -102,7 +102,9 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     for (const address in state.claims) {
       const claimIndex = state.claims[address].indexOf(cleanupFingerprint)
-      state.claims[address].splice(claimIndex, 1)
+      if (claimIndex >= 0) {
+        state.claims[address].splice(claimIndex, 1)
+      }
     }
   }
 
