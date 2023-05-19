@@ -8,6 +8,9 @@ export type OwnableState = {
   owner?: string
 }
 
+export const ERROR_ONLY_OWNER =
+  'This function is only available to the contract owner'
+
 export const OnlyOwner = <S extends OwnableState>(
   _target: Object,
   _propertyKey: string | symbol,
@@ -22,9 +25,7 @@ export const OnlyOwner = <S extends OwnableState>(
       action: ContractInteraction<any>
     ) => {
       if (action.caller !== state.owner) {
-        throw new ContractError(
-          'This function is only available to the contract owner'
-        )
+        throw new ContractError(ERROR_ONLY_OWNER)
       } else {
         return originalMethod.apply(_target, [state, action])
       }

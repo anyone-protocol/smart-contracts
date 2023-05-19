@@ -13,43 +13,39 @@ import {
 
 export const FINGERPRINT_REQUIRED = 'Fingerprint required'
 export const INVALID_FINGERPRINT = 'Invalid fingerprint'
-export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
-export const FINGERPRINT_ALREADY_VERIFIED = 'Fingerprint already verified'
-export const FINGERPRINT_NOT_VERIFIED = 'Fingerprint not verified'
-export const NOT_RELAY_OWNER = 'Not relay owner'
+export const FINGERPRINT_ALREADY_CLAIMABLE = 'Fingerprint already claimable'
+export const FINGERPRINT_NOT_CLAIMABLE = 'Fingerprint not claimable'
+// export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
+// export const FINGERPRINT_ALREADY_VERIFIED = 'Fingerprint already verified'
+// export const FINGERPRINT_NOT_VERIFIED = 'Fingerprint not verified'
+// export const NOT_RELAY_OWNER = 'Not relay owner'
 export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
 export const INVALID_INPUT = 'Invalid input'
-export const NO_CLAIM_TO_VERIFY = 'No claim to verify'
+// export const NO_CLAIM_TO_VERIFY = 'No claim to verify'
 export const UPPER_HEX_CHARS = '0123456789ABCDEF'
 
 export type Fingerprint = string
 export type EvmAddress = string
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
-  claims: { [address in EvmAddress as string]: Fingerprint[] }
-  verified: { [fingerprint: Fingerprint]: EvmAddress }
+  claimable: { [address in Fingerprint as string]: EvmAddress }
 }
 
-export interface Register extends ContractFunctionInput {
-  function: 'register'
-  fingerprint: Fingerprint
-}
-
-export interface Verify extends ContractFunctionInput {
-  function: 'verify'
+export interface AddClaimable extends ContractFunctionInput {
+  function: 'addClaimable'
   fingerprint: Fingerprint
   address: EvmAddress
 }
 
-export interface Unregister extends ContractFunctionInput {
-  function: 'unregister'
+export interface RemoveClaimable extends ContractFunctionInput {
+  function: 'removeClaimable'
   fingerprint: Fingerprint
 }
 
-export interface RemoveStale extends ContractFunctionInput {
-  function: 'remove-stale'
-  fingerprint: Fingerprint
+export interface Claimable extends ContractFunctionInput {
+  function: 'claimable'
+  address?: EvmAddress
 }
 
 export class RelayRegistryContract extends Evolvable(Object) {
@@ -82,100 +78,79 @@ export class RelayRegistryContract extends Evolvable(Object) {
     }
   }
 
-  private assertNotAlreadyVerified(
+  private isFingerprintClaimable(
     state: RelayRegistryState,
     fingerprint: Fingerprint
-  ) {
-    ContractAssert(
-      !Object.keys(state.verified).includes(fingerprint),
-      FINGERPRINT_ALREADY_VERIFIED
-    )
-  }
-
-  private cleanupClaims(
-    state: RelayRegistryState,
-    cleanupFingerprint: Fingerprint
-  ) {
-    for (const address in state.claims) {
-      const claimIndex = state.claims[address].indexOf(cleanupFingerprint)
-      if (claimIndex > -1) {
-        state.claims[address].splice(claimIndex, 1)
-      }
-    }
-  }
-
-  register(
-    state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<Register>>
-  ): HandlerResult<RelayRegistryState, any> {
-    const { caller, input: { fingerprint } } = action
-
-    this.assertValidFingerprint(fingerprint)
-    this.assertNotAlreadyVerified(state, fingerprint)
-
-    if (!state.claims[caller]) {
-      state.claims[caller] = [ fingerprint ]
-    } else {
-      const alreadyClaimed = state.claims[caller].includes(fingerprint)
-
-      if (!alreadyClaimed) {
-        state.claims[caller].push(fingerprint)
-      } else {
-        throw new ContractError(DUPLICATE_FINGERPRINT)
-      }
-    }
-
-    return { state, result: true }
+  ): boolean {
+    // TODO -> assert not already verified
+    return Object.keys(state.claimable).includes(fingerprint)
   }
 
   @OnlyOwner
-  verify(
+  addClaimable(
     state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<Verify>>
+    action: ContractInteraction<PartialFunctionInput<AddClaimable>>
   ): HandlerResult<RelayRegistryState, any> {
-    const { fingerprint, address } = action.input
-    
+    const { input: { address, fingerprint } } = action
+
     this.assertValidFingerprint(fingerprint)
     this.assertValidEvmAddress(address)
-    ContractAssert(!!state.claims[address], NO_CLAIM_TO_VERIFY)
     ContractAssert(
-      state.claims[address].includes(fingerprint),
-      NO_CLAIM_TO_VERIFY
+      !this.isFingerprintClaimable(state, fingerprint),
+      FINGERPRINT_ALREADY_CLAIMABLE
     )
-
-    this.cleanupClaims(state, fingerprint)
-    state.verified[fingerprint] = address
-
-    return { state, result: true }
-  }
-
-  unregister(
-    state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<Unregister>>
-  ): HandlerResult<RelayRegistryState, any> {
-    const { caller, input: { fingerprint } } = action
-
-    this.assertValidFingerprint(fingerprint)
-    ContractAssert(caller === state.verified[fingerprint], NOT_RELAY_OWNER)
-
-    delete state.verified[fingerprint]
+    
+    state.claimable[fingerprint] = address
 
     return { state, result: true }
   }
 
   @OnlyOwner
-  removeStale(
+  removeClaimable(
     state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<RemoveStale>>
+    action: ContractInteraction<PartialFunctionInput<AddClaimable>>
   ): HandlerResult<RelayRegistryState, any> {
-    const { fingerprint } = action.input
+    const { input: { fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
-    ContractAssert(!!state.verified[fingerprint], FINGERPRINT_NOT_VERIFIED)
+    ContractAssert(
+      this.isFingerprintClaimable(state, fingerprint),
+      FINGERPRINT_NOT_CLAIMABLE
+    )
 
-    delete state.verified[fingerprint]
+    delete state.claimable[fingerprint]
 
     return { state, result: true }
+  }
+
+  claimable(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<Claimable>>
+  ): HandlerResult<
+    RelayRegistryState,
+    RelayRegistryState['claimable'] | Fingerprint[]
+  > {
+    const { input: { address } } = action
+
+    const result = address
+      ? Object
+        .keys(state.claimable)
+        .filter(fp => state.claimable[fp] === address)
+      : state.claimable
+
+    return { state, result }
+  }
+
+  isClaimable(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<Claimable>>
+  ): HandlerResult<RelayRegistryState, boolean> {
+    const { input: { address, fingerprint } } = action
+
+    const result = Object.keys(state.claimable).includes(fingerprint)
+      && state.claimable[fingerprint] === address
+
+    return { state, result }
   }
 }
 
@@ -186,14 +161,14 @@ export default function handle(
   const contract = new RelayRegistryContract()
 
   switch (action.input.function) {
-    case 'register':
-      return contract.register(state, action)
-    case 'verify':
-      return contract.verify(state, action)
-    case 'unregister':
-      return contract.unregister(state, action)
-    case 'remove-stale':
-      return contract.removeStale(state, action)
+    case 'addClaimable':
+      return contract.addClaimable(state, action)
+    case 'removeClaimable':
+      return contract.removeClaimable(state, action)
+    case 'claimable':
+      return contract.claimable(state, action)
+    case 'isClaimable':
+      return contract.isClaimable(state, action)
     case 'evolve':
       return contract.evolve(
         state,
