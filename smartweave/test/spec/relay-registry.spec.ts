@@ -265,6 +265,8 @@ describe('Relay Registry Contract', () => {
     expect(bobResult).to.deep.equal([ fingerprintB ])
   })
 
+  it('Validates address when viewing claimable relays by address')
+
   it('Provides a view method to check if a relay is claimable', () => {
     const addClaimableInteraction = createInteraction(OWNER, {
       function: 'addClaimable',
@@ -316,4 +318,40 @@ describe('Relay Registry Contract', () => {
       'Alice with fingerprint B should not be claimable'
     ).to.be.false
   })
+
+  it('Requires & validates fingerprints when checking if relay is claimable')
+
+  it('Requires & validates address when checking if relay is claimable')
+
+  it('Allows claiming of claimable relays')
+
+  it('Requires address to match caller when claiming a relay')
+
+  it('Requires & validates fingerprint when claiming a relay')
+
+  it('Throws if a relay being claimed is not claimable')
+
+  it('Allows renouncing of verified/claimed relays')
+
+  it('Requires & validates fingerprint when renouncing a relay')
+
+  it('Requires address to match caller when renouncing a relay')
+
+  it('Throws if a relay is not verified/claimed when renouncing')
+
+  it('Allows Owner to remove verified relays')
+
+  it('Prevents non-owners from removing verified relays')
+
+  it('Requires & validates fingerprint when removing verified relays')
+
+  it('Provides a view method of verified relays')
+
+  it('Provides a view method of verified relays by address')
+
+  it('Validates address when viewing verified relays by address')
+
+  it('Provides a view method to check if a relay is verified')
+
+  it('Requires & validates fingerprint when checking if a relay is verified')
 })
