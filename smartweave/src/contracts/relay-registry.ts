@@ -20,14 +20,9 @@ export const FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS =
 export const FINGERPRINT_ALREADY_CLAIMED = 'Fingerprint already claimed'
 export const FINGERPRINT_NOT_CLAIMED_BY_ADDRESS =
   'Fingerprint not claimed by address'
-// export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
-// export const FINGERPRINT_ALREADY_VERIFIED = 'Fingerprint already verified'
-// export const FINGERPRINT_NOT_VERIFIED = 'Fingerprint not verified'
-// export const NOT_RELAY_OWNER = 'Not relay owner'
 export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
 export const INVALID_INPUT = 'Invalid input'
-// export const NO_CLAIM_TO_VERIFY = 'No claim to verify'
 export const UPPER_HEX_CHARS = '0123456789ABCDEF'
 
 export type Fingerprint = string
