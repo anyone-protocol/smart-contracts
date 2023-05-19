@@ -5,7 +5,10 @@ import { ContractError, ContractInteraction } from 'warp-contracts'
 import {
   ADDRESS_REQUIRED,
   FINGERPRINT_ALREADY_CLAIMABLE,
+  FINGERPRINT_ALREADY_CLAIMED,
   FINGERPRINT_NOT_CLAIMABLE,
+  FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS,
+  FINGERPRINT_NOT_CLAIMED_BY_ADDRESS,
   FINGERPRINT_REQUIRED,
   INVALID_ADDRESS,
   INVALID_FINGERPRINT,
@@ -26,7 +29,8 @@ let initState: RelayRegistryState
 function resetState() {
   initState = {
     owner: OWNER,
-    claimable: {}
+    claimable: {},
+    verified: {}
   }
 }
 
@@ -131,7 +135,24 @@ describe('Relay Registry Contract', () => {
     ).to.throw(ContractError, FINGERPRINT_ALREADY_CLAIMABLE)
   })
 
-  it('Throws when adding a claimable relay that is already verified')
+  it('Throws when adding a claimable relay that is already verified', () => {
+    const addClaimableInteraction = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const claimInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+
+    RelayRegistryHandle(initState, addClaimableInteraction)
+    RelayRegistryHandle(initState, claimInteraction)
+
+    expect(
+      () => RelayRegistryHandle(initState, addClaimableInteraction)
+    ).to.throw(ContractError, FINGERPRINT_ALREADY_CLAIMED)
+  })
   
   it('Allows Owner to remove claimable relays', () => {
     const addClaimableInteractionA = createInteraction(OWNER, {
@@ -186,7 +207,29 @@ describe('Relay Registry Contract', () => {
     ).to.throw(ContractError, FINGERPRINT_NOT_CLAIMABLE)
   })
 
-  it('Throws when removing a claimable relay that is verified')
+  it('Throws when removing a claimable relay that is verified', () => {
+    const addClaimableInteraction = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const claimInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+
+    RelayRegistryHandle(initState, addClaimableInteraction)
+    RelayRegistryHandle(initState, claimInteraction)
+
+    const removeClaimableInteraction = createInteraction(OWNER, {
+      function: 'removeClaimable',
+      fingerprint: fingerprintA
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, removeClaimableInteraction)
+    ).to.throw(ContractError, FINGERPRINT_ALREADY_CLAIMED)
+  })
 
   it('Provides a view method of claimable relays', () => {
     const addClaimableInteractionA = createInteraction(OWNER, {
@@ -265,7 +308,16 @@ describe('Relay Registry Contract', () => {
     expect(bobResult).to.deep.equal([ fingerprintB ])
   })
 
-  it('Validates address when viewing claimable relays by address')
+  it('Validates address when viewing claimable relays by address', () => {
+    const invalidAddressInteraction = createInteraction(ALICE, {
+      function: 'claimable',
+      address: 'invalid-address'
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, invalidAddressInteraction)
+    ).to.throw(ContractError, INVALID_ADDRESS)
+  })
 
   it('Provides a view method to check if a relay is claimable', () => {
     const addClaimableInteraction = createInteraction(OWNER, {
@@ -319,39 +371,423 @@ describe('Relay Registry Contract', () => {
     ).to.be.false
   })
 
-  it('Requires & validates fingerprints when checking if relay is claimable')
+  it('Requires & validates fingerprints when checking if relay is claimable', () => {
+    const missingFinterprintInteraction = createInteraction(ALICE, {
+      function: 'isClaimable',
+      address: ALICE
+    }, 'view')
+    const invalidFingerprintInteraction = createInteraction(ALICE, {
+      function: 'isClaimable',
+      address: ALICE,
+      fingerprint: 'invalid-fingerprint'
+    }, 'view')
 
-  it('Requires & validates address when checking if relay is claimable')
+    expect(
+      () => RelayRegistryHandle(initState, missingFinterprintInteraction)
+    ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+    expect(
+      () => RelayRegistryHandle(initState, invalidFingerprintInteraction)
+    ).to.throw(ContractError, INVALID_FINGERPRINT)
+  })
 
-  it('Allows claiming of claimable relays')
+  it('Requires & validates address when checking if relay is claimable', () => {
+    const missingAddressInteraction = createInteraction(ALICE, {
+      function: 'isClaimable',
+      fingerprint: fingerprintA
+    }, 'view')
+    const invalidAddressInteraction = createInteraction(ALICE, {
+      function: 'isClaimable',
+      fingerprint: fingerprintA,
+      address: 'invalid-address'
+    }, 'view')
 
-  it('Requires address to match caller when claiming a relay')
+    expect(
+      () => RelayRegistryHandle(initState, missingAddressInteraction)
+    ).to.throw(ContractError, ADDRESS_REQUIRED)
+    expect(
+      () => RelayRegistryHandle(initState, invalidAddressInteraction)
+    ).to.throw(ContractError, INVALID_ADDRESS)
+  })
 
-  it('Requires & validates fingerprint when claiming a relay')
+  it('Allows claiming of claimable relays', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const addClaimableBobFingerprintB = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintB,
+      address: BOB
+    })
+    const addClaimableAliceFingerprintC = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintC,
+      address: ALICE
+    })
 
-  it('Throws if a relay being claimed is not claimable')
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, addClaimableBobFingerprintB)
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintC)
 
-  it('Allows renouncing of verified/claimed relays')
+    const aliceClaimFingerprintA = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
 
-  it('Requires & validates fingerprint when renouncing a relay')
+    const { state } = RelayRegistryHandle(initState, aliceClaimFingerprintA)
 
-  it('Requires address to match caller when renouncing a relay')
+    expect(state.claimable).to.deep.equal({
+      [fingerprintB]: BOB,
+      [fingerprintC]: ALICE
+    })
+    expect(state.verified).to.deep.equal({
+      [fingerprintA]: ALICE
+    })
+  })
 
-  it('Throws if a relay is not verified/claimed when renouncing')
+  it('Requires address to match caller when claiming a relay', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
 
-  it('Allows Owner to remove verified relays')
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
 
-  it('Prevents non-owners from removing verified relays')
+    const bobClaimFingerprintA = createInteraction(BOB, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
 
-  it('Requires & validates fingerprint when removing verified relays')
+    expect(
+      () => RelayRegistryHandle(initState, bobClaimFingerprintA)
+    ).to.throw(ContractError, FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS)
+  })
 
-  it('Provides a view method of verified relays')
+  it('Requires & validates fingerprint when claiming a relay', () => {
+    const missingFingerprintInteraction = createInteraction(ALICE, {
+      function: 'claim'
+    })
+    const invalidFingerprintInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: 'invalid-fingerprint'
+    })
 
-  it('Provides a view method of verified relays by address')
+    expect(
+      () => RelayRegistryHandle(initState, missingFingerprintInteraction)
+    ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+    expect(
+      () => RelayRegistryHandle(initState, invalidFingerprintInteraction)
+    ).to.throw(ContractError, INVALID_FINGERPRINT)
+  })
 
-  it('Validates address when viewing verified relays by address')
+  it('Throws if a relay being claimed is not claimable', () => {
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
 
-  it('Provides a view method to check if a relay is verified')
+    expect(
+      () => RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    ).to.throw(FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS)
+  })
 
-  it('Requires & validates fingerprint when checking if a relay is verified')
+  it('Allows renouncing of verified/claimed relays', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    const aliceRenounceFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'renounce',
+      fingerprint: fingerprintA
+    })
+    const { state } = RelayRegistryHandle(
+      initState,
+      aliceRenounceFingerprintAInteraction
+    )
+
+    expect(state.claimable).to.deep.equal({})
+    expect(state.verified).to.deep.equal({})
+  })
+
+  it('Requires & validates fingerprint when renouncing a relay', () => {
+    const missingFingerprintInteraction = createInteraction(ALICE, {
+      function: 'renounce'
+    })
+    const invalidFingerprintInteraction = createInteraction(ALICE, {
+      function: 'renounce',
+      fingerprint: 'invalid-fingerprint'
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, missingFingerprintInteraction)
+    ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+    expect(
+      () => RelayRegistryHandle(initState, invalidFingerprintInteraction)
+    ).to.throw(ContractError, INVALID_FINGERPRINT)
+  })
+
+  it('Requires address to match caller when renouncing a relay', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    const bobRenounceFingerprintAInteraction = createInteraction(BOB, {
+      function: 'renounce',
+      fingerprint: fingerprintA
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, bobRenounceFingerprintAInteraction)
+    ).to.throw(ContractError, FINGERPRINT_NOT_CLAIMED_BY_ADDRESS)
+  })
+
+  it('Throws if a relay is not verified/claimed when renouncing', () => {
+    const aliceRenounceFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'renounce',
+      fingerprint: fingerprintA
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, aliceRenounceFingerprintAInteraction)
+    ).to.throw(ContractError, FINGERPRINT_NOT_CLAIMED_BY_ADDRESS)
+  })
+
+  it('Allows Owner to remove verified relays', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    const removeVerifiedInteraction = createInteraction(OWNER, {
+      function: 'removeVerified',
+      fingerprint: fingerprintA
+    })
+    const { state } = RelayRegistryHandle(initState, removeVerifiedInteraction)
+
+    expect(state.claimable).to.deep.equal({})
+    expect(state.verified).to.deep.equal({})
+  })
+
+  it('Prevents non-owners from removing verified relays', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    const bobRemoveVerifiedInteraction = createInteraction(BOB, {
+      function: 'removeVerified',
+      fingerprint: fingerprintA
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, bobRemoveVerifiedInteraction)
+    ).to.throw(ContractError, ERROR_ONLY_OWNER)
+  })
+
+  it('Requires & validates fingerprint when removing verified relays', () => {
+    const missingFingerprintInteraction = createInteraction(OWNER, {
+      function: 'removeVerified'
+    })
+    const invalidFingerprintInteraction = createInteraction(OWNER, {
+      function: 'removeVerified',
+      fingerprint: 'invalid-fingerprint'
+    })
+
+    expect(
+      () => RelayRegistryHandle(initState, missingFingerprintInteraction)
+    ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+    expect(
+      () => RelayRegistryHandle(initState, invalidFingerprintInteraction)
+    ).to.throw(ContractError, INVALID_FINGERPRINT)
+  })
+
+  it('Provides a view method of verified relays', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: ALICE,
+      fingerprint: fingerprintA
+    })
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    const addClaimableBobFingerprintB = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: BOB,
+      fingerprint: fingerprintB
+    })
+    const addClaimableAliceFingerprintC = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: ALICE,
+      fingerprint: fingerprintC
+    })
+    const aliceClaimFingerprintC = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintC
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    RelayRegistryHandle(initState, addClaimableBobFingerprintB)
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintC)
+    RelayRegistryHandle(initState, aliceClaimFingerprintC)
+    const viewVerifiedRelaysInteraction = createInteraction(ALICE, {
+      function: 'verified'
+    }, 'view')
+    
+    const { state, result } = RelayRegistryHandle(
+      initState,
+      viewVerifiedRelaysInteraction
+    )
+
+    expect(result).to.deep.equal(state.verified)
+  })
+
+  it('Provides a view method of verified relays by address', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: ALICE,
+      fingerprint: fingerprintA
+    })
+    const aliceClaimFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    const addClaimableBobFingerprintB = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: BOB,
+      fingerprint: fingerprintB
+    })
+    const bobClaimFingerprintB = createInteraction(BOB, {
+      function: 'claim',
+      fingerprint: fingerprintB
+    })
+    const addClaimableAliceFingerprintC = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: ALICE,
+      fingerprint: fingerprintC
+    })
+    const aliceClaimFingerprintC = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintC
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintAInteraction)
+    RelayRegistryHandle(initState, addClaimableBobFingerprintB)
+    RelayRegistryHandle(initState, bobClaimFingerprintB)
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintC)
+    RelayRegistryHandle(initState, aliceClaimFingerprintC)
+    const viewAliceVerifiedRelaysInteraction = createInteraction(ALICE, {
+      function: 'verified',
+      address: ALICE
+    }, 'view')
+    const viewBobVerifiedRelaysInteraction = createInteraction(ALICE, {
+      function: 'verified',
+      address: BOB
+    }, 'view')
+
+    const { result: aliceViewVerifiedResult } = RelayRegistryHandle(
+      initState,
+      viewAliceVerifiedRelaysInteraction
+    )
+    const { result: bobViewVerifiedResult } = RelayRegistryHandle(
+      initState,
+      viewBobVerifiedRelaysInteraction
+    )
+
+    expect(aliceViewVerifiedResult).to.deep.equal([
+      fingerprintA,
+      fingerprintC
+    ])
+    expect(bobViewVerifiedResult).to.deep.equal([ fingerprintB ])
+  })
+
+  it('Validates address when viewing verified relays by address', () => {
+    const invalidAddressInteraction = createInteraction(ALICE, {
+      function: 'verified',
+      address: 'invalid-address'
+    }, 'view')
+
+    expect(
+      () => RelayRegistryHandle(initState, invalidAddressInteraction)
+    ).to.throw(ContractError, INVALID_ADDRESS)
+  })
+
+  it('Provides a view method to check if a relay is verified', () => {
+    const addClaimableAliceFingerprintA = createInteraction(OWNER, {
+      function: 'addClaimable',
+      address: ALICE,
+      fingerprint: fingerprintA
+    })
+    const aliceClaimFingerprintA = createInteraction(ALICE, {
+      function: 'claim',
+      fingerprint: fingerprintA
+    })
+    RelayRegistryHandle(initState, addClaimableAliceFingerprintA)
+    RelayRegistryHandle(initState, aliceClaimFingerprintA)
+    const isVerifiedFingerprintAInteraction = createInteraction(ALICE, {
+      function: 'isVerified',
+      fingerprint: fingerprintA
+    }, 'view')
+    const isVerifiedFingerprintBInteraction = createInteraction(ALICE, {
+      function: 'isVerified',
+      fingerprint: fingerprintB
+    }, 'view')
+
+    const { result: isVerifiedFingerprintA } = RelayRegistryHandle(
+      initState,
+      isVerifiedFingerprintAInteraction
+    )
+    const { result: isVerifiedFingerprintB } = RelayRegistryHandle(
+      initState,
+      isVerifiedFingerprintBInteraction
+    )
+
+    expect(isVerifiedFingerprintA).to.be.true
+    expect(isVerifiedFingerprintB).to.be.false
+  })
+
+  it('Requires & validates fingerprint when checking if a relay is verified', () => {
+    const missingFingerprintInteraction = createInteraction(ALICE, {
+      function: 'isVerified'
+    }, 'view')
+    const invalidFingerprintInteraction = createInteraction(ALICE, {
+      function: 'isVerified',
+      fingerprint: 'invalid-fingerprint'
+    }, 'view')
+
+    expect(
+      () => RelayRegistryHandle(initState, missingFingerprintInteraction)
+    ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+    expect(
+      () => RelayRegistryHandle(initState, invalidFingerprintInteraction)
+    ).to.throw(ContractError, INVALID_FINGERPRINT)
+  })
 })
