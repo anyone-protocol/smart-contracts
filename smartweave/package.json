@@ -15,6 +15,7 @@
   "scripts": {
     "arlocal": "ts-node scripts/arlocal.ts",
     "build": "rimraf dist && ts-node --project node.tsconfig.json scripts/build.ts",
+    "deploy": "ts-node scripts/deploy.ts",
     "test": "mocha -r ts-node/register test/spec/**/*.ts",
     "test:e2e": "mocha -r ts-node/register test/e2e/**/*.ts"
   },
