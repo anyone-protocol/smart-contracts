@@ -1,3 +1,4 @@
+import 'mocha'
 import { expect } from 'chai'
 import { Wallet } from 'ethers'
 import fs from 'fs'
@@ -17,7 +18,7 @@ import {
 } from 'warp-contracts-plugin-signature/server'
 
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
-import { Register, RelayRegistryState, Verify } from '../../src/contracts'
+import { AddClaimable, Claim, RelayRegistryState } from '../../src/contracts'
 
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
@@ -60,15 +61,15 @@ describe('Relay Registry Contract (e2e)', () => {
       path.join(__dirname, '../../dist/contracts/relay-registry.js')
     ).toString()
 
-    const initState = JSON.stringify({
+    const initState: RelayRegistryState = {
       owner: owner.address,
-      claims: {},
+      claimable: {},
       verified: {}
-    })
+    }
     const deploy = await warp.deploy({
       src: contractSrc,
       wallet: owner.wallet,
-      initState
+      initState: JSON.stringify(initState)
     })
     contractTxId = deploy.contractTxId
     console.log('contract deployed at', contractTxId)
@@ -79,7 +80,7 @@ describe('Relay Registry Contract (e2e)', () => {
     const { cachedValue: { state } } = await contract.readState()
     
     expect(state.owner).to.equal(owner.address)
-    expect(state.claims).to.be.empty
+    expect(state.claimable).to.be.empty
     expect(state.verified).to.be.empty
   })
 
@@ -89,84 +90,52 @@ describe('Relay Registry Contract (e2e)', () => {
         signer: buildEvmSignature(alice.signer),
         type: 'ethereum'
       })
-      .writeInteraction<Register>({
-        function: 'register',
+      .writeInteraction<Claim>({
+        function: 'claim',
         fingerprint: 'bad-fingerprint'
       })
 
     const { cachedValue: { state } } = await contract.readState()
 
     expect(state.owner).to.equal(owner.address)
-    expect(state.claims).to.be.empty
+    expect(state.claimable).to.be.empty
     expect(state.verified).to.be.empty
   })
 
-  it('Should allow users to register relay fingerprints', async () => {
-    await contract
-      .connect({
-        signer: buildEvmSignature(alice.signer),
-        type: 'ethereum'
-      })
-      .writeInteraction<Register>({
-        function: 'register',
-        fingerprint: fingerprintA
-      })
-    await contract
-      .connect({
-        signer: buildEvmSignature(bob.signer),
-        type: 'ethereum'
-      })
-      .writeInteraction<Register>({
-        function: 'register',
-        fingerprint: fingerprintA
-      })
-    await contract
-      .connect({
-        signer: buildEvmSignature(alice.signer),
-        type: 'ethereum'
-      })
-      .writeInteraction<Register>({
-        function: 'register',
-        fingerprint: fingerprintB
-      })
-
-    const { cachedValue: { state } } = await contract.readState()
-
-    expect(state.claims).to.deep.equal({
-      [alice.address]: [ fingerprintA, fingerprintB ],
-      [bob.address]: [ fingerprintA ]
-    })
-    expect(state.verified).to.deep.equal({})
-  })
-
-  it('Should allow the contract owner to verify claims', async () => {
-    await contract
-      .connect({
-        signer: buildEvmSignature(bob.signer),
-        type: 'ethereum'
-      })
-      .writeInteraction<Verify>({
-        function: 'verify',
-        address: alice.address,
-        fingerprint: fingerprintB
-      })
+  it('Should allow the contract owner to add claimable relays', async () => {
     await contract
       .connect({
         signer: buildEvmSignature(owner.signer),
         type: 'ethereum'
       })
-      .writeInteraction<Verify>({
-        function: 'verify',
+      .writeInteraction<AddClaimable>({
+        function: 'addClaimable',
         address: alice.address,
         fingerprint: fingerprintA
       })
 
     const { cachedValue: { state } } = await contract.readState()
 
-    expect(state.claims).to.deep.equal({
-      [alice.address]: [ fingerprintB ],
-      [bob.address]: [ ]
+    expect(state.claimable).to.deep.equal({
+      [fingerprintA]: alice.address
     })
+    expect(state.verified).to.deep.equal({})
+  })
+
+  it('Should allow users to claim relay fingerprints', async () => {
+    await contract
+      .connect({
+        signer: buildEvmSignature(alice.signer),
+        type: 'ethereum'
+      })
+      .writeInteraction<Claim>({
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.claimable).to.deep.equal({})
     expect(state.verified).to.deep.equal({
       [fingerprintA]: alice.address
     })
