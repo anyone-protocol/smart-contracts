@@ -22,6 +22,7 @@ import { AddClaimable, Claim, RelayRegistryState } from '../../src/contracts'
 
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
 
 describe('Relay Registry Contract (e2e)', () => {
   let warp: Warp,
@@ -136,6 +137,40 @@ describe('Relay Registry Contract (e2e)', () => {
     const { cachedValue: { state } } = await contract.readState()
 
     expect(state.claimable).to.deep.equal({})
+    expect(state.verified).to.deep.equal({
+      [fingerprintA]: alice.address
+    })
+  })
+
+  it('Should add some more claimable relays for testing', async () => {
+    await contract
+      .connect({
+        signer: buildEvmSignature(owner.signer),
+        type: 'ethereum'
+      })
+      .writeInteraction<AddClaimable>({
+        function: 'addClaimable',
+        address: alice.address,
+        fingerprint: fingerprintB
+      })
+    
+    await contract
+      .connect({
+        signer: buildEvmSignature(owner.signer),
+        type: 'ethereum'
+      })
+      .writeInteraction<AddClaimable>({
+        function: 'addClaimable',
+        address: alice.address,
+        fingerprint: fingerprintC
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.claimable).to.deep.equal({
+      [fingerprintB]: alice.address,
+      [fingerprintC]: alice.address
+    })
     expect(state.verified).to.deep.equal({
       [fingerprintA]: alice.address
     })
