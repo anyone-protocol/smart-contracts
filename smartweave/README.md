@@ -45,25 +45,54 @@ $ npm run deploy
 
 ### Relay Registry
 
-- `@OnlyOwner addClaimable(fingerprint: string, address: string) => void`
-  - Owner/Validator adds a fingerprint/address tuple as claimable
-- `@OnlyOwner removeClaimable(fingerprint: string) => void`
-  - Owner/Validator removes a fingerprint/address tuple as claimable
-- `claimable(address?: string) => ClaimableRelays | Fingerprint[]`
-  - View method to return either
-    1) The current claimable fingerprint/address tuples
-    2) A list of fingerprints claimable by the provided address
-- `isClaimable(fingerprint: string, address: string) => boolean`
-  - View method to check if a fingerprint/address tuple is claimable
-- `claim(fingerprint: string) => void`
-  - Claims a fingerprint if claimable by the caller's EVM address
-- `renounce(fingerprint: string) => void`
-  - Renounces a verified fingerprint/address claim if currently verified by the caller's EVM address
-- `@OnlyOwner removeVerified(fingerprint) => void`
-  - Allows Owner to remove stale verifications
-- `verified(address?: string) => VerifiedRelays | Fingerprint[]`
-  - View method to return either
-    1) The current verified fingerprint/address tuples
-    2) A list of fingerprints claimed/verified by the provided address
-- `isVerified(fingerprint: string) => boolean`
-  - View method to check if a fingerprint is verified
+- Owner/Validator adds a fingerprint/address tuple as claimable
+  ```typescript
+  // @OnlyOwner
+  addClaimable(fingerprint: string, address: string) => void
+  ```
+
+- Owner/Validator removes a fingerprint/address tuple as claimable
+  ```typescript
+  // @OnlyOwner
+  removeClaimable(fingerprint: string) => void
+  ```
+
+- View method to return either
+  1) The current claimable fingerprint/address tuples
+  2) A list of fingerprints claimable by the provided address
+  ```typescript
+  claimable(address?: string) => ClaimableRelays | Fingerprint[]
+  ```
+
+- View method to check if a fingerprint/address tuple is claimable
+  ```typescript
+  isClaimable(fingerprint: string, address: string) => boolean
+  ```
+
+- Claims a fingerprint if claimable by the caller's EVM address
+  ```typescript
+  claim(fingerprint: string) => void
+  ```
+
+- Renounces a verified fingerprint/address claim if currently verified by the caller's EVM address
+  ```typescript
+  renounce(fingerprint: string) => void
+  ```
+
+- Allows Owner to remove stale verifications
+  ```typescript
+  // @OnlyOwner
+  removeVerified(fingerprint) => void
+  ```
+
+- View method to return either
+  1) The current verified fingerprint/address tuples
+  2) A list of fingerprints claimed/verified by the provided address
+  ```typescript
+  verified(address?: string) => VerifiedRelays | Fingerprint[]
+  ```
+
+- View method to check if a fingerprint is verified
+  ```typescript
+  isVerified(fingerprint: string) => boolean
+  ```
