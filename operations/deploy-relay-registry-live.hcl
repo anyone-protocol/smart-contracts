@@ -49,7 +49,7 @@ job "deploy-relay-registry-stage" {
         }
 
         env {
-            PHASE="stage"
+            PHASE="live"
             CONTRACT_SRC="../dist/contracts/relay-registry.js"
             INIT_STATE="../dist/contracts/relay-registry-init-state.json"
         }
