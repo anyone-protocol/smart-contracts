@@ -1,4 +1,4 @@
-job "deploy-relay-registry" {
+job "deploy-relay-registry-stage" {
     datacenters = ["ator-fin"]
     type = "batch"
 
