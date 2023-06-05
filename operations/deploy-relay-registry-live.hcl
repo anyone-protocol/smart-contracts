@@ -1,4 +1,4 @@
-job "deploy-relay-registry-stage" {
+job "deploy-relay-registry-live" {
     datacenters = ["ator-fin"]
     type = "batch"
 
@@ -10,7 +10,8 @@ job "deploy-relay-registry-stage" {
         driver = "docker"
 
         config {
-            image = "ghcr.io/ator-development/smart-contracts:0.0.5"
+            network_mode = "host"
+            image = "ghcr.io/ator-development/smart-contracts:0.0.9"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
@@ -20,12 +21,12 @@ job "deploy-relay-registry-stage" {
         }
 
         vault {
-            policies = ["relay-registry-stage"]
+            policies = ["relay-registry-live"]
         }
 
         template {
             data = <<EOH
-            {{with secret "kv/relay-registry/stage"}}
+            {{with secret "kv/relay-registry/live"}}
                 DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
             {{end}}
             EOH
@@ -35,7 +36,7 @@ job "deploy-relay-registry-stage" {
 
         template {
             data = <<EOH
-            {{with secret "kv/relay-registry/stage"}}
+            {{with secret "kv/relay-registry/live"}}
 {
     "claims":{},
     "owner":"{{.Data.data.RELAY_REGISTRY_OWNER_ADDRESS}}",
@@ -50,6 +51,8 @@ job "deploy-relay-registry-stage" {
 
         env {
             PHASE="live"
+            CONSUL_IP="127.0.0.1"
+            CONSUL_PORT="8500"
             CONTRACT_SRC="../dist/contracts/relay-registry.js"
             INIT_STATE="../dist/contracts/relay-registry-init-state.json"
         }

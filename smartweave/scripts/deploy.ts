@@ -49,7 +49,7 @@ const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   console.log(`Contract deployed at ${contractTxId}`)
 
   if (process.env.PHASE !== undefined && process.env.CONSUL_IP !== undefined) {
-    console.log(`Connecting to Consult at ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}`)
+    console.log(`Connecting to Consul at ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}...`)
     const consul = new Consul({
       host: process.env.CONSUL_IP,
       port: process.env.CONSUL_PORT
