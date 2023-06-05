@@ -14,6 +14,7 @@ job "deploy-relay-registry-stage" {
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
+            extra_hosts = [ "host.docker.internal:${NOMAD_IP_http}" ]
             volumes = [
                 "local/relay-registry-init-state.json:/usr/src/app/smartweave/dist/contracts/relay-registry-init-state.json"
             ]
