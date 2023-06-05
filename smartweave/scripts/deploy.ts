@@ -48,11 +48,13 @@ const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   console.log(`Contract source published at ${srcTxId}`)
   console.log(`Contract deployed at ${contractTxId}`)
 
-  if (process.env.PHASE !== undefined) {
+  if (process.env.PHASE !== undefined && process.env.CONSUL_IP !== undefined) {
+    console.log(`Connecting to Consult at ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}`)
     const consul = new Consul({
-      host: "host.docker.internal"
+      host: process.env.CONSUL_IP,
+      port: process.env.CONSUL_PORT
     });
-    
+
     const updateResult = await consul.kv.set(`smart-contracts/${process.env.PHASE}/relay-registry-address`, contractTxId);
     console.log(`Cluster variable updated: ${updateResult}`)
   } else {
