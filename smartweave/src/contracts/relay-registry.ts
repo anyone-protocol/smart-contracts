@@ -1,10 +1,15 @@
-import { ContractError, ContractInteraction, HandlerResult } from 'warp-contracts'
+import {
+  ContractError,
+  ContractInteraction,
+  HandlerResult
+} from 'warp-contracts'
 
 import {
   ContractAssert,
   ContractFunctionInput,
   Evolvable,
   EvolvableState,
+  INVALID_INPUT,
   OnlyOwner,
   OwnableState,
   PartialFunctionInput,
@@ -22,7 +27,6 @@ export const FINGERPRINT_NOT_CLAIMED_BY_ADDRESS =
   'Fingerprint not claimed by address'
 export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
-export const INVALID_INPUT = 'Invalid input'
 export const UPPER_HEX_CHARS = '0123456789ABCDEF'
 
 export type Fingerprint = string

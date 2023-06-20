@@ -79,3 +79,5 @@ export type PartialFunctionInput<T extends ContractFunctionInput> =
 export interface Constructor<T = {}> {
   new (...args: any[]): T
 }
+
+export const INVALID_INPUT = 'Invalid input'
