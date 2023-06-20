@@ -12,11 +12,10 @@ import {
   FINGERPRINT_REQUIRED,
   INVALID_ADDRESS,
   INVALID_FINGERPRINT,
-  INVALID_INPUT,
   RelayRegistryHandle,
   RelayRegistryState,
 } from '../../src/contracts'
-import { ERROR_ONLY_OWNER } from '../../src/util'
+import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -25,6 +24,7 @@ const CHARLS = '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
+
 let initState: RelayRegistryState
 function resetState() {
   initState = {
