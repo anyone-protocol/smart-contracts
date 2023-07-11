@@ -7,4 +7,14 @@ export function ContractAssert(cond: boolean, message: any): asserts cond {
   }
 }
 
-export const SmartWeave = { extensions: { ethers: { utils } } }
+export const SmartWeave = {
+  extensions: { ethers: { utils } },
+  transaction: { id: '' },
+  unsafeClient: {
+    transactions: {
+      async getData(txid: string) {
+        return null
+      }
+    }
+  }
+}
