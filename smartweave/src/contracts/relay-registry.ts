@@ -13,7 +13,8 @@ import {
   OnlyOwner,
   OwnableState,
   PartialFunctionInput,
-  SmartWeave
+  SmartWeave,
+  UPPER_HEX_CHARS
 } from '../util'
 
 export const FINGERPRINT_REQUIRED = 'Fingerprint required'
@@ -27,7 +28,6 @@ export const FINGERPRINT_NOT_CLAIMED_BY_ADDRESS =
   'Fingerprint not claimed by address'
 export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
-export const UPPER_HEX_CHARS = '0123456789ABCDEF'
 
 export type Fingerprint = string
 export type EvmAddress = string

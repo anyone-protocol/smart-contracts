@@ -35,3 +35,28 @@ export const OnlyOwner = <S extends OwnableState>(
 
   return descriptor
 }
+
+export const OnlyOwnerAsync = <S extends OwnableState>(
+  _target: Object,
+  _propertyKey: string | symbol,
+  descriptor: TypedPropertyDescriptor<
+    (state: S, action: ContractInteraction<any>) => Promise<HandlerResult<S, any>>
+  >
+) => {
+  if (descriptor.value) {
+    const originalMethod = descriptor.value
+    const wrapper = async (
+      state: S,
+      action: ContractInteraction<any>
+    ) => {
+      if (action.caller !== state.owner) {
+        throw new ContractError(ERROR_ONLY_OWNER)
+      } else {
+        return await originalMethod.apply(_target, [state, action])
+      }
+    }
+    descriptor.value = wrapper
+  }
+
+  return descriptor
+}
