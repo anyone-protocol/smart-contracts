@@ -16,6 +16,7 @@ import {
   SmartWeave,
   UPPER_HEX_CHARS
 } from '../util'
+import { ADDRESS_REQUIRED, Claimable, EvmAddress, INVALID_ADDRESS } from './'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
 export const INVALID_TIMESTAMP = 'Invalid timestamp'
@@ -23,6 +24,7 @@ export const INVALID_SCORES = 'Invalid scores'
 export const DUPLICATE_FINGERPRINT_SCORES = 'Duplicate fingerprint in scores'
 export const NO_PENDING_SCORES = 'No pending scores to distribute from'
 export const NO_DISTRIBUTION_TO_CANCEL = 'No distribution to cancel'
+export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 
 export type Score = {
   score: bigint
@@ -37,6 +39,9 @@ export type DistributionState = OwnableState & EvolvableState & {
   },
   claimable: {
     [address: string]: bigint
+  }
+  previousDistributions: {
+    [timestamp: string]: { distributionAmount: bigint }
   }
 }
 
@@ -90,6 +95,41 @@ export class DistributionContract extends Evolvable(Object) {
       && !Number.isNaN(Number.parseInt(timestamp || ''))
   }
 
+  private getLatestDistribution(state: DistributionState): number | false {
+    return Object.keys(state.previousDistributions).length > 0
+      && Number.parseInt(Object.keys(state.previousDistributions).sort()[0])
+  }
+
+  private isTimestampNotBackdated(
+    state: DistributionState,
+    timestamp: string
+  ): boolean {
+    const latestDistribution = this.getLatestDistribution(state)
+    
+    if (latestDistribution) {
+      return Number.parseInt(timestamp) > latestDistribution
+    }
+
+    return true
+  }
+
+  private assertValidEvmAddress(
+    address?: string
+  ): asserts address is EvmAddress {
+    ContractAssert(!!address, ADDRESS_REQUIRED)
+    ContractAssert(typeof address === 'string', INVALID_ADDRESS)
+    ContractAssert(address.length === 42, INVALID_ADDRESS)
+    
+    try {
+      const checksumAddress = SmartWeave.extensions.ethers.utils.getAddress(
+        address
+      )
+      ContractAssert(address === checksumAddress, INVALID_ADDRESS)
+    } catch (error) {
+      throw new ContractError(INVALID_ADDRESS)
+    }
+  }
+
   @OnlyOwner
   setDistributionAmount(
     state: DistributionState,
@@ -116,6 +156,10 @@ export class DistributionContract extends Evolvable(Object) {
 
     ContractAssert(this.isValidTimestamp(timestamp), INVALID_TIMESTAMP)
     ContractAssert(this.areValidScores(scores), INVALID_SCORES)
+    ContractAssert(
+      this.isTimestampNotBackdated(state, timestamp),
+      CANNOT_BACKDATE_SCORES
+    )
 
     if (!state.pendingDistributions[timestamp]) {
       state.pendingDistributions[timestamp] = []
@@ -151,16 +195,37 @@ export class DistributionContract extends Evolvable(Object) {
       NO_PENDING_SCORES
     )
 
-    const scores = state.pendingDistributions[timestamp]
-    for (let i = 0; i < scores.length; i++) {
-      const { score, address } = scores[i]
-      if (state.claimable[address]) {
-        state.claimable[address] += score
-      } else {
-        state.claimable[address] = score
+    const lastDistribution = this.getLatestDistribution(state)
+    let distributionAmount = state.distributionAmount
+    if (!lastDistribution) {
+      distributionAmount = BigInt(0)
+    } else {
+      // const elapsedSinceLastDistribution = Number.parseInt(timestamp) - lastDistribution
+      // console.log('elapsedSinceLastDistribution', elapsedSinceLastDistribution)
+      // distributionAmount = state.distributionAmount * BigInt(elapsedSinceLastDistribution)
+      // distributionAmount.
+      // console.log('distributionAmount', elapsedSinceLastDistribution)
+      const scores = state.pendingDistributions[timestamp]
+      const total = scores.reduce<bigint>(
+        (total, { score }) => total + score,
+        BigInt(0)
+      )
+
+      for (let i = 0; i < scores.length; i++) {
+        const { score, address } = scores[i]
+        const contributionShare = Number(score * BigInt(100) / total) / 100
+        const claimable = BigInt(contributionShare * 100)
+          * distributionAmount
+          / BigInt(100)
+        if (state.claimable[address]) {
+          state.claimable[address] += claimable
+        } else {
+          state.claimable[address] = claimable
+        }
       }
     }
 
+    state.previousDistributions[timestamp] = { distributionAmount }
     delete state.pendingDistributions[timestamp]
 
     return { state, result: true }
@@ -183,6 +248,20 @@ export class DistributionContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  claimable(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<Claimable>>
+  ): HandlerResult<DistributionState, bigint> {
+    const { address } = action.input
+
+    this.assertValidEvmAddress(address)
+
+    return {
+      state,
+      result: state.claimable[address] || BigInt(0)
+    }
+  }
 }
 
 export default function handle(
@@ -200,6 +279,8 @@ export default function handle(
       return contract.distribute(state, action)
     case 'cancelDistribution':
       return contract.cancelDistribution(state, action)
+    case 'claimable':
+      return contract.claimable(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }
