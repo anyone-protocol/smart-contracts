@@ -4,6 +4,8 @@ import {
   HandlerResult
 } from 'warp-contracts'
 
+import BigNumber from 'bignumber.js'
+
 import {
   ContractAssert,
   ContractFunctionInput,
@@ -26,28 +28,30 @@ export const NO_PENDING_SCORES = 'No pending scores to distribute from'
 export const NO_DISTRIBUTION_TO_CANCEL = 'No distribution to cancel'
 export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 
+export const DISTRIBUTION_RATE_MS = BigNumber(1000)
+
 export type Score = {
-  score: bigint
+  score: string
   address: string
   fingerprint: string
 }
 
 export type DistributionState = OwnableState & EvolvableState & {
-  distributionAmount: bigint,
+  distributionAmount: string,
   pendingDistributions: {
     [timestamp: string]: Score[]
   },
   claimable: {
-    [address: string]: bigint
+    [address: string]: string
   }
   previousDistributions: {
-    [timestamp: string]: { distributionAmount: bigint }
+    [timestamp: string]: { distributionAmount: string }
   }
 }
 
 export interface SetDistributionAmount extends ContractFunctionInput {
   function: 'setDistributionAmount',
-  distributionAmount: bigint
+  distributionAmount: string
 }
 
 export interface AddScores extends ContractFunctionInput {
@@ -80,8 +84,8 @@ export class DistributionContract extends Evolvable(Object) {
             && typeof fingerprint === 'string'
             && fingerprint.length === 40
             && fingerprint.split('').every(c => UPPER_HEX_CHARS.includes(c))
-            && typeof score === 'bigint'
-            && score >= 0
+            && typeof score === 'string'
+            && BigNumber(score).gte(0)
         } catch (error) {
           return false
         }
@@ -138,7 +142,8 @@ export class DistributionContract extends Evolvable(Object) {
     const { input: { distributionAmount } } = action
 
     ContractAssert(
-      typeof distributionAmount === 'bigint' && distributionAmount > -1,
+      typeof distributionAmount === 'string'
+        && BigNumber(distributionAmount).gte(0),
       INVALID_DISTRIBUTION_AMOUNT
     )
 
@@ -196,36 +201,39 @@ export class DistributionContract extends Evolvable(Object) {
     )
 
     const lastDistribution = this.getLatestDistribution(state)
-    let distributionAmount = state.distributionAmount
+    let distributionAmount = BigNumber(state.distributionAmount)
     if (!lastDistribution) {
-      distributionAmount = BigInt(0)
+      distributionAmount = BigNumber(0)
     } else {
-      // const elapsedSinceLastDistribution = Number.parseInt(timestamp) - lastDistribution
-      // console.log('elapsedSinceLastDistribution', elapsedSinceLastDistribution)
-      // distributionAmount = state.distributionAmount * BigInt(elapsedSinceLastDistribution)
-      // distributionAmount.
-      // console.log('distributionAmount', elapsedSinceLastDistribution)
+      const elapsedSinceLastDistribution =
+        Number.parseInt(timestamp) - lastDistribution
+      
+      distributionAmount = BigNumber(state.distributionAmount)
+        .times(BigNumber(elapsedSinceLastDistribution))
+        .dividedBy(DISTRIBUTION_RATE_MS)
+      
       const scores = state.pendingDistributions[timestamp]
-      const total = scores.reduce<bigint>(
-        (total, { score }) => total + score,
-        BigInt(0)
+      const total = scores.reduce<BigNumber>(
+        (total, { score }) => total.plus(BigNumber(score)),
+        BigNumber(0)
       )
 
       for (let i = 0; i < scores.length; i++) {
         const { score, address } = scores[i]
-        const contributionShare = Number(score * BigInt(100) / total) / 100
-        const claimable = BigInt(contributionShare * 100)
-          * distributionAmount
-          / BigInt(100)
-        if (state.claimable[address]) {
-          state.claimable[address] += claimable
-        } else {
-          state.claimable[address] = claimable
-        }
+        const claimable = BigNumber(score)
+          .dividedBy(total)
+          .times(distributionAmount)
+        const previouslyClaimable = state.claimable[address] || '0'
+        state.claimable[address] = BigNumber(previouslyClaimable)
+          .plus(claimable)
+          .integerValue(BigNumber.ROUND_FLOOR)
+          .toString()
       }
     }
 
-    state.previousDistributions[timestamp] = { distributionAmount }
+    state.previousDistributions[timestamp] = {
+      distributionAmount: distributionAmount.toString()
+    }
     delete state.pendingDistributions[timestamp]
 
     return { state, result: true }
@@ -252,14 +260,14 @@ export class DistributionContract extends Evolvable(Object) {
   claimable(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<Claimable>>
-  ): HandlerResult<DistributionState, bigint> {
+  ): HandlerResult<DistributionState, string> {
     const { address } = action.input
 
     this.assertValidEvmAddress(address)
 
     return {
       state,
-      result: state.claimable[address] || BigInt(0)
+      result: state.claimable[address] || '0'
     }
   }
 }

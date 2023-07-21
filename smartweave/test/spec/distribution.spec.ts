@@ -23,7 +23,7 @@ const BOB    = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
-const DEFAULT_DISTRIBUTION_AMOUNT = BigInt(1000)
+const DEFAULT_DISTRIBUTION_AMOUNT = '1000'
 
 let initState: DistributionState
 function resetState() {
@@ -58,7 +58,7 @@ describe('Distribution Contract', () => {
   })
 
   it('Allows owner to set distribution amount', () => {
-    const distributionAmount = BigInt(200)
+    const distributionAmount = '200'
     const setDistributionAmount = createInteraction(OWNER, {
       function: 'setDistributionAmount',
       distributionAmount
@@ -73,7 +73,7 @@ describe('Distribution Contract', () => {
     const setMissingDistributionAmount = createInteraction(OWNER, {
       function: 'setDistributionAmount'
     })
-    const negativeDistributionAmount = BigInt(-100)
+    const negativeDistributionAmount = '-100'
     const setNegativeDistributionAmount = createInteraction(OWNER, {
       function: 'setDistributionAmount',
       distributionAmount: negativeDistributionAmount
@@ -112,7 +112,7 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp,
       scores: [
-        { score: BigInt(1000), address: ALICE, fingerprint: fingerprintA }
+        { score: '1000', address: ALICE, fingerprint: fingerprintA }
       ]
     })
 
@@ -120,7 +120,7 @@ describe('Distribution Contract', () => {
 
     expect(state.pendingDistributions).to.deep.equal({
       [timestamp]: [
-        { score: BigInt(1000), address: ALICE, fingerprint: fingerprintA }
+        { score: '1000', address: ALICE, fingerprint: fingerprintA }
       ]
     })
   })
@@ -252,9 +252,9 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp: Date.now().toString(),
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA },
-        { score: BigInt(100), address: BOB, fingerprint: fingerprintB },
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
+        { score: '100', address: ALICE, fingerprint: fingerprintA },
+        { score: '100', address: BOB, fingerprint: fingerprintB },
+        { score: '100', address: ALICE, fingerprint: fingerprintA }
       ]
     })
 
@@ -277,7 +277,7 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp,
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
+        { score: '100', address: ALICE, fingerprint: fingerprintA }
       ]
     })
     const distribute = createInteraction(OWNER, {
@@ -290,7 +290,7 @@ describe('Distribution Contract', () => {
 
     expect(state.pendingDistributions).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
-      [timestamp]: { distributionAmount: BigInt(0) }
+      [timestamp]: { distributionAmount: '0' }
     })
   })
 
@@ -329,8 +329,8 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp,
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA },
-        { score: BigInt(100), address: BOB, fingerprint: fingerprintB }
+        { score: '100', address: ALICE, fingerprint: fingerprintA },
+        { score: '100', address: BOB, fingerprint: fingerprintB }
       ]
     })
     const cancelDistribution = createInteraction(OWNER, {
@@ -379,7 +379,7 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp,
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
+        { score: '100', address: ALICE, fingerprint: fingerprintA }
       ]
     })
     const distribute = createInteraction(OWNER, {
@@ -391,7 +391,7 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp: backdatedTimestamp,
       scores: [
-        { score: BigInt(100), address: BOB, fingerprint: fingerprintB }
+        { score: '100', address: BOB, fingerprint: fingerprintB }
       ]
     })
     const distributeBackdated = createInteraction(OWNER, {
@@ -416,7 +416,7 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp,
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
+        { score: '100', address: ALICE, fingerprint: fingerprintA }
       ]
     })
     const distribute = createInteraction(OWNER, {
@@ -434,7 +434,7 @@ describe('Distribution Contract', () => {
     const timeBetweenDistributions = 1000
     const now = Date.now()
     const firstTimestamp = now.toString()
-    const firstAliceScore = BigInt(100)
+    const firstAliceScore = '100'
     const firstAddScores = createInteraction(OWNER, {
       function: 'addScores',
       timestamp: firstTimestamp,
@@ -447,7 +447,7 @@ describe('Distribution Contract', () => {
       timestamp: firstTimestamp
     })
     const secondTimestamp = (now + timeBetweenDistributions).toString()
-    const secondAliceScore = BigInt(500)
+    const secondAliceScore = '500'
     const secondAddScores = createInteraction(OWNER, {
       function: 'addScores',
       timestamp: secondTimestamp,
@@ -468,7 +468,7 @@ describe('Distribution Contract', () => {
 
     expect(state.pendingDistributions).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: BigInt(0) },
+      [firstTimestamp]: { distributionAmount: '0' },
       [secondTimestamp]: { distributionAmount: DEFAULT_DISTRIBUTION_AMOUNT }
     })
     expect(state.claimable).to.deep.equal({
@@ -483,11 +483,11 @@ describe('Distribution Contract', () => {
     }, 'view')
 
     const { state, result } = DistributionHandle(
-      { ...initState, claimable: { [ALICE]: BigInt(1000) } },
+      { ...initState, claimable: { [ALICE]: '1000' } },
       aliceClaimable
     )
 
-    expect(result).to.equal(BigInt(1000))
+    expect(result).to.equal('1000')
   })
 
   it('Requires a valid address when viewing claimable tokens', () => {
@@ -523,9 +523,9 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp: firstTimestamp,
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA },
-        { score: BigInt(100), address: BOB, fingerprint: fingerprintB },
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintC }
+        { score: '100', address: ALICE, fingerprint: fingerprintA },
+        { score: '100', address: BOB, fingerprint: fingerprintB },
+        { score: '100', address: ALICE, fingerprint: fingerprintC }
       ]
     })
     const firstDistribute = createInteraction(OWNER, {
@@ -537,9 +537,9 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp: secondTimestamp,
       scores: [
-        { score: BigInt(69), address: ALICE, fingerprint: fingerprintA },
-        { score: BigInt(1337), address: BOB, fingerprint: fingerprintB },
-        { score: BigInt(420), address: ALICE, fingerprint: fingerprintC }
+        { score: '75', address: ALICE, fingerprint: fingerprintA },
+        { score: '1337', address: BOB, fingerprint: fingerprintB },
+        { score: '657', address: ALICE, fingerprint: fingerprintC }
       ]
     })
     const secondDistribute = createInteraction(OWNER, {
@@ -553,8 +553,8 @@ describe('Distribution Contract', () => {
     const { state } = DistributionHandle(initState, secondDistribute)
 
     expect(state.claimable).to.deep.equal({
-      [ALICE]: BigInt(260),
-      [BOB]: BigInt(730)
+      [ALICE]: '353',
+      [BOB]: '646'
     })
   })
 
@@ -567,9 +567,9 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp: firstTimestamp,
       scores: [
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA },
-        { score: BigInt(100), address: BOB, fingerprint: fingerprintB },
-        { score: BigInt(100), address: ALICE, fingerprint: fingerprintC }
+        { score: '100', address: ALICE, fingerprint: fingerprintA },
+        { score: '100', address: BOB, fingerprint: fingerprintB },
+        { score: '100', address: ALICE, fingerprint: fingerprintC }
       ]
     })
     const firstDistribute = createInteraction(OWNER, {
@@ -581,11 +581,11 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp: secondTimestamp,
       scores: [
-        { score: BigInt(69), address: ALICE, fingerprint: fingerprintA },
-        { score: BigInt(1337), address: BOB, fingerprint: fingerprintB },
-        { score: BigInt(420), address: ALICE, fingerprint: fingerprintC }
+        { score: '75', address: ALICE, fingerprint: fingerprintA },
+        { score: '1337', address: BOB, fingerprint: fingerprintB },
+        { score: '657', address: ALICE, fingerprint: fingerprintC }
       ]
-    }) // total = 1826, alice = 0.26779846659364731653888280394304, bob = 0.73220153340635268346111719605696
+    }) // total = 2069, alice = 0.353794, bob = 0.646206
     const secondDistribute = createInteraction(OWNER, {
       function: 'distribute',
       timestamp: secondTimestamp
@@ -597,9 +597,12 @@ describe('Distribution Contract', () => {
     const { state } = DistributionHandle(initState, secondDistribute)
 
     expect(state.claimable).to.deep.equal({
-      [ALICE]: BigInt(1454),
-      [BOB]: BigInt(3977)
+      [ALICE]: '1920',
+      [BOB]: '3510'
     })
   })
+
+  it('TODO -> distributions faster than 1s')
+
   it('TODO -> distribution edge cases')
 })
