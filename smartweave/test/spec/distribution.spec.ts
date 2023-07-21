@@ -3,9 +3,12 @@ import { expect } from 'chai'
 import { ContractError, ContractInteraction } from 'warp-contracts'
 
 import {
+  ADDRESS_REQUIRED,
+  CANNOT_BACKDATE_SCORES,
   DUPLICATE_FINGERPRINT_SCORES,
   DistributionHandle,
   DistributionState,
+  INVALID_ADDRESS,
   INVALID_DISTRIBUTION_AMOUNT,
   INVALID_SCORES,
   INVALID_TIMESTAMP,
@@ -19,6 +22,7 @@ const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
 const BOB    = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
 const DEFAULT_DISTRIBUTION_AMOUNT = BigInt(1000)
 
 let initState: DistributionState
@@ -27,7 +31,8 @@ function resetState() {
     owner: OWNER,
     distributionAmount: DEFAULT_DISTRIBUTION_AMOUNT,
     pendingDistributions: {},
-    claimable: {}
+    claimable: {},
+    previousDistributions: {}
   }
 }
 
@@ -52,7 +57,7 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, INVALID_INPUT)
   })
 
-  it('Allows owner to set distribution amount and rate', () => {
+  it('Allows owner to set distribution amount', () => {
     const distributionAmount = BigInt(200)
     const setDistributionAmount = createInteraction(OWNER, {
       function: 'setDistributionAmount',
@@ -120,7 +125,7 @@ describe('Distribution Contract', () => {
     })
   })
 
-  it('Adding scores requires a valid timestamp', () => {
+  it('Requires a valid timestamp when adding scores', () => {
     const addScoresNoTimestamp = createInteraction(OWNER, {
       function: 'addScores'
     })
@@ -151,7 +156,7 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, INVALID_TIMESTAMP)
   })
 
-  it('Adding scores requires at least one score', () => {
+  it('Requires at least one score when adding scores', () => {
     const addScoresUndefinedScores = createInteraction(OWNER, {
       function: 'addScores',
       timestamp: Date.now().toString()
@@ -169,7 +174,7 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, INVALID_SCORES)
   })
 
-  it('Adding scores requires valid score, address, fingerprint tuples', () => {
+  it('Requires added scores be valid (score, address, fingerprint)', () => {
     const timestamp = Date.now().toString()
     const addScoresNoScore = createInteraction(OWNER, {
       function: 'addScores',
@@ -242,7 +247,7 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, INVALID_SCORES)
   })
 
-  it('Adding scores requires unique fingerprints', () => {
+  it('Requires added scores have unique fingerprints', () => {
     const addDuplicateFingerprintScores = createInteraction(OWNER, {
       function: 'addScores',
       timestamp: Date.now().toString(),
@@ -272,7 +277,7 @@ describe('Distribution Contract', () => {
       function: 'addScores',
       timestamp,
       scores: [
-        { score: BigInt(1000), address: ALICE, fingerprint: fingerprintA }
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
       ]
     })
     const distribute = createInteraction(OWNER, {
@@ -284,7 +289,9 @@ describe('Distribution Contract', () => {
     const { state } = DistributionHandle(initState, distribute)
 
     expect(state.pendingDistributions).to.be.empty
-    expect(state.claimable).to.deep.equal({ [ALICE]: BigInt(1000) })
+    expect(state.previousDistributions).to.deep.equal({
+      [timestamp]: { distributionAmount: BigInt(0) }
+    })
   })
 
   it('Prevents non-owner from distributing token claims', () => {
@@ -295,7 +302,7 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, ERROR_ONLY_OWNER)
   })
 
-  it('Distributing requires a timestamp', () => {
+  it('Requires a valid timestamp to distribute', () => {
     const distributeNoTimestamp = createInteraction(OWNER, {
       function: 'distribute'
     })
@@ -305,7 +312,7 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, INVALID_TIMESTAMP)
   })
 
-  it('Distributing requires scores previously added for the timestamp', () => {
+  it('Requires previously added scores to distribute', () => {
     const distributeNoAddedScores = createInteraction(OWNER, {
       function: 'distribute',
       timestamp: Date.now().toString()
@@ -365,7 +372,234 @@ describe('Distribution Contract', () => {
     ).to.throw(ContractError, ERROR_ONLY_OWNER)
   })
 
-  it('Previously distributed score sets should be immutable after distribution')
-  it('TODO -> distribution calcs')
+  it('Prevents adding of backdated scores and backdating distributions', () => {
+    const now = Date.now()
+    const timestamp = now.toString()
+    const addScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp,
+      scores: [
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
+      ]
+    })
+    const distribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp
+    })
+    const backdatedTimestamp = (now - 10000).toString()
+    const addScoresBackdated = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: backdatedTimestamp,
+      scores: [
+        { score: BigInt(100), address: BOB, fingerprint: fingerprintB }
+      ]
+    })
+    const distributeBackdated = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: backdatedTimestamp
+    })
+
+    DistributionHandle(initState, addScores)
+    DistributionHandle(initState, distribute)
+
+    expect(
+      () => DistributionHandle(initState, addScoresBackdated)
+    ).to.throw(ContractError, CANNOT_BACKDATE_SCORES)
+    expect(
+      () => DistributionHandle(initState, distributeBackdated)
+    ).to.throw(ContractError, NO_PENDING_SCORES)
+  })
+  
+  it('Should not add claimable tokens on initial distribution', () => {
+    const timestamp = Date.now().toString()
+    const addScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp,
+      scores: [
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA }
+      ]
+    })
+    const distribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp
+    })
+
+    DistributionHandle(initState, addScores)
+    const { state } = DistributionHandle(initState, distribute)
+
+    expect(state.claimable).to.deep.equal({})
+  })
+
+  it('Should add claimable tokens on subsequent distributions', () => {
+    const timeBetweenDistributions = 1000
+    const now = Date.now()
+    const firstTimestamp = now.toString()
+    const firstAliceScore = BigInt(100)
+    const firstAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: firstTimestamp,
+      scores: [
+        { score: firstAliceScore, address: ALICE, fingerprint: fingerprintA }
+      ]
+    })
+    const firstDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: firstTimestamp
+    })
+    const secondTimestamp = (now + timeBetweenDistributions).toString()
+    const secondAliceScore = BigInt(500)
+    const secondAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: secondTimestamp,
+      scores: [
+        { score: secondAliceScore, address: ALICE, fingerprint: fingerprintA }
+      ]
+    })
+    const secondDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: secondTimestamp
+    })
+
+    DistributionHandle(initState, firstAddScores)
+    DistributionHandle(initState, firstDistribute)
+    DistributionHandle(initState, secondAddScores)
+    const { state } = DistributionHandle(initState, secondDistribute)
+
+
+    expect(state.pendingDistributions).to.be.empty
+    expect(state.previousDistributions).to.deep.equal({
+      [firstTimestamp]: { distributionAmount: BigInt(0) },
+      [secondTimestamp]: { distributionAmount: DEFAULT_DISTRIBUTION_AMOUNT }
+    })
+    expect(state.claimable).to.deep.equal({
+      [ALICE]: DEFAULT_DISTRIBUTION_AMOUNT
+    })
+  })
+  
+  it('Provides a view method for claimable tokens by address', () => {
+    const aliceClaimable = createInteraction(ALICE, {
+      function: 'claimable',
+      address: ALICE
+    }, 'view')
+
+    const { state, result } = DistributionHandle(
+      { ...initState, claimable: { [ALICE]: BigInt(1000) } },
+      aliceClaimable
+    )
+
+    expect(result).to.equal(BigInt(1000))
+  })
+
+  it('Requires a valid address when viewing claimable tokens', () => {
+    const undefinedClaimable = createInteraction(ALICE, {
+      function: 'claimable'
+    }, 'view')
+    const objectClaimable = createInteraction(ALICE, {
+      function: 'claimable',
+      address: { address: ALICE }
+    })
+    const invalidAddressClaimable = createInteraction(ALICE, {
+      function: 'claimable',
+      address: 'invalid-address'
+    })
+
+    expect(
+      () => DistributionHandle(initState, undefinedClaimable)
+    ).to.throw(ContractError, ADDRESS_REQUIRED)
+    expect(
+      () => DistributionHandle(initState, objectClaimable)
+    ).to.throw(ContractError, INVALID_ADDRESS)
+    expect(
+      () => DistributionHandle(initState, invalidAddressClaimable)
+    ).to.throw(ContractError, INVALID_ADDRESS)
+  })
+
+  it('Should roll up scores by same owner on distribution', () => {
+    const timeDifference = 1000
+    const now = Date.now()
+    const firstTimestamp = now.toString()
+    const secondTimestamp = (now + timeDifference).toString()
+    const firstAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: firstTimestamp,
+      scores: [
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA },
+        { score: BigInt(100), address: BOB, fingerprint: fingerprintB },
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintC }
+      ]
+    })
+    const firstDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: firstTimestamp
+    })
+
+    const secondAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: secondTimestamp,
+      scores: [
+        { score: BigInt(69), address: ALICE, fingerprint: fingerprintA },
+        { score: BigInt(1337), address: BOB, fingerprint: fingerprintB },
+        { score: BigInt(420), address: ALICE, fingerprint: fingerprintC }
+      ]
+    })
+    const secondDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: secondTimestamp
+    })
+
+    DistributionHandle(initState, firstAddScores)
+    DistributionHandle(initState, firstDistribute)
+    DistributionHandle(initState, secondAddScores)
+    const { state } = DistributionHandle(initState, secondDistribute)
+
+    expect(state.claimable).to.deep.equal({
+      [ALICE]: BigInt(260),
+      [BOB]: BigInt(730)
+    })
+  })
+
+  it('Should scale distribution by time since last distribution', () => {
+    const timeDifference = 5432
+    const now = Date.now()
+    const firstTimestamp = now.toString()
+    const secondTimestamp = (now + timeDifference).toString()
+    const firstAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: firstTimestamp,
+      scores: [
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintA },
+        { score: BigInt(100), address: BOB, fingerprint: fingerprintB },
+        { score: BigInt(100), address: ALICE, fingerprint: fingerprintC }
+      ]
+    })
+    const firstDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: firstTimestamp
+    })
+
+    const secondAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: secondTimestamp,
+      scores: [
+        { score: BigInt(69), address: ALICE, fingerprint: fingerprintA },
+        { score: BigInt(1337), address: BOB, fingerprint: fingerprintB },
+        { score: BigInt(420), address: ALICE, fingerprint: fingerprintC }
+      ]
+    }) // total = 1826, alice = 0.26779846659364731653888280394304, bob = 0.73220153340635268346111719605696
+    const secondDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: secondTimestamp
+    })
+
+    DistributionHandle(initState, firstAddScores)
+    DistributionHandle(initState, firstDistribute)
+    DistributionHandle(initState, secondAddScores)
+    const { state } = DistributionHandle(initState, secondDistribute)
+
+    expect(state.claimable).to.deep.equal({
+      [ALICE]: BigInt(1454),
+      [BOB]: BigInt(3977)
+    })
+  })
   it('TODO -> distribution edge cases')
 })
