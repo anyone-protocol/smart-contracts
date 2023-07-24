@@ -7,16 +7,23 @@ import typescript from '@rollup/plugin-typescript'
 import { rollup } from 'rollup'
 import cleanup from 'rollup-plugin-cleanup'
 import prettier from 'rollup-plugin-prettier'
+import { nodeResolve } from '@rollup/plugin-node-resolve'
+import commonJs from '@rollup/plugin-commonjs'
 
 const contracts: { [key: string]: string } = {
-  'relay-registry': 'src/contracts/relay-registry.ts'
+  // 'relay-registry': 'src/contracts/relay-registry.ts',
+  'distribution': 'src/contracts/distribution.ts'
 }
 
 const babelOpts: RollupBabelInputPluginOptions = {
   filename: 'relay-registry.ts',
   presets: [ '@babel/preset-typescript' ],
   plugins: [
-    [ 'babel-plugin-transform-remove-imports', { removeAll: true } ],
+    [
+      'babel-plugin-transform-remove-imports',
+      // { test: /^(?!bignumber\.js).*$/ }
+      { removeAll: true }
+    ],
     [ '@babel/plugin-proposal-decorators', { version: '2022-03' } ],
     [{
       visitor: {
@@ -35,11 +42,24 @@ async function build() {
       output: { format: 'cjs' },
       plugins: [
         typescript(),
-        getBabelOutputPlugin(babelOpts),
+        // nodeResolve({
+        //   resolveOnly: [ 'bignumber.js' ]
+        // }),
+        getBabelOutputPlugin({ ...babelOpts, filename: contract }),
         cleanup(),
         prettier({ singleQuote: true, parser: 'babel' })
       ],
-      external: [ /(..\/)+environment/ ],
+      external: //[
+        // /(..\/)+environment/,
+        (source: string, importer: string | undefined, isResolved: boolean) => {
+          // if (source === 'bignumber.js') {
+          //   console.log('  rollup external source, importer, isResolved', source, importer, isResolved)
+          //   return false
+          // }
+            
+          return /(..\/)+environment/.test(source)
+        },
+      //],
       onwarn(warning, rollupWarn) {
         if (warning.code !== 'CIRCULAR_DEPENDENCY') {
           rollupWarn(warning)

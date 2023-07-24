@@ -600,7 +600,11 @@ describe('Distribution Contract', () => {
       [ALICE]: '1920',
       [BOB]: '3510'
     })
+    // TODO -> expect state.previousDistributions
+    // TODO -> expect state.pendingDistributions
   })
+
+  it('TODO -> state.previousDistributions.distributionAmount should be exact (no decimals!)')
 
   it('TODO -> distributions faster than 1s')
 
