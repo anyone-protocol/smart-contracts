@@ -17,11 +17,7 @@ const babelOpts: RollupBabelInputPluginOptions = {
   filename: 'relay-registry.ts',
   presets: [ '@babel/preset-typescript' ],
   plugins: [
-    [
-      'babel-plugin-transform-remove-imports',
-      // { test: /^(?!bignumber\.js).*$/ }
-      { removeAll: true }
-    ],
+    [ 'babel-plugin-transform-remove-imports', { removeAll: true } ],
     [ '@babel/plugin-proposal-decorators', { version: '2022-03' } ],
     [{
       visitor: {
@@ -40,24 +36,11 @@ async function build() {
       output: { format: 'cjs' },
       plugins: [
         typescript(),
-        // nodeResolve({
-        //   resolveOnly: [ 'bignumber.js' ]
-        // }),
         getBabelOutputPlugin({ ...babelOpts, filename: contract }),
         cleanup(),
         prettier({ singleQuote: true, parser: 'babel' })
       ],
-      external: //[
-        // /(..\/)+environment/,
-        (source: string, importer: string | undefined, isResolved: boolean) => {
-          // if (source === 'bignumber.js') {
-          //   console.log('  rollup external source, importer, isResolved', source, importer, isResolved)
-          //   return false
-          // }
-            
-          return /(..\/)+environment/.test(source)
-        },
-      //],
+      external: [ /(..\/)+environment/ ],
       onwarn(warning, rollupWarn) {
         if (warning.code !== 'CIRCULAR_DEPENDENCY') {
           rollupWarn(warning)
