@@ -7,11 +7,9 @@ import typescript from '@rollup/plugin-typescript'
 import { rollup } from 'rollup'
 import cleanup from 'rollup-plugin-cleanup'
 import prettier from 'rollup-plugin-prettier'
-import { nodeResolve } from '@rollup/plugin-node-resolve'
-import commonJs from '@rollup/plugin-commonjs'
 
 const contracts: { [key: string]: string } = {
-  // 'relay-registry': 'src/contracts/relay-registry.ts',
+  'relay-registry': 'src/contracts/relay-registry.ts',
   'distribution': 'src/contracts/distribution.ts'
 }
 
