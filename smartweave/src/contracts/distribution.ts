@@ -202,6 +202,7 @@ export class DistributionContract extends Evolvable(Object) {
 
     const lastDistribution = this.getLatestDistribution(state)
     let distributionAmount = BigNumber(state.distributionAmount)
+    let totalDistributed = BigNumber(0)
     if (!lastDistribution) {
       distributionAmount = BigNumber(0)
     } else {
@@ -223,16 +224,17 @@ export class DistributionContract extends Evolvable(Object) {
         const claimable = BigNumber(score)
           .dividedBy(total)
           .times(distributionAmount)
+          .integerValue(BigNumber.ROUND_FLOOR)
+        totalDistributed = totalDistributed.plus(claimable)
         const previouslyClaimable = state.claimable[address] || '0'
         state.claimable[address] = BigNumber(previouslyClaimable)
           .plus(claimable)
-          .integerValue(BigNumber.ROUND_FLOOR)
           .toString()
       }
     }
 
     state.previousDistributions[timestamp] = {
-      distributionAmount: distributionAmount.toString()
+      distributionAmount: totalDistributed.toString()
     }
     delete state.pendingDistributions[timestamp]
 

@@ -576,7 +576,59 @@ describe('Distribution Contract', () => {
       function: 'distribute',
       timestamp: firstTimestamp
     })
+    const secondAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: secondTimestamp,
+      scores: [
+        { score: '75', address: ALICE, fingerprint: fingerprintA },
+        { score: '1337', address: BOB, fingerprint: fingerprintB },
+        { score: '657', address: ALICE, fingerprint: fingerprintC }
+      ]
+    }) // total = 2069, alice = 0.353794, bob = 0.646206
+    const secondDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: secondTimestamp
+    })
+    
+    DistributionHandle(initState, firstAddScores)
+    DistributionHandle(initState, firstDistribute)
+    DistributionHandle(initState, secondAddScores)
+    const { state } = DistributionHandle(initState, secondDistribute)
 
+    expect(state.claimable).to.deep.equal({
+      [ALICE]: '1920',
+      [BOB]: '3510'
+    })
+    expect(state.previousDistributions).to.deep.equal({
+      [firstTimestamp]: { distributionAmount: '0' },
+      [secondTimestamp]: { distributionAmount: '5430' }
+    })
+    expect(state.pendingDistributions).to.be.empty
+  })
+
+  it('Allows distributions faster than assumed 1 second rate', () => {
+    const timeDifference = 443
+    const now = Date.now()
+    const firstTimestamp = now.toString()
+    const secondTimestamp = (now + timeDifference).toString()
+    const newDistributionAmount = '4333'
+    const setNewDistributionAmount = createInteraction(OWNER, {
+      function: 'setDistributionAmount',
+      distributionAmount: newDistributionAmount
+    })
+    const firstAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: firstTimestamp,
+      scores: [
+        { score: '100', address: ALICE, fingerprint: fingerprintA },
+        { score: '100', address: BOB, fingerprint: fingerprintB },
+        { score: '100', address: ALICE, fingerprint: fingerprintC }
+      ]
+    })
+    const firstDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: firstTimestamp
+    })
     const secondAddScores = createInteraction(OWNER, {
       function: 'addScores',
       timestamp: secondTimestamp,
@@ -591,22 +643,21 @@ describe('Distribution Contract', () => {
       timestamp: secondTimestamp
     })
 
+    DistributionHandle(initState, setNewDistributionAmount)
     DistributionHandle(initState, firstAddScores)
     DistributionHandle(initState, firstDistribute)
     DistributionHandle(initState, secondAddScores)
     const { state } = DistributionHandle(initState, secondDistribute)
 
     expect(state.claimable).to.deep.equal({
-      [ALICE]: '1920',
-      [BOB]: '3510'
+      [ALICE]:  '678',   // ~  679.114
+      [BOB]:   '1240'    // ~ 1240.405
     })
-    // TODO -> expect state.previousDistributions
-    // TODO -> expect state.pendingDistributions
+    expect(state.previousDistributions).to.deep.equal({
+      [firstTimestamp]: { distributionAmount: '0' },
+      // 4333 tps rate over 443ms ~= 1,919.519 tokens
+      [secondTimestamp]: { distributionAmount: '1918' }
+    })
+    expect(state.pendingDistributions).to.be.empty
   })
-
-  it('TODO -> state.previousDistributions.distributionAmount should be exact (no decimals!)')
-
-  it('TODO -> distributions faster than 1s')
-
-  it('TODO -> distribution edge cases')
 })

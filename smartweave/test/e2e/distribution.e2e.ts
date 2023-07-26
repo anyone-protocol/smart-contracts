@@ -275,7 +275,7 @@ describe('Distribution Contract (e2e)', () => {
 
     expect(state.previousDistributions).to.deep.equal({
       [firstTimestamp]: { distributionAmount: '0' },
-      [secondTimestamp]: { distributionAmount: '10864' }
+      [secondTimestamp]: { distributionAmount: '10862' }
     })
     expect(state.pendingDistributions).to.be.empty
     expect(state.claimable).to.deep.equal({
