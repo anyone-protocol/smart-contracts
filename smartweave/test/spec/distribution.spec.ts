@@ -23,13 +23,13 @@ const BOB    = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
-const DEFAULT_DISTRIBUTION_AMOUNT = '1000'
+const DEFAULT_TOKENS_PER_SECOND = '1000'
 
 let initState: DistributionState
 function resetState() {
   initState = {
     owner: OWNER,
-    distributionAmount: DEFAULT_DISTRIBUTION_AMOUNT,
+    tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
     pendingDistributions: {},
     claimable: {},
     previousDistributions: {}
@@ -58,30 +58,32 @@ describe('Distribution Contract', () => {
   })
 
   it('Allows owner to set distribution amount', () => {
-    const distributionAmount = '200'
-    const setDistributionAmount = createInteraction(OWNER, {
-      function: 'setDistributionAmount',
-      distributionAmount
+    const tokensDistributedPerSecond = '200'
+    const setTokenDistributionRate = createInteraction(OWNER, {
+      function: 'setTokenDistributionRate',
+      tokensDistributedPerSecond
     })
 
-    const { state } = DistributionHandle(initState, setDistributionAmount)
+    const { state } = DistributionHandle(initState, setTokenDistributionRate)
 
-    expect(state.distributionAmount).to.equal(distributionAmount)
+    expect(state.tokensDistributedPerSecond).to.equal(
+      tokensDistributedPerSecond
+    )
   })
 
   it('Validates when setting distribution amount', () => {
     const setMissingDistributionAmount = createInteraction(OWNER, {
-      function: 'setDistributionAmount'
+      function: 'setTokenDistributionRate'
     })
     const negativeDistributionAmount = '-100'
     const setNegativeDistributionAmount = createInteraction(OWNER, {
-      function: 'setDistributionAmount',
-      distributionAmount: negativeDistributionAmount
+      function: 'setTokenDistributionRate',
+      tokensDistributedPerSecond: negativeDistributionAmount
     })
     const numberDistributionAmount = 100
     const setNumberDistributionAmount = createInteraction(OWNER, {
-      function: 'setDistributionAmount',
-      distributionAmount: numberDistributionAmount
+      function: 'setTokenDistributionRate',
+      tokensDistributedPerSecond: numberDistributionAmount
     })
     
     expect(
@@ -97,8 +99,8 @@ describe('Distribution Contract', () => {
 
   it('Prevents non-owners from setting distribution amount', () => {
     const aliceSetDistribution = createInteraction(ALICE, {
-      function: 'setDistributionAmount',
-      distributionAmount: BigInt(500)
+      function: 'setTokenDistributionRate',
+      tokensDistributedPerSecond: BigInt(500)
     })
 
     expect(
@@ -290,7 +292,12 @@ describe('Distribution Contract', () => {
 
     expect(state.pendingDistributions).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
-      [timestamp]: { distributionAmount: '0' }
+      [timestamp]: {
+        totalScore: '100',
+        timeElapsed: '0',
+        totalDistributed: '0',
+        tokensDistributedPerSecond: '1000'
+      }
     })
   })
 
@@ -465,14 +472,23 @@ describe('Distribution Contract', () => {
     DistributionHandle(initState, secondAddScores)
     const { state } = DistributionHandle(initState, secondDistribute)
 
-
     expect(state.pendingDistributions).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' },
-      [secondTimestamp]: { distributionAmount: DEFAULT_DISTRIBUTION_AMOUNT }
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+        totalDistributed: '0',
+        totalScore: '100'
+      },
+      [secondTimestamp]: {
+        timeElapsed: timeBetweenDistributions.toString(),
+        tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+        totalDistributed: '1000',
+        totalScore: '500'
+      }
     })
     expect(state.claimable).to.deep.equal({
-      [ALICE]: DEFAULT_DISTRIBUTION_AMOUNT
+      [ALICE]: DEFAULT_TOKENS_PER_SECOND
     })
   })
   
@@ -600,8 +616,18 @@ describe('Distribution Contract', () => {
       [BOB]: '3510'
     })
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' },
-      [secondTimestamp]: { distributionAmount: '5430' }
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+        totalDistributed: '0',
+        totalScore: '300'
+      },
+      [secondTimestamp]: {
+        timeElapsed: timeDifference.toString(),
+        tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+        totalDistributed: '5430',
+        totalScore: '2069'
+      }
     })
     expect(state.pendingDistributions).to.be.empty
   })
@@ -613,8 +639,8 @@ describe('Distribution Contract', () => {
     const secondTimestamp = (now + timeDifference).toString()
     const newDistributionAmount = '4333'
     const setNewDistributionAmount = createInteraction(OWNER, {
-      function: 'setDistributionAmount',
-      distributionAmount: newDistributionAmount
+      function: 'setTokenDistributionRate',
+      tokensDistributedPerSecond: newDistributionAmount
     })
     const firstAddScores = createInteraction(OWNER, {
       function: 'addScores',
@@ -654,9 +680,19 @@ describe('Distribution Contract', () => {
       [BOB]:   '1240'    // ~ 1240.405
     })
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' },
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: '4333',
+        totalDistributed: '0',
+        totalScore: '300'
+      },
       // 4333 tps rate over 443ms ~= 1,919.519 tokens
-      [secondTimestamp]: { distributionAmount: '1918' }
+      [secondTimestamp]: {
+        timeElapsed: '443',
+        tokensDistributedPerSecond: '4333',
+        totalDistributed: '1918',
+        totalScore: '2069'
+      }
     })
     expect(state.pendingDistributions).to.be.empty
   })

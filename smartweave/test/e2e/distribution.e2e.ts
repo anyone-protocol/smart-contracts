@@ -18,7 +18,13 @@ import {
 } from 'warp-contracts-plugin-signature/server'
 
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
-import { AddScores, Distribute, DistributionState, SetDistributionAmount } from '../../src/contracts'
+import MockScores from './data/scores.json'
+import {
+  AddScores,
+  Distribute,
+  DistributionState,
+  SetTokenDistributionRate
+} from '../../src/contracts'
 
 const INITIAL_DISTRIBUTION_AMOUNT = '1000'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
@@ -28,6 +34,8 @@ const now = Date.now()
 const firstTimestamp = now.toString()
 const later = now + 5432
 const secondTimestamp = later.toString()
+const aDayLater = later + 86_400_000
+const thirdTimestamp = aDayLater.toString()
 
 describe('Distribution Contract (e2e)', () => {
   let warp: Warp,
@@ -69,7 +77,7 @@ describe('Distribution Contract (e2e)', () => {
 
     const initState: DistributionState = {
       owner: owner.address,
-      distributionAmount: INITIAL_DISTRIBUTION_AMOUNT,
+      tokensDistributedPerSecond: INITIAL_DISTRIBUTION_AMOUNT,
       pendingDistributions: {},
       claimable: {},
       previousDistributions: {}
@@ -90,7 +98,7 @@ describe('Distribution Contract (e2e)', () => {
     const { cachedValue: { state } } = await contract.readState()
 
     expect(state.owner).to.equal(owner.address)
-    expect(state.distributionAmount).to.equal(INITIAL_DISTRIBUTION_AMOUNT)
+    expect(state.tokensDistributedPerSecond).to.equal(INITIAL_DISTRIBUTION_AMOUNT)
     expect(state.pendingDistributions).to.be.empty
     expect(state.claimable).to.be.empty
     expect(state.previousDistributions).to.be.empty
@@ -111,46 +119,50 @@ describe('Distribution Contract (e2e)', () => {
     const { cachedValue: { state } } = await contract.readState()
 
     expect(state.owner).to.equal(owner.address)
-    expect(state.distributionAmount).to.equal(INITIAL_DISTRIBUTION_AMOUNT)
+    expect(state.tokensDistributedPerSecond).to.equal(INITIAL_DISTRIBUTION_AMOUNT)
     expect(state.pendingDistributions).to.be.empty
     expect(state.claimable).to.be.empty
     expect(state.previousDistributions).to.be.empty
   })
 
   it('Prevents non-owners to set distribution amount', async () => {
-    const distributionAmount = '1234'
+    const tokensDistributedPerSecond = '1234'
     
     await contract
       .connect({
         signer: buildEvmSignature(alice.signer),
         type: 'ethereum'
       })
-      .writeInteraction<SetDistributionAmount>({
-        function: 'setDistributionAmount',
-        distributionAmount
+      .writeInteraction<SetTokenDistributionRate>({
+        function: 'setTokenDistributionRate',
+        tokensDistributedPerSecond
       })
 
     const { cachedValue: { state } } = await contract.readState()
 
-    expect(state.distributionAmount).to.equal(INITIAL_DISTRIBUTION_AMOUNT)
+    expect(state.tokensDistributedPerSecond).to.equal(
+      INITIAL_DISTRIBUTION_AMOUNT
+    )
   })
 
   it('Allows the owner to set distribution amount', async () => {
-    const distributionAmount = '2000'
+    const tokensDistributedPerSecond = '2000'
     
     await contract
       .connect({
         signer: buildEvmSignature(owner.signer),
         type: 'ethereum'
       })
-      .writeInteraction<SetDistributionAmount>({
-        function: 'setDistributionAmount',
-        distributionAmount
+      .writeInteraction<SetTokenDistributionRate>({
+        function: 'setTokenDistributionRate',
+        tokensDistributedPerSecond
       })
 
     const { cachedValue: { state } } = await contract.readState()
 
-    expect(state.distributionAmount).to.equal(distributionAmount)
+    expect(state.tokensDistributedPerSecond).to.equal(
+      tokensDistributedPerSecond
+    )
   })
 
   it('Allows owner to add scores', async () => {
@@ -195,7 +207,12 @@ describe('Distribution Contract (e2e)', () => {
 
     expect(state.claimable).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' }
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '0',
+        totalScore: '300'
+      }
     })
     expect(state.pendingDistributions).to.be.empty
   })
@@ -232,7 +249,12 @@ describe('Distribution Contract (e2e)', () => {
 
     expect(cachedValue.state.claimable).to.be.empty
     expect(cachedValue.state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' }
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '0',
+        totalScore: '300'
+      }
     })
     expect(cachedValue.state.pendingDistributions).to.deep.equal({
       [secondTimestamp]: [ scoreA, scoreB ]
@@ -253,7 +275,12 @@ describe('Distribution Contract (e2e)', () => {
 
     expect(state.claimable).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' }
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '0',
+        totalScore: '300'
+      }
     })
     expect(state.pendingDistributions).to.deep.equal({
       [secondTimestamp]: [ scoreA, scoreB, scoreC ]
@@ -274,8 +301,18 @@ describe('Distribution Contract (e2e)', () => {
     const { cachedValue: { state } } = await contract.readState()
 
     expect(state.previousDistributions).to.deep.equal({
-      [firstTimestamp]: { distributionAmount: '0' },
-      [secondTimestamp]: { distributionAmount: '10862' }
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '0',
+        totalScore: '300'
+      },
+      [secondTimestamp]: {
+        timeElapsed: '5432',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '10862',
+        totalScore: '2069'
+      }
     })
     expect(state.pendingDistributions).to.be.empty
     expect(state.claimable).to.deep.equal({
@@ -283,4 +320,60 @@ describe('Distribution Contract (e2e)', () => {
       [bob.address]: '7020'
     })
   })
+
+  it('Distributes tokens for many realistic scores', async () => {
+    const BATCH_SIZE = 15
+
+    for (let i = 0; i < MockScores.length; i += BATCH_SIZE) {
+      const scores = MockScores.slice(i, i + BATCH_SIZE)
+      await contract
+        .connect({
+          signer: buildEvmSignature(owner.signer),
+          type: 'ethereum'
+        })
+        .writeInteraction<AddScores>({
+          function: 'addScores',
+          timestamp: thirdTimestamp,
+          scores
+      })
+    }
+
+    await contract
+      .connect({
+        signer: buildEvmSignature(owner.signer),
+        type: 'ethereum'
+      })
+      .writeInteraction<Distribute>({
+        function: 'distribute',
+        timestamp: thirdTimestamp
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+    
+    expect(state.previousDistributions).to.deep.equal({
+      [firstTimestamp]: {
+        timeElapsed: '0',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '0',
+        totalScore: '300'
+      },
+      [secondTimestamp]: {
+        timeElapsed: '5432',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '10862',
+        totalScore: '2069'
+      },
+      [thirdTimestamp]: {
+        timeElapsed: '86405432',
+        tokensDistributedPerSecond: '2000',
+        totalDistributed: '172810790',
+        totalScore: '1793643'
+      }
+    })
+    expect(state.pendingDistributions).to.be.empty
+    // expect(state.claimable).to.deep.equal({
+    //   [alice.address]: '3842',
+    //   [bob.address]: '7020'
+    // })
+  }).timeout(5000)
 })
