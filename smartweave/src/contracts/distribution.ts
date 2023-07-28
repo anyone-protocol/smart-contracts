@@ -37,7 +37,7 @@ export type Score = {
 }
 
 export type DistributionState = OwnableState & EvolvableState & {
-  distributionAmount: string,
+  tokensDistributedPerSecond: string,
   pendingDistributions: {
     [timestamp: string]: Score[]
   },
@@ -45,13 +45,18 @@ export type DistributionState = OwnableState & EvolvableState & {
     [address: string]: string
   }
   previousDistributions: {
-    [timestamp: string]: { distributionAmount: string }
+    [timestamp: string]: {
+      totalScore: string
+      totalDistributed: string
+      timeElapsed: string
+      tokensDistributedPerSecond: string
+    }
   }
 }
 
-export interface SetDistributionAmount extends ContractFunctionInput {
-  function: 'setDistributionAmount',
-  distributionAmount: string
+export interface SetTokenDistributionRate extends ContractFunctionInput {
+  function: 'setTokenDistributionRate',
+  tokensDistributedPerSecond: string
 }
 
 export interface AddScores extends ContractFunctionInput {
@@ -135,19 +140,19 @@ export class DistributionContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
-  setDistributionAmount(
+  setTokenDistributionRate(
     state: DistributionState,
-    action: ContractInteraction<PartialFunctionInput<SetDistributionAmount>>
+    action: ContractInteraction<PartialFunctionInput<SetTokenDistributionRate>>
   ): HandlerResult<DistributionState, any> {
-    const { input: { distributionAmount } } = action
+    const { input: { tokensDistributedPerSecond } } = action
 
     ContractAssert(
-      typeof distributionAmount === 'string'
-        && BigNumber(distributionAmount).gte(0),
+      typeof tokensDistributedPerSecond === 'string'
+        && BigNumber(tokensDistributedPerSecond).gte(0),
       INVALID_DISTRIBUTION_AMOUNT
     )
 
-    state.distributionAmount = distributionAmount
+    state.tokensDistributedPerSecond = tokensDistributedPerSecond
 
     return { state, result: true }
   }
@@ -201,28 +206,28 @@ export class DistributionContract extends Evolvable(Object) {
     )
 
     const lastDistribution = this.getLatestDistribution(state)
-    let distributionAmount = BigNumber(state.distributionAmount)
+    let distributionAmount = BigNumber(state.tokensDistributedPerSecond)
     let totalDistributed = BigNumber(0)
+    const scores = state.pendingDistributions[timestamp]
+    const totalScore = scores.reduce<BigNumber>(
+      (total, { score }) => total.plus(BigNumber(score)),
+      BigNumber(0)
+    )
+    let timeElapsed = '0'
     if (!lastDistribution) {
       distributionAmount = BigNumber(0)
     } else {
       const elapsedSinceLastDistribution =
         Number.parseInt(timestamp) - lastDistribution
-      
-      distributionAmount = BigNumber(state.distributionAmount)
+      timeElapsed = elapsedSinceLastDistribution.toString()
+      distributionAmount = BigNumber(state.tokensDistributedPerSecond)
         .times(BigNumber(elapsedSinceLastDistribution))
         .dividedBy(DISTRIBUTION_RATE_MS)
-      
-      const scores = state.pendingDistributions[timestamp]
-      const total = scores.reduce<BigNumber>(
-        (total, { score }) => total.plus(BigNumber(score)),
-        BigNumber(0)
-      )
 
       for (let i = 0; i < scores.length; i++) {
         const { score, address } = scores[i]
         const claimable = BigNumber(score)
-          .dividedBy(total)
+          .dividedBy(totalScore)
           .times(distributionAmount)
           .integerValue(BigNumber.ROUND_FLOOR)
         totalDistributed = totalDistributed.plus(claimable)
@@ -234,7 +239,10 @@ export class DistributionContract extends Evolvable(Object) {
     }
 
     state.previousDistributions[timestamp] = {
-      distributionAmount: totalDistributed.toString()
+      totalScore: totalScore.toString(),
+      timeElapsed,
+      totalDistributed: totalDistributed.toString(),
+      tokensDistributedPerSecond: state.tokensDistributedPerSecond
     }
     delete state.pendingDistributions[timestamp]
 
@@ -281,8 +289,8 @@ export default function handle(
   const contract = new DistributionContract()
 
   switch (action.input.function) {
-    case 'setDistributionAmount':
-      return contract.setDistributionAmount(state, action)
+    case 'setTokenDistributionRate':
+      return contract.setTokenDistributionRate(state, action)
     case 'addScores':
       return contract.addScores(state, action)
     case 'distribute':
