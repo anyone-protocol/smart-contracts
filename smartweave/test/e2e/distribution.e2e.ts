@@ -362,6 +362,7 @@ describe('Distribution Contract (e2e)', () => {
 
     const { cachedValue: { state } } = await contract.readState()
     
+    expect(state.pendingDistributions).to.be.empty
     expect(state.previousDistributions).to.deep.equal({
       [firstTimestamp]: {
         timeElapsed: '0',
@@ -382,11 +383,5 @@ describe('Distribution Contract (e2e)', () => {
         totalScore: '1793643'
       }
     })
-
-    expect(state.pendingDistributions).to.be.empty
-    // expect(state.claimable).to.deep.equal({
-    //   [alice.address]: '3842',
-    //   [bob.address]: '7020'
-    // })
   }).timeout(5000)
 })
