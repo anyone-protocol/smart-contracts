@@ -321,7 +321,19 @@ describe('Distribution Contract (e2e)', () => {
     })
   })
 
-  it('Distributes tokens for many realistic scores', async () => {
+  it('Distributes tokens for realistic rate and scores', async () => {
+    const realisticTokensPerSecond = '628000000000000000'
+
+    await contract
+      .connect({
+        signer: buildEvmSignature(owner.signer),
+        type: 'ethereum'
+      })
+      .writeInteraction<SetTokenDistributionRate>({
+        function: 'setTokenDistributionRate',
+        tokensDistributedPerSecond: realisticTokensPerSecond
+      })
+
     const BATCH_SIZE = 15
 
     for (let i = 0; i < MockScores.length; i += BATCH_SIZE) {
@@ -335,7 +347,7 @@ describe('Distribution Contract (e2e)', () => {
           function: 'addScores',
           timestamp: thirdTimestamp,
           scores
-      })
+        })
     }
 
     await contract
@@ -365,11 +377,12 @@ describe('Distribution Contract (e2e)', () => {
       },
       [thirdTimestamp]: {
         timeElapsed: '86405432',
-        tokensDistributedPerSecond: '2000',
-        totalDistributed: '172810790',
+        tokensDistributedPerSecond: realisticTokensPerSecond,
+        totalDistributed: '5.4262611296000000001004e+22',
         totalScore: '1793643'
       }
     })
+
     expect(state.pendingDistributions).to.be.empty
     // expect(state.claimable).to.deep.equal({
     //   [alice.address]: '3842',
