@@ -24,6 +24,9 @@ const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
 const consulKey = process.env.CONSUL_KEY
   || 'smart-contracts/stage/test-deploy'
 
+const consulToken = process.env.CONSUL_TOKEN
+|| 'no-token'
+
 ;(async () => {
   LoggerFactory.INST.logLevel('error')  
 
@@ -55,10 +58,14 @@ const consulKey = process.env.CONSUL_KEY
     console.log(`Connecting to Consul at ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}...`)
     const consul = new Consul({
       host: process.env.CONSUL_IP,
-      port: process.env.CONSUL_PORT
+      port: process.env.CONSUL_PORT,
     });
 
-    const updateResult = await consul.kv.set(consulKey, contractTxId);
+    const updateResult = await consul.kv.set({
+      key: consulKey,
+      value: contractTxId,
+      token: consulToken
+    });
     console.log(`Cluster variable updated: ${updateResult}`)
   } else {
     console.warn('Deployment env var PHASE not defined, skipping update of cluster variable in Consul.')

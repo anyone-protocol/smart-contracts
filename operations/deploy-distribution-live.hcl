@@ -28,6 +28,7 @@ job "deploy-distribution-live" {
             data = <<EOH
             {{with secret "kv/distribution/live"}}
                 DEPLOYER_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+                CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
             {{end}}
             EOH
             destination = "secrets/file.env"

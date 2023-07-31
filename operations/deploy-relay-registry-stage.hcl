@@ -28,6 +28,7 @@ job "deploy-relay-registry-stage" {
             data = <<EOH
             {{with secret "kv/relay-registry/stage"}}
                 DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
+                CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
             {{end}}
             EOH
             destination = "secrets/file.env"
