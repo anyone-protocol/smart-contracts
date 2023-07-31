@@ -11,7 +11,7 @@ job "deploy-relay-registry-stage" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/ator-development/smart-contracts:0.1.0"
+            image = "ghcr.io/ator-development/smart-contracts:0.1.1"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
