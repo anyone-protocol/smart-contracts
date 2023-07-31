@@ -21,6 +21,9 @@ const pathToInitState = process.env.INIT_STATE
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 
+const consulKey = process.env.CONSUL_KEY
+  || 'smart-contracts/stage/test-deploy'
+
 ;(async () => {
   LoggerFactory.INST.logLevel('error')  
 
@@ -55,7 +58,7 @@ const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
       port: process.env.CONSUL_PORT
     });
 
-    const updateResult = await consul.kv.set(`smart-contracts/${process.env.PHASE}/relay-registry-address`, contractTxId);
+    const updateResult = await consul.kv.set(consulKey, contractTxId);
     console.log(`Cluster variable updated: ${updateResult}`)
   } else {
     console.warn('Deployment env var PHASE not defined, skipping update of cluster variable in Consul.')

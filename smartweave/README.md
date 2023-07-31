@@ -36,6 +36,8 @@ Before deploying, make sure the following environment variables are set:
 - `DEPLOYER_PRIVATE_KEY`
   - EVM deployer private key hex
   - Defaults to Hardhat Account #0
+- `CONSUL_KEY`
+  - path to cluster kv key holding contract's address
 
 ```bash
 $ npm run deploy
