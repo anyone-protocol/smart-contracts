@@ -575,10 +575,14 @@ describe('Distribution Contract', () => {
   })
 
   it('Should scale distribution by time since last distribution', () => {
-    const timeDifference = 5432
+    const firstTimeDifference = 5432
+    const secondTimeDifference = 86400
     const now = Date.now()
     const firstTimestamp = now.toString()
-    const secondTimestamp = (now + timeDifference).toString()
+    const secondTimestamp = (now + firstTimeDifference).toString()
+    const thirdTimestamp = (
+      now + firstTimeDifference + secondTimeDifference
+    ).toString()
     const firstAddScores = createInteraction(OWNER, {
       function: 'addScores',
       timestamp: firstTimestamp,
@@ -605,15 +609,30 @@ describe('Distribution Contract', () => {
       function: 'distribute',
       timestamp: secondTimestamp
     })
+    const thirdAddScores = createInteraction(OWNER, {
+      function: 'addScores',
+      timestamp: thirdTimestamp,
+      scores: [
+        { score: '254', address: ALICE, fingerprint: fingerprintA },
+        { score: '5676', address: BOB, fingerprint: fingerprintB },
+        { score: '2232', address: ALICE, fingerprint: fingerprintC },
+      ]
+    })
+    const thirdDistribute = createInteraction(OWNER, {
+      function: 'distribute',
+      timestamp: thirdTimestamp
+    })
     
     DistributionHandle(initState, firstAddScores)
     DistributionHandle(initState, firstDistribute)
     DistributionHandle(initState, secondAddScores)
-    const { state } = DistributionHandle(initState, secondDistribute)
+    DistributionHandle(initState, secondDistribute)
+    DistributionHandle(initState, thirdAddScores)
+    const { state } = DistributionHandle(initState, thirdDistribute)
 
     expect(state.claimable).to.deep.equal({
-      [ALICE]: '1920',
-      [BOB]: '3510'
+      [ALICE]: '28235',
+      [BOB]: '63594'
     })
     expect(state.previousDistributions).to.deep.equal({
       [firstTimestamp]: {
@@ -623,10 +642,16 @@ describe('Distribution Contract', () => {
         totalScore: '300'
       },
       [secondTimestamp]: {
-        timeElapsed: timeDifference.toString(),
+        timeElapsed: firstTimeDifference.toString(),
         tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
         totalDistributed: '5430',
         totalScore: '2069'
+      },
+      [thirdTimestamp]: {
+        timeElapsed: (secondTimeDifference).toString(),
+        tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+        totalDistributed: '86399',
+        totalScore: '8162'
       }
     })
     expect(state.pendingDistributions).to.be.empty

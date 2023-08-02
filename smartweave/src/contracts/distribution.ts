@@ -105,8 +105,18 @@ export class DistributionContract extends Evolvable(Object) {
   }
 
   private getLatestDistribution(state: DistributionState): number | false {
-    return Object.keys(state.previousDistributions).length > 0
-      && Number.parseInt(Object.keys(state.previousDistributions).sort()[0])
+    const timestamps = Object.keys(state.previousDistributions)
+    if (timestamps.length < 1) { return false }
+
+    let latestTimestamp = Number.parseInt(timestamps[0])
+    for (let i = 0; i < timestamps.length; i++) {
+      const timestamp = Number.parseInt(timestamps[i])
+      if (latestTimestamp < timestamp) {
+        latestTimestamp = timestamp
+      }
+    }
+    
+    return latestTimestamp
   }
 
   private isTimestampNotBackdated(
