@@ -43,7 +43,7 @@ job "deploy-distribution-stage" {
     "owner":"{{.Data.data.DISTRIBUTION_OWNER_ADDRESS}}",
     "pendingDistributions":{},
     "previousDistributions":{},
-    "tokensDistributedPerSecond":"628000000000000000"
+    "tokensDistributedPerSecond":"62800000000000000"
 }
 
             {{end}}
