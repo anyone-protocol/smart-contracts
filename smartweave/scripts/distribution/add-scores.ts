@@ -32,6 +32,7 @@ const warp = WarpFactory
   .use(new EvmSignatureVerificationServerPlugin())
 
 async function main() {
+  let consul
   if (consulToken) {
     const host = process.env.CONSUL_IP,
       port = process.env.CONSUL_PORT,
@@ -41,7 +42,7 @@ async function main() {
     if (!key) { throw new Error('DISTRIBUTION_ADDRESS_CONSUL_KEY is not set!') }
     
     console.log(`Connecting to Consul at ${host}:${port}`)
-    const consul = new Consul({ host, port })
+    consul = new Consul({ host, port })
 
     contractTxId = await consul.kv.get({ token: consulToken, key })
   }
@@ -54,16 +55,32 @@ async function main() {
     throw new Error('DISTRIBUTION_OWNER_KEY is not set!')
   }
 
-  if (!pathToScores) {
-    throw new Error('SCORES_PATH is not set!')
-  }
-
   const contract = warp.contract<DistributionState>(contractTxId)
   const contractOwner = new EthereumSigner(contractOwnerPrivateKey)
   const contractOwnerAddress = new Wallet(contractOwnerPrivateKey).address
-  const scores: Score[] = JSON.parse(
-    fs.readFileSync(path.join(__dirname, pathToScores)).toString()
-  )
+  let scores: Score[] = []
+  
+  if (pathToScores) {
+    scores = JSON.parse(
+      fs.readFileSync(path.join(__dirname, pathToScores)).toString()
+    )
+  } else {
+    if (consul) {
+      const accountsData: string = await consul.kv.get({
+        key: process.env.TEST_ACCOUNTS_KEY || 'dummy-path',
+        token: consulToken
+      })
+      if (accountsData) {
+        const decodedValue = Buffer.from(accountsData, 'base64').toString('utf-8');
+        const accounts = JSON.parse(decodedValue) as string[];
+        scores = accounts.map((acct, index, array) => ({
+          score: (10_000 + Math.random() * 10_000).toFixed(0),
+          address: acct,
+          fingerprint: (Math.random() * 1E32).toFixed(0)
+        }))
+      }
+    }
+  }
   const timestamp = Date.now().toString()
 
   const BATCH_SIZE = 5
