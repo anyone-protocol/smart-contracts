@@ -1,4 +1,5 @@
-job "set-token-distribution-rate-stage" {
+
+job "add-scores-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +7,7 @@ job "set-token-distribution-rate-stage" {
     attempts = 0
   }
 
-  task "set-token-distribution-rate-stage-task" {
+  task "add-scores-stage-task" {
     driver = "docker"
 
     config {
@@ -14,7 +15,10 @@ job "set-token-distribution-rate-stage" {
       image = "ghcr.io/ator-development/smart-contracts:0.1.1"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-token-distribution-rate.ts"]
+      args = ["scripts/distribution/add-scores.ts"]
+      volumes = [
+        "local/scores:/usr/src/app/smartweave/dist/contracts/scores.json"
+      ]
     }
 
     vault {
@@ -32,11 +36,18 @@ job "set-token-distribution-rate-stage" {
       env         = true
     }
 
+    template {
+      data = <<EOH
+      TODO: scores json :)
+      EOH
+      destination = "local/scores.json"
+      env = false
+    }
+
     env {
       PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TOKENS_DISTRIBUTED_PER_SECOND="62800000000000000"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
     }
 
