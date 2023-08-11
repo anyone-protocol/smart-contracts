@@ -26,7 +26,6 @@ job "set-token-distribution-rate-live" {
       {{with secret "kv/distribution/live"}}
         DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
-        TOKENS_DISTRIBUTED_PER_SECOND="62800000000000000"
       {{end}}
       EOH
       destination = "secrets/file.env"
@@ -37,6 +36,8 @@ job "set-token-distribution-rate-live" {
       PHASE="live"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
+      TOKENS_DISTRIBUTED_PER_SECOND="62800000000000000"
+      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
     }
 
     restart {
