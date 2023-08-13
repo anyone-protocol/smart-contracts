@@ -17,7 +17,7 @@ import {
   AddScores,
   Score,
   Distribute
-} from '~/src/contracts'
+} from '../../src/contracts'
 
 let contractTxId = process.env.DISTRIBUTION_CONTRACT_ID
 const consulToken = process.env.CONSUL_TOKEN
