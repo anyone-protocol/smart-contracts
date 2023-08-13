@@ -10,6 +10,7 @@ import {
 } from 'warp-contracts-plugin-signature/server'
 import { Wallet } from 'ethers'
 import Consul from 'consul'
+import BigNumber from 'bignumber.js'
 
 import {
   DistributionHandle,
@@ -77,7 +78,7 @@ async function main() {
         scores = accounts.map((acct, index, array) => ({
           score: (10_000 + Math.random() * 10_000).toFixed(0),
           address: acct,
-          fingerprint: BigInt(1E40 + index).toString()
+          fingerprint: BigNumber(1E40).plus(index).integerValue().toString()
         }))
 
         console.log(scores)
