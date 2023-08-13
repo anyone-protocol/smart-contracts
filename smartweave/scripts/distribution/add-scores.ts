@@ -77,7 +77,7 @@ async function main() {
         scores = accounts.map((acct, index, array) => ({
           score: (10_000 + Math.random() * 10_000).toFixed(0),
           address: acct,
-          fingerprint: (Math.random() * 1E32).toFixed(0)
+          fingerprint: (Math.random() * 1E40).toFixed(0)
         }))
       }
     }
