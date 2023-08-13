@@ -74,6 +74,7 @@ async function main() {
       console.log(typeof accountsData, accountsData)
 
       if (accountsData) {
+        //@ts-ignore
         const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
         const accounts = JSON.parse(decodedValue) as string[];
         scores = accounts.map((acct, index, array) => ({
