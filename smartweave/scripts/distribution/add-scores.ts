@@ -66,12 +66,15 @@ async function main() {
     )
   } else {
     if (consul) {
-      const accountsData: string = await consul.kv.get({
+      const accountsData = await consul.kv.get({
         key: process.env.TEST_ACCOUNTS_KEY || 'dummy-path',
         token: consulToken
       })
+
+      console.log(typeof accountsData, accountsData)
+
       if (accountsData) {
-        const decodedValue = Buffer.from(accountsData, 'base64').toString('utf-8');
+        const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
         const accounts = JSON.parse(decodedValue) as string[];
         scores = accounts.map((acct, index, array) => ({
           score: (10_000 + Math.random() * 10_000).toFixed(0),
