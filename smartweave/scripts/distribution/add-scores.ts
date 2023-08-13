@@ -88,31 +88,36 @@ async function main() {
   }
   const timestamp = Date.now().toString()
 
-  const BATCH_SIZE = 5
-  for (let i = 0; i < scores.length; i++) {
-    const scoresBatch = scores.slice(i, i + BATCH_SIZE)
-    const input: AddScores = {
-      function: 'addScores',
-      timestamp,
-      scores: scoresBatch
-    }
-  
-    // NB: Sanity check by getting current state and "dry-running" thru contract
-    //     source handle directly.  If it doesn't throw, we're good.
-    const { cachedValue: { state } } = await contract.readState()
-    DistributionHandle(state, {
-      input,
-      caller: contractOwner.address,
-      interactionType: 'write'
-    })
-  
-    // NB: Send off the interaction for real
-    await contract
-      .connect({
-        signer: buildEvmSignature(contractOwner),
-        type: 'ethereum'
+  try {
+    const BATCH_SIZE = 5
+    for (let i = 0; i < scores.length; i++) {
+      const scoresBatch = scores.slice(i, i + BATCH_SIZE)
+      const input: AddScores = {
+        function: 'addScores',
+        timestamp,
+        scores: scoresBatch
+      }
+    
+      // NB: Sanity check by getting current state and "dry-running" thru contract
+      //     source handle directly.  If it doesn't throw, we're good.
+      const { cachedValue: { state } } = await contract.readState()
+      DistributionHandle(state, {
+        input,
+        caller: contractOwner.address,
+        interactionType: 'write'
       })
-      .writeInteraction<AddScores>(input)
+    
+      // NB: Send off the interaction for real
+      await contract
+        .connect({
+          signer: buildEvmSignature(contractOwner),
+          type: 'ethereum'
+        })
+        .writeInteraction<AddScores>(input)
+    }
+  } catch(e) {
+    console.error(e)
+    console.log("Continuing execution")
   }
 
   const input: Distribute = { function: 'distribute', timestamp }
