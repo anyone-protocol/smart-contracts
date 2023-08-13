@@ -58,8 +58,7 @@ async function main() {
   }
 
   const contract = warp.contract<DistributionState>(contractTxId)
-  const contractOwner = new EthereumSigner(contractOwnerPrivateKey)
-  const contractOwnerAddress = new Wallet(contractOwnerPrivateKey).address
+  const contractOwner = new Wallet(contractOwnerPrivateKey)
   let scores: Score[] = []
   
   if (pathToScores) {
@@ -103,7 +102,7 @@ async function main() {
     const { cachedValue: { state } } = await contract.readState()
     DistributionHandle(state, {
       input,
-      caller: contractOwnerAddress,
+      caller: contractOwner.address,
       interactionType: 'write'
     })
   
@@ -123,7 +122,7 @@ async function main() {
   const { cachedValue: { state } } = await contract.readState()
   DistributionHandle(state, {
     input,
-    caller: contractOwnerAddress,
+    caller: contractOwner.address,
     interactionType: 'write'
   })
 
