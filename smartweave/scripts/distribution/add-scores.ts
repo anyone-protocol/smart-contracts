@@ -79,6 +79,8 @@ async function main() {
           address: acct,
           fingerprint: (Math.random() * 1E40).toFixed(0)
         }))
+
+        console.log(scores)
       }
     }
   }
