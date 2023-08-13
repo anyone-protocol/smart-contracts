@@ -80,7 +80,7 @@ async function main() {
         scores = accounts.map((acct, index, array) => ({
           score: (10_000 + Math.random() * 10_000).toFixed(0),
           address: acct,
-          fingerprint: BigNumber(1E40).plus(index).integerValue().toString()
+          fingerprint: BigNumber(1E39).plus(index).integerValue().toString()
         }))
 
         console.log(scores)
