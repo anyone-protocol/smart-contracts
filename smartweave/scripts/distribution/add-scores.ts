@@ -26,6 +26,7 @@ const contractOwnerPrivateKey = process.env.DISTRIBUTION_OWNER_KEY
 const pathToScores = process.env.SCORES_PATH
 
 LoggerFactory.INST.logLevel('error')
+BigNumber.config({ EXPONENTIAL_AT: 50 })
 
 const warp = WarpFactory
   .forMainnet()
@@ -71,6 +72,7 @@ async function main() {
         key: process.env.TEST_ACCOUNTS_KEY || 'dummy-path',
         token: consulToken
       })
+      
 
       if (accountsData) {
         const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
