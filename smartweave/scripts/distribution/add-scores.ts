@@ -100,12 +100,12 @@ async function main() {
     
       // NB: Sanity check by getting current state and "dry-running" thru contract
       //     source handle directly.  If it doesn't throw, we're good.
-      const { cachedValue: { state } } = await contract.readState()
-      DistributionHandle(state, {
-        input,
-        caller: contractOwner.address,
-        interactionType: 'write'
-      })
+      // const { cachedValue: { state } } = await contract.readState()
+      // DistributionHandle(state, {
+      //   input,
+      //   caller: contractOwner.address,
+      //   interactionType: 'write'
+      // })
     
       // NB: Send off the interaction for real
       await contract

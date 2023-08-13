@@ -12,7 +12,7 @@ job "add-scores-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.1.16"
+      image = "ghcr.io/ator-development/smart-contracts:0.1.17"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/add-scores.ts"]
