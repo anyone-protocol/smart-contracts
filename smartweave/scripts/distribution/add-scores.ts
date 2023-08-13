@@ -90,7 +90,7 @@ async function main() {
 
   try {
     const BATCH_SIZE = 5
-    for (let i = 0; i < scores.length; i++) {
+    for (let i = 0; i < scores.length; i += BATCH_SIZE) {
       const scoresBatch = scores.slice(i, i + BATCH_SIZE)
       const input: AddScores = {
         function: 'addScores',
@@ -100,12 +100,12 @@ async function main() {
     
       // NB: Sanity check by getting current state and "dry-running" thru contract
       //     source handle directly.  If it doesn't throw, we're good.
-      // const { cachedValue: { state } } = await contract.readState()
-      // DistributionHandle(state, {
-      //   input,
-      //   caller: contractOwner.address,
-      //   interactionType: 'write'
-      // })
+      const { cachedValue: { state } } = await contract.readState()
+      DistributionHandle(state, {
+        input,
+        caller: contractOwner.address,
+        interactionType: 'write'
+      })
     
       // NB: Send off the interaction for real
       await contract
