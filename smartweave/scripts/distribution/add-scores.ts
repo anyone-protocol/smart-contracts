@@ -43,8 +43,8 @@ async function main() {
     
     console.log(`Connecting to Consul at ${host}:${port}`)
     consul = new Consul({ host, port })
-
-    contractTxId = await consul.kv.get({ token: consulToken, key })
+    const { Value } = await consul.kv.get<{Value: string}>({ token: consulToken, key })
+    contractTxId = Value
   }
 
   if (!contractTxId) {
@@ -66,15 +66,12 @@ async function main() {
     )
   } else {
     if (consul) {
-      const accountsData = await consul.kv.get({
+      const accountsData = await consul.kv.get<{ Value: string }>({
         key: process.env.TEST_ACCOUNTS_KEY || 'dummy-path',
         token: consulToken
       })
 
-      console.log(typeof accountsData, accountsData)
-
       if (accountsData) {
-        //@ts-ignore
         const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
         const accounts = JSON.parse(decodedValue) as string[];
         scores = accounts.map((acct, index, array) => ({

@@ -43,7 +43,8 @@ async function main() {
     console.log(`Connecting to Consul at ${host}:${port}`)
     const consul = new Consul({ host, port })
 
-    contractTxId = await consul.kv.get({ token: consulToken, key })
+    const { Value } = await consul.kv.get<{Value: string}>({ token: consulToken, key })
+    contractTxId = Value
   }
 
   if (!contractTxId) {
