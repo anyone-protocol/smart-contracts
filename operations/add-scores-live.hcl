@@ -48,7 +48,7 @@ job "add-scores-live" {
       PHASE="live"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TEST_ACCOUNTS_KEY="facilitator-goerli/test-accounts"
+      TEST_ACCOUNTS_KEY="facilitator/goerli/live/test-accounts"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
     }
 
