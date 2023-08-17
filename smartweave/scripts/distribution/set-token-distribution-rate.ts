@@ -13,7 +13,7 @@ import {
   DistributionHandle,
   DistributionState,
   SetTokenDistributionRate
-} from '~/src/contracts'
+} from '../../src/contracts'
 
 let consulToken = process.env.CONSUL_TOKEN,
   contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
