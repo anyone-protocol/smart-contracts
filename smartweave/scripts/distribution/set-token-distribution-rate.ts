@@ -1,5 +1,4 @@
 import { LoggerFactory, WarpFactory } from 'warp-contracts'
-import { EthereumSigner } from 'warp-contracts-plugin-deploy'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
 import {
   buildEvmSignature,
@@ -56,8 +55,7 @@ async function main() {
   }
 
   const contract = warp.contract<DistributionState>(contractTxId)
-  const contractOwner = new EthereumSigner(contractOwnerPrivateKey)
-  const contractOwnerAddress = new Wallet(contractOwnerPrivateKey).address
+  const contractOwner = new Wallet(contractOwnerPrivateKey)
 
   const input: SetTokenDistributionRate = {
     function: 'setTokenDistributionRate',
@@ -69,7 +67,7 @@ async function main() {
   const { cachedValue: { state } } = await contract.readState()
   DistributionHandle(state, {
     input,
-    caller: contractOwnerAddress,
+    caller: contractOwner.address,
     interactionType: 'write'
   })
 
