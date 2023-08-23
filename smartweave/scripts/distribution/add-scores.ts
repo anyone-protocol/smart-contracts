@@ -77,7 +77,7 @@ async function main() {
         const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
         const accounts = JSON.parse(decodedValue) as string[];
         scores = accounts.map((acct, index, array) => ({
-          score: (10_000 + Math.random() * 10_000).toFixed(0),
+          score: (BigNumber("1e22").plus(BigNumber(Math.random() * 10_000))).toFixed(),
           address: acct,
           fingerprint: BigNumber(1E39).plus(index).integerValue().toString()
         }))
