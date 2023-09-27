@@ -22,7 +22,7 @@ const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 
 const consulKey = process.env.CONSUL_KEY
-  || 'smart-contracts/stage/test-deploy'
+  || 'dummy-path'
 
 const consulToken = process.env.CONSUL_TOKEN
 || 'no-token'
