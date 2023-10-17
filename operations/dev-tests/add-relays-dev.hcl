@@ -1,4 +1,4 @@
-job "set-token-distribution-rate-live" {
+job "add-relays-dev" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "set-token-distribution-rate-live" {
     attempts = 0
   }
 
-  task "set-token-distribution-rate-live-task" {
+  task "add-relays-dev-task" {
     driver = "docker"
 
     config {
@@ -14,17 +14,17 @@ job "set-token-distribution-rate-live" {
       image = "ghcr.io/ator-development/smart-contracts:0.1.24"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-token-distribution-rate.ts"]
+      args = ["scripts/relay-registry/add-relays.ts"]
     }
 
     vault {
-      policies = ["distribution-live"]
+      policies = ["relay-registry-dev"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/live"}}
-        DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+      {{with secret "kv/relay-registry/dev"}}
+        RELAY_REGISTRY_OWNER_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH
@@ -33,11 +33,11 @@ job "set-token-distribution-rate-live" {
     }
 
     env {
-      PHASE="live"
+      PHASE="dev"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TOKENS_DISTRIBUTED_PER_SECOND="95116000000000000"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
+      TEST_ACCOUNTS_KEY="facilitator/goerli/dev/test-accounts"
+      RELAY_REGISTRY_ADDRESS_CONSUL_KEY="smart-contracts/dev/relay-registry-address"
     }
 
     restart {

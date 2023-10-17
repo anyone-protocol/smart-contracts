@@ -1,5 +1,5 @@
 
-job "add-scores-live" {
+job "add-scores-dev" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -7,12 +7,12 @@ job "add-scores-live" {
     attempts = 0
   }
 
-  task "add-scores-live-task" {
+  task "add-scores-dev-task" {
     driver = "docker"
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.1.19"
+      image = "ghcr.io/ator-development/smart-contracts:0.1.24"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/add-scores.ts"]
@@ -22,12 +22,12 @@ job "add-scores-live" {
     }
 
     vault {
-      policies = ["distribution-live"]
+      policies = ["distribution-dev"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/live"}}
+      {{with secret "kv/distribution/dev"}}
         DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
@@ -45,11 +45,11 @@ job "add-scores-live" {
     }
 
     env {
-      PHASE="live"
+      PHASE="dev"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TEST_ACCOUNTS_KEY="facilitator/goerli/live/test-accounts"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
+      TEST_ACCOUNTS_KEY="facilitator/goerli/dev/test-accounts"
+      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/dev/distribution-address"
     }
 
     restart {
