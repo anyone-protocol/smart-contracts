@@ -1,3 +1,4 @@
+import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import 'mocha'
 import { expect } from 'chai'
 import { Wallet } from 'ethers'
@@ -9,13 +10,8 @@ import {
   Warp,
   WarpFactory
 } from 'warp-contracts'
-import { DeployPlugin, EthereumSigner } from 'warp-contracts-plugin-deploy'
+import { DeployPlugin } from 'warp-contracts-plugin-deploy'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-import {
-  buildEvmSignature,
-  EvmSignatureVerificationServerPlugin
-  // @ts-ignore
-} from 'warp-contracts-plugin-signature/server'
 
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
 import MockScores from './data/scores.json'
@@ -24,7 +20,7 @@ import {
   Distribute,
   DistributionState,
   SetTokenDistributionRate
-} from '../../src/contracts'
+} from '../../src/contracts/distribution'
 
 const INITIAL_DISTRIBUTION_AMOUNT = '1000'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
@@ -42,9 +38,9 @@ describe('Distribution Contract (e2e)', () => {
   contractSrc: string,
   contractTxId: string,
   contract: Contract<DistributionState>,
-  owner: { address: string, wallet: EthereumSigner, signer: Wallet },
-  alice: { address: string, wallet: EthereumSigner, signer: Wallet },
-  bob: { address: string, wallet: EthereumSigner, signer: Wallet }
+  owner: { address: string, wallet: EthereumSigner },
+  alice: { address: string, wallet: EthereumSigner },
+  bob: { address: string, wallet: EthereumSigner }
   
   before('Set up environment', async () => {
     LoggerFactory.INST.logLevel('error')
@@ -53,22 +49,18 @@ describe('Distribution Contract (e2e)', () => {
       .forMainnet()
       .use(new EthersExtension())
       .use(new DeployPlugin())
-      .use(new EvmSignatureVerificationServerPlugin())
     
     owner = {
       address: HardhatKeys.owner.address,
-      wallet: new EthereumSigner(HardhatKeys.owner.key),
-      signer: new Wallet(HardhatKeys.owner.key)
+      wallet: new EthereumSigner(HardhatKeys.owner.key)
     }
     alice = {
       address: HardhatKeys.alice.address,
-      wallet: new EthereumSigner(HardhatKeys.alice.key),
-      signer: new Wallet(HardhatKeys.alice.key)
+      wallet: new EthereumSigner(HardhatKeys.alice.key)
     }
     bob = {
       address: HardhatKeys.bob.address,
-      wallet: new EthereumSigner(HardhatKeys.bob.key),
-      signer: new Wallet(HardhatKeys.bob.key)
+      wallet: new EthereumSigner(HardhatKeys.bob.key)
     }
 
     contractSrc = fs.readFileSync(
@@ -82,16 +74,18 @@ describe('Distribution Contract (e2e)', () => {
       claimable: {},
       previousDistributions: {}
     }
-
     const deploy = await warp.deploy({
       src: contractSrc,
       wallet: owner.wallet,
       initState: JSON.stringify(initState)
     })
-
     contractTxId = deploy.contractTxId
     console.log('contract deployed at', contractTxId)
     contract = warp.contract<DistributionState>(contractTxId)
+  })
+
+  after('Tear down environment', async () => {
+    await warp.close()
   })
 
   it('Should match initial state after deployment', async () => {
@@ -106,10 +100,7 @@ describe('Distribution Contract (e2e)', () => {
 
   it('Should not affect state on invalid input', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddScores>({
         function: 'addScores',
         timestamp: 'bad-timestamp',
@@ -129,10 +120,7 @@ describe('Distribution Contract (e2e)', () => {
     const tokensDistributedPerSecond = '1234'
     
     await contract
-      .connect({
-        signer: buildEvmSignature(alice.signer),
-        type: 'ethereum'
-      })
+      .connect(alice.wallet)
       .writeInteraction<SetTokenDistributionRate>({
         function: 'setTokenDistributionRate',
         tokensDistributedPerSecond
@@ -149,10 +137,7 @@ describe('Distribution Contract (e2e)', () => {
     const tokensDistributedPerSecond = '2000'
     
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<SetTokenDistributionRate>({
         function: 'setTokenDistributionRate',
         tokensDistributedPerSecond
@@ -173,10 +158,7 @@ describe('Distribution Contract (e2e)', () => {
     ]
 
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddScores>({
         function: 'addScores',
         timestamp: firstTimestamp,
@@ -194,10 +176,7 @@ describe('Distribution Contract (e2e)', () => {
 
   it('Should not award claimable tokens on initial distribution', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<Distribute>({
         function: 'distribute',
         timestamp: firstTimestamp
@@ -235,10 +214,7 @@ describe('Distribution Contract (e2e)', () => {
     }
 
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddScores>({
         function: 'addScores',
         timestamp: secondTimestamp,
@@ -261,10 +237,7 @@ describe('Distribution Contract (e2e)', () => {
     })
 
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddScores>({
         function: 'addScores',
         timestamp: secondTimestamp,
@@ -289,10 +262,7 @@ describe('Distribution Contract (e2e)', () => {
 
   it('Distributes claimable tokens on subsequent distributions', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<Distribute>({
         function: 'distribute',
         timestamp: secondTimestamp
@@ -325,10 +295,7 @@ describe('Distribution Contract (e2e)', () => {
     const realisticTokensPerSecond = '628000000000000000'
 
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<SetTokenDistributionRate>({
         function: 'setTokenDistributionRate',
         tokensDistributedPerSecond: realisticTokensPerSecond
@@ -339,10 +306,7 @@ describe('Distribution Contract (e2e)', () => {
     for (let i = 0; i < MockScores.length; i += BATCH_SIZE) {
       const scores = MockScores.slice(i, i + BATCH_SIZE)
       await contract
-        .connect({
-          signer: buildEvmSignature(owner.signer),
-          type: 'ethereum'
-        })
+        .connect(owner.wallet)
         .writeInteraction<AddScores>({
           function: 'addScores',
           timestamp: thirdTimestamp,
@@ -351,10 +315,7 @@ describe('Distribution Contract (e2e)', () => {
     }
 
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<Distribute>({
         function: 'distribute',
         timestamp: thirdTimestamp
@@ -377,9 +338,9 @@ describe('Distribution Contract (e2e)', () => {
         totalScore: '2069'
       },
       [thirdTimestamp]: {
-        timeElapsed: '86405432',
+        timeElapsed: '86400000',
         tokensDistributedPerSecond: realisticTokensPerSecond,
-        totalDistributed: '5.4262611296000000001004e+22',
+        totalDistributed: '5.4259200000000000001007e+22',
         totalScore: '1793643'
       }
     })

@@ -1,11 +1,8 @@
+import dotenv from 'dotenv'
 import { LoggerFactory, WarpFactory } from 'warp-contracts'
-import { EthereumSigner } from 'warp-contracts-plugin-deploy'
+import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-import {
-  buildEvmSignature,
-  EvmSignatureVerificationServerPlugin
-  // @ts-ignore
-} from 'warp-contracts-plugin-signature/server'
+
 import { Wallet } from 'ethers'
 import Consul from 'consul'
 import BigNumber from 'bignumber.js'
@@ -16,7 +13,9 @@ import {
   RelayRegistryState
 } from '../../src/contracts'
 
-let contractTxId = ''
+dotenv.config()
+
+let contractTxId = process.env.RELAY_REGISTRY_CONTRACT_ID || ''
 const consulToken = process.env.CONSUL_TOKEN
 const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OWNER_KEY
 
@@ -26,7 +25,6 @@ BigNumber.config({ EXPONENTIAL_AT: 50 })
 const warp = WarpFactory
   .forMainnet()
   .use(new EthersExtension())
-  .use(new EvmSignatureVerificationServerPlugin())
 
 async function main() {
   let consul
@@ -45,16 +43,15 @@ async function main() {
   }
 
   if (!contractTxId) {
-    throw new Error('DISTRIBUTION_CONTRACT_ID is not set!')
+    throw new Error('RELAY_REGISTRY_CONTRACT_ID is not set!')
   }
 
   if (!contractOwnerPrivateKey) {
-    throw new Error('DISTRIBUTION_OWNER_KEY is not set!')
+    throw new Error('RELAY_REGISTRY_OWNER_KEY is not set!')
   }
 
   const contract = warp.contract<RelayRegistryState>(contractTxId)
-  const contractOwner = new Wallet(contractOwnerPrivateKey)
-  
+
   let claims: {address: string, fingerprint: string}[] = []
 
   if (consul) {
@@ -86,21 +83,18 @@ async function main() {
         address: claims[i].address,
       }
     
-      // NB: Sanity check by getting current state and "dry-running" thru contract
-      //     source handle directly.  If it doesn't throw, we're good.
+      // NB: Sanity check by getting current state and "dry-running" thru
+      //     contract source handle directly.  If it doesn't throw, we're good.
       const { cachedValue: { state } } = await contract.readState()
       RelayRegistryHandle(state, {
         input,
-        caller: contractOwner.address,
+        caller: new Wallet(contractOwnerPrivateKey).address,
         interactionType: 'write'
       })
     
       // NB: Send off the interaction for real
       await contract
-        .connect({
-          signer: buildEvmSignature(contractOwner),
-          type: 'ethereum'
-        })
+        .connect(new EthereumSigner(contractOwnerPrivateKey))
         .writeInteraction<AddClaimable>(input)
     }
   } catch(e) {

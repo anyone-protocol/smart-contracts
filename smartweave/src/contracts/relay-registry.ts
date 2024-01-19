@@ -4,6 +4,8 @@ import {
   HandlerResult
 } from 'warp-contracts'
 
+import BigNumber from 'bignumber.js'
+
 import {
   ContractAssert,
   ContractFunctionInput,
@@ -28,6 +30,9 @@ export const FINGERPRINT_NOT_CLAIMED_BY_ADDRESS =
   'Fingerprint not claimed by address'
 export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
+
+// TODO -> REMOVE! used for debugging warp contracts
+// export const REMOVE_THIS_BIG_NUMBER = BigNumber(1010)
 
 export type Fingerprint = string
 export type EvmAddress = string
@@ -132,7 +137,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   addClaimable(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<AddClaimable>>
-  ): HandlerResult<RelayRegistryState, any> {
+  ) {
     const { input: { address, fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
@@ -155,7 +160,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   removeClaimable(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<AddClaimable>>
-  ): HandlerResult<RelayRegistryState, any> {
+  ) {
     const { input: { fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
@@ -176,10 +181,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   claimable(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<Claimable>>
-  ): HandlerResult<
-    RelayRegistryState,
-    RelayRegistryState['claimable'] | Fingerprint[]
-  > {
+  ) {
     const { input: { address } } = action
 
     if (address) {
@@ -199,7 +201,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   isClaimable(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<IsClaimable>>
-  ): HandlerResult<RelayRegistryState, boolean> {
+  ) {
     const { input: { address, fingerprint } } = action
       
     this.assertValidFingerprint(fingerprint)
@@ -215,7 +217,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   claim(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<Claim>>
-  ): HandlerResult<RelayRegistryState, any> {
+  ) {
     const { caller, input: { fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
@@ -234,7 +236,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   renounce(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<Renounce>>
-  ): HandlerResult<RelayRegistryState, any> {
+  ) {
     const { caller, input: { fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
@@ -253,7 +255,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   removeVerified(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<RemoveVerified>>
-  ): HandlerResult<RelayRegistryState, any> {
+  ) {
     const { input: { fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
@@ -266,10 +268,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   verified(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<Verified>>
-  ): HandlerResult<
-    RelayRegistryState,
-    RelayRegistryState['verified'] | Fingerprint[]
-  > {
+  ) {
     const { input: { address } } = action
 
     if (address) {
@@ -289,7 +288,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   isVerified(
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<IsVerified>>
-  ): HandlerResult<RelayRegistryState, boolean> {
+  ) {
     const { input: { fingerprint } } = action
 
     this.assertValidFingerprint(fingerprint)
@@ -301,10 +300,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
   }
 }
 
-export default function handle(
+export function handle(
   state: RelayRegistryState,
   action: ContractInteraction<any>
-): HandlerResult<RelayRegistryState, any> {
+) {
   const contract = new RelayRegistryContract()
 
   switch (action.input.function) {

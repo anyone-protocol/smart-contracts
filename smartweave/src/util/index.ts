@@ -55,15 +55,15 @@ declare function onlyEvmAddress<S extends string>(
 ): any
 // onlyEvmAddress('0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
 
-export type TorFingerprint<S extends string = ''> = Uppercase<S> &
+export type RelayFingerprint<S extends string = ''> = Uppercase<S> &
   S extends ''
     ? never
     : LengthOfString<S> extends 40
       ? HexString<S>
       : never
 
-declare function onlyTorFingerprint<S extends string>(
-  fingerprint: S & TorFingerprint<S>
+declare function onlyRelayFingerprint<S extends string>(
+  fingerprint: S & RelayFingerprint<S>
 ): any
 
 // onlyTorFingerprint('AAAAABBBBBCCCCCDDDDDEEEEEFFFFF0000011111')

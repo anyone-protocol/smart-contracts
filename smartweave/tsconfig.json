@@ -21,12 +21,7 @@
     "useUnknownInCatchVariables": false,
     "baseUrl": ".",
     "paths": {
-      "~/*": [
-        "./*"
-      ],
-      "@/*": [
-        "./*"
-      ]
+      "~/*": [ "./*" ],
     },
     "types": [
       "node",
