@@ -50,7 +50,8 @@
   "dependencies": {
     "arweave": "1.14.4",
     "warp-contracts": "1.4.32",
-    "warp-contracts-plugin-deploy": "1.0.12",
-    "warp-contracts-plugin-ethers": "1.0.7"
+    "warp-contracts-plugin-deploy": "1.0.13-beta.1",
+    "warp-contracts-plugin-ethers": "1.0.8-beta.0",
+    "warp-contracts-plugin-signature": "1.0.20-beta.0"
   }
 }

@@ -12,6 +12,7 @@ import {
 } from 'warp-contracts'
 import { DeployPlugin } from 'warp-contracts-plugin-deploy'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
+import {} from 'warp-contracts-plugin-signature/server'
 
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
 import MockScores from './data/scores.json'
