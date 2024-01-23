@@ -16,8 +16,11 @@ import { EthersExtension } from 'warp-contracts-plugin-ethers'
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
 import {
   AddClaimable,
+  AddRegistrationCredit,
+  BlockAddress,
   Claim,
-  RelayRegistryState
+  RelayRegistryState,
+  UnblockAddress
 } from '../../src/contracts/relay-registry'
 
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
@@ -33,8 +36,9 @@ describe('Relay Registry Contract (e2e)', () => {
       alice: { address: string, wallet: EthereumSigner },
       bob: { address: string, wallet: EthereumSigner }
 
-  before('Set up environment', async () => {
+  before('Set up environment', async function () {
     LoggerFactory.INST.logLevel('error')
+    this.timeout(10000)
 
     warp = WarpFactory
       .forMainnet()
@@ -61,7 +65,9 @@ describe('Relay Registry Contract (e2e)', () => {
     const initState: RelayRegistryState = {
       owner: owner.address,
       claimable: {},
-      verified: {}
+      verified: {},
+      registrationCredits: {},
+      blockedAddresses: []
     }
     const deploy = await warp.deploy({
       src: contractSrc,
@@ -77,7 +83,7 @@ describe('Relay Registry Contract (e2e)', () => {
     await warp.close()
   })
 
-  it('Should match initial state after deployment', async () => {
+  it('Matches initial state after deployment', async () => {
     const { cachedValue: { state } } = await contract.readState()
     
     expect(state.owner).to.equal(owner.address)
@@ -100,7 +106,7 @@ describe('Relay Registry Contract (e2e)', () => {
     expect(state.verified).to.be.empty
   })
 
-  it('Should allow the contract owner to add claimable relays', async () => {
+  it('Allows Owner to add claimable relays', async () => {
     await contract
       .connect(owner.wallet)
       .writeInteraction<AddClaimable>({
@@ -117,7 +123,47 @@ describe('Relay Registry Contract (e2e)', () => {
     expect(state.verified).to.deep.equal({})
   })
 
-  it('Should allow users to claim relay fingerprints', async () => {
+  it('Allows Owner to add registration credits', async () => {
+    await contract
+      .connect(owner.wallet)
+      .writeInteraction<AddRegistrationCredit>({
+        function: 'addRegistrationCredit',
+        address: alice.address,
+        fingerprint: fingerprintA
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.registrationCredits).to.deep.equal({ [alice.address]: 1 })
+  })
+
+  it('Allows Owner to block addresses from claiming', async () => {
+    await contract
+      .connect(owner.wallet)
+      .writeInteraction<BlockAddress>({
+        function: 'blockAddress',
+        address: alice.address
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.blockedAddresses).to.include(alice.address)
+  })
+
+  it('Allows Owner to unblock addresses from claiming', async () => {
+    await contract
+    .connect(owner.wallet)
+    .writeInteraction<UnblockAddress>({
+      function: 'unblockAddress',
+      address: alice.address
+    })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.blockedAddresses).to.not.include(alice.address)
+  })
+
+  it('Allows users to claim relay fingerprints', async () => {
     await contract
       .connect(alice.wallet)
       .writeInteraction<Claim>({
@@ -131,9 +177,12 @@ describe('Relay Registry Contract (e2e)', () => {
     expect(state.verified).to.deep.equal({
       [fingerprintA]: alice.address
     })
+    expect(state.registrationCredits).to.deep.equal({
+      [alice.address]: 0
+    })
   })
 
-  it('Should add some more claimable relays for testing', async () => {
+  it('Allows adding multiple claimable relay fingerprints', async () => {
     await contract
       .connect(owner.wallet)
       .writeInteraction<AddClaimable>({

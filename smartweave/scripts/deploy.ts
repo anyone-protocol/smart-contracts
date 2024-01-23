@@ -15,11 +15,11 @@ import HardhatKeys from './test-keys/hardhat.json'
 dotenv.config()
 
 const pathToContractSrc = process.env.CONTRACT_SRC
-  || '../dist/contracts/relay-registry.js'
-  // || '../dist/contracts/distribution.js'
+  // || '../dist/contracts/relay-registry.js'
+  || '../dist/contracts/distribution.js'
 const pathToInitState = process.env.INIT_STATE
-  || './test-states/relay-registry-init-state.json'
-  // || './test-states/distribution-init-state.json'
+  // || './test-states/relay-registry-init-state.json'
+  || './test-states/distribution-init-state.json'
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 

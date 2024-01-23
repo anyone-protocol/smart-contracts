@@ -4,8 +4,6 @@ import {
   HandlerResult
 } from 'warp-contracts'
 
-import BigNumber from 'bignumber.js'
-
 import {
   ContractAssert,
   ContractFunctionInput,
@@ -30,16 +28,20 @@ export const FINGERPRINT_NOT_CLAIMED_BY_ADDRESS =
   'Fingerprint not claimed by address'
 export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
-
-// TODO -> REMOVE! used for debugging warp contracts
-// export const REMOVE_THIS_BIG_NUMBER = BigNumber(1010)
+export const REGISTRATION_CREDIT_REQUIRED =
+  'A Registration Credit is required to claim a fingerprint'
+export const ADDRESS_ALREADY_BLOCKED = 'Address already blocked'
+export const ADDRESS_NOT_BLOCKED = 'Address not blocked'
+export const ADDRESS_IS_BLOCKED = 'Address is blocked'
 
 export type Fingerprint = string
 export type EvmAddress = string
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
-  claimable: { [address in Fingerprint as string]: EvmAddress }
-  verified: { [address in Fingerprint as string]: EvmAddress }
+  claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
+  verified: { [fingerprint in Fingerprint as string]: EvmAddress }
+  registrationCredits: { [address in EvmAddress as string]: number }
+  blockedAddresses: EvmAddress[]
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -87,6 +89,21 @@ export interface Verified extends ContractFunctionInput {
 export interface IsVerified extends ContractFunctionInput {
   function: 'isVerified'
   fingerprint: Fingerprint
+}
+
+export interface AddRegistrationCredit extends ContractFunctionInput {
+  function: 'addRegistrationCredit'
+  address: EvmAddress
+}
+
+export interface BlockAddress extends ContractFunctionInput {
+  function: 'blockAddress',
+  address: EvmAddress
+}
+
+export interface UnblockAddress extends ContractFunctionInput {
+  function: 'unblockAddress',
+  address: EvmAddress
 }
 
 export class RelayRegistryContract extends Evolvable(Object) {
@@ -226,7 +243,16 @@ export class RelayRegistryContract extends Evolvable(Object) {
       caller === state.claimable[fingerprint],
       FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS
     )
-
+    ContractAssert(
+      !state.blockedAddresses.includes(caller),
+      ADDRESS_IS_BLOCKED
+    )
+    ContractAssert(
+      !!state.registrationCredits[caller],
+      REGISTRATION_CREDIT_REQUIRED
+    )
+    
+    state.registrationCredits[caller] = state.registrationCredits[caller] - 1
     state.verified[fingerprint] = state.claimable[fingerprint]
     delete state.claimable[fingerprint]
 
@@ -298,6 +324,53 @@ export class RelayRegistryContract extends Evolvable(Object) {
       result: Object.keys(state.verified).includes(fingerprint)
     }
   }
+
+  @OnlyOwner
+  addRegistrationCredit(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<AddRegistrationCredit>>
+  ) {
+    const { input: { address } } = action
+
+    this.assertValidEvmAddress(address)
+    
+    state.registrationCredits[address] =
+      (state.registrationCredits[address] || 0) + 1
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  blockAddress(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<BlockAddress>>
+  ) {
+    const { input: { address } } = action
+
+    this.assertValidEvmAddress(address)
+    ContractAssert(
+      !state.blockedAddresses.includes(address),
+      ADDRESS_ALREADY_BLOCKED
+    )
+    state.blockedAddresses.push(address)
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  unblockAddress(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<UnblockAddress>>
+  ) {
+    const { input: { address } } = action
+
+    this.assertValidEvmAddress(address)
+    const blockedIndex = state.blockedAddresses.indexOf(address)
+    ContractAssert(blockedIndex > -1, ADDRESS_NOT_BLOCKED)
+    state.blockedAddresses.splice(blockedIndex, 1)
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -325,6 +398,12 @@ export function handle(
       return contract.verified(state, action)
     case 'isVerified':
       return contract.isVerified(state, action)
+    case 'addRegistrationCredit':
+      return contract.addRegistrationCredit(state, action)
+    case 'blockAddress':
+      return contract.blockAddress(state, action)
+    case 'unblockAddress':
+      return contract.unblockAddress(state, action)
     case 'evolve':
       return contract.evolve(
         state,
