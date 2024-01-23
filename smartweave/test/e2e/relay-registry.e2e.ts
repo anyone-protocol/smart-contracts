@@ -16,6 +16,7 @@ import { EthersExtension } from 'warp-contracts-plugin-ethers'
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
 import {
   AddClaimable,
+  AddRegistrationCredit,
   Claim,
   RelayRegistryState
 } from '../../src/contracts/relay-registry'
@@ -61,7 +62,8 @@ describe('Relay Registry Contract (e2e)', () => {
     const initState: RelayRegistryState = {
       owner: owner.address,
       claimable: {},
-      verified: {}
+      verified: {},
+      registrationCredits: {}
     }
     const deploy = await warp.deploy({
       src: contractSrc,
@@ -77,7 +79,7 @@ describe('Relay Registry Contract (e2e)', () => {
     await warp.close()
   })
 
-  it('Should match initial state after deployment', async () => {
+  it('Matches initial state after deployment', async () => {
     const { cachedValue: { state } } = await contract.readState()
     
     expect(state.owner).to.equal(owner.address)
@@ -100,7 +102,7 @@ describe('Relay Registry Contract (e2e)', () => {
     expect(state.verified).to.be.empty
   })
 
-  it('Should allow the contract owner to add claimable relays', async () => {
+  it('Allows Owner to add claimable relays', async () => {
     await contract
       .connect(owner.wallet)
       .writeInteraction<AddClaimable>({
@@ -117,7 +119,21 @@ describe('Relay Registry Contract (e2e)', () => {
     expect(state.verified).to.deep.equal({})
   })
 
-  it('Should allow users to claim relay fingerprints', async () => {
+  it('Allows Owner to add registration credits', async () => {
+    await contract
+      .connect(owner.wallet)
+      .writeInteraction<AddRegistrationCredit>({
+        function: 'addRegistrationCredit',
+        address: alice.address,
+        fingerprint: fingerprintA
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.registrationCredits).to.deep.equal({ [alice.address]: 1 })
+  })
+
+  it('Allows users to claim relay fingerprints', async () => {
     await contract
       .connect(alice.wallet)
       .writeInteraction<Claim>({
@@ -133,7 +149,7 @@ describe('Relay Registry Contract (e2e)', () => {
     })
   })
 
-  it('Should add some more claimable relays for testing', async () => {
+  it('Allows adding multiple claimable relay fingerprints', async () => {
     await contract
       .connect(owner.wallet)
       .writeInteraction<AddClaimable>({
