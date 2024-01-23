@@ -1,3 +1,4 @@
+import dotenv from 'dotenv'
 import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import Consul from 'consul'
 import fs from 'fs'
@@ -11,10 +12,14 @@ import { EthersExtension } from 'warp-contracts-plugin-ethers'
 
 import HardhatKeys from './test-keys/hardhat.json'
 
+dotenv.config()
+
 const pathToContractSrc = process.env.CONTRACT_SRC
   || '../dist/contracts/relay-registry.js'
+  // || '../dist/contracts/distribution.js'
 const pathToInitState = process.env.INIT_STATE
   || './test-states/relay-registry-init-state.json'
+  // || './test-states/distribution-init-state.json'
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 

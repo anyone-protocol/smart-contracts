@@ -1,18 +1,17 @@
+import dotenv from 'dotenv'
 import { LoggerFactory, WarpFactory } from 'warp-contracts'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-import {
-  buildEvmSignature,
-  EvmSignatureVerificationServerPlugin
-  // @ts-ignore
-} from 'warp-contracts-plugin-signature/server'
 import { Wallet } from 'ethers'
 import Consul from 'consul'
+import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 
 import {
   DistributionHandle,
   DistributionState,
   SetTokenDistributionRate
 } from '../../src/contracts'
+
+dotenv.config()
 
 let consulToken = process.env.CONSUL_TOKEN,
   contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
@@ -24,7 +23,6 @@ LoggerFactory.INST.logLevel('error')
 const warp = WarpFactory
   .forMainnet()
   .use(new EthersExtension())
-  .use(new EvmSignatureVerificationServerPlugin())
 
 async function main() {
   if (!tokensDistributedPerSecond) {
@@ -73,10 +71,7 @@ async function main() {
 
   // NB: Send off the interaction for real
   await contract
-    .connect({
-      signer: buildEvmSignature(contractOwner),
-      type: 'ethereum'
-    })
+    .connect(new EthereumSigner(contractOwnerPrivateKey))
     .writeInteraction<SetTokenDistributionRate>(input)
 }
 
