@@ -30,6 +30,9 @@ export const ADDRESS_REQUIRED = 'Address required'
 export const INVALID_ADDRESS = 'Invalid address'
 export const REGISTRATION_CREDIT_REQUIRED =
   'A Registration Credit is required to claim a fingerprint'
+export const ADDRESS_ALREADY_BLOCKED = 'Address already blocked'
+export const ADDRESS_NOT_BLOCKED = 'Address not blocked'
+export const ADDRESS_IS_BLOCKED = 'Address is blocked'
 
 export type Fingerprint = string
 export type EvmAddress = string
@@ -236,6 +239,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
       FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS
     )
     ContractAssert(
+      !state.blockedAddresses.includes(caller),
+      ADDRESS_IS_BLOCKED
+    )
+    ContractAssert(
       !!state.registrationCredits[caller],
       REGISTRATION_CREDIT_REQUIRED
     )
@@ -335,8 +342,27 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { address } } = action
 
-    // this.assertValidEvmAddress(address)
-    state.blockedAddresses.push(address!)
+    this.assertValidEvmAddress(address)
+    ContractAssert(
+      !state.blockedAddresses.includes(address),
+      ADDRESS_ALREADY_BLOCKED
+    )
+    state.blockedAddresses.push(address)
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  unblockAddress(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<BlockAddress>>
+  ) {
+    const { input: { address } } = action
+
+    this.assertValidEvmAddress(address)
+    const blockedIndex = state.blockedAddresses.indexOf(address)
+    ContractAssert(blockedIndex > -1, ADDRESS_NOT_BLOCKED)
+    state.blockedAddresses.splice(blockedIndex, 1)
 
     return { state, result: true }
   }
@@ -371,6 +397,8 @@ export function handle(
       return contract.addRegistrationCredit(state, action)
     case 'blockAddress':
       return contract.blockAddress(state, action)
+    case 'unblockAddress':
+      return contract.unblockAddress(state, action)
     case 'evolve':
       return contract.evolve(
         state,

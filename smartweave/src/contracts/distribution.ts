@@ -1,8 +1,4 @@
-import {
-  ContractError,
-  ContractInteraction,
-  HandlerResult
-} from 'warp-contracts'
+import { ContractError, ContractInteraction } from 'warp-contracts'
 
 import BigNumber from 'bignumber.js'
 

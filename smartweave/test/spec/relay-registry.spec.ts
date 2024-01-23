@@ -14,9 +14,12 @@ import {
   INVALID_FINGERPRINT,
   RelayRegistryHandle,
   RelayRegistryState,
+  ADDRESS_ALREADY_BLOCKED,
+  ADDRESS_IS_BLOCKED,
+  ADDRESS_NOT_BLOCKED,
+  REGISTRATION_CREDIT_REQUIRED
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
-import { REGISTRATION_CREDIT_REQUIRED } from '../../src/contracts/relay-registry'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -750,27 +753,153 @@ describe('Relay Registry Contract', () => {
   })
 
   describe('Blocking Registration', () => {
-    it('Allows Owner to block an address from claiming relays', async () => {
-      const blockClaiming = createInteraction(OWNER, {
+    it('Allows Owner to block an address from claiming relays', () => {
+      const blockInteraction = createInteraction(OWNER, {
         function: 'blockAddress',
         address: ALICE
       })
 
-      const { state } = RelayRegistryHandle(initState, blockClaiming)
+      const { state } = RelayRegistryHandle(initState, blockInteraction)
 
       expect(state.blockedAddresses).to.deep.equal([ALICE])
     })
 
-    it('Requires & validates address when blocking')
+    it('Requires & validates address when blocking', () => {
+      const noAddressInteraction = createInteraction(OWNER, {
+        function: 'blockAddress'
+      })
+      const invalidAddressInteraction = createInteraction(OWNER, {
+        function: 'blockAddress',
+        address: '0xbadbeef'
+      })
 
-    it('Throws if address already blocked')
+      expect(
+        () => RelayRegistryHandle(initState, noAddressInteraction)
+      ).to.throw(ContractError, ADDRESS_REQUIRED)
+      expect(
+        () => RelayRegistryHandle(initState, invalidAddressInteraction)
+      ).to.throw(ContractError, INVALID_ADDRESS)
+    })
 
-    it('Prevents non-owners from blocking an address from claiming relays')
+    it('Throws if address already blocked', () => {
+      const blockInteraction = createInteraction(OWNER, {
+        function: 'blockAddress',
+        address: ALICE
+      })
 
-    it('Allows Owner to unblock an address from claiming relays')
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            blockedAddresses: [ALICE]
+          },
+          blockInteraction
+        )
+      ).to.throw(ContractError, ADDRESS_ALREADY_BLOCKED)
+    })
 
-    it('Requires & validates address when unblocking')
+    it('Prevents non-owners from blocking an address', () => {
+      const blockInteraction = createInteraction(ALICE, {
+        function: 'blockAddress',
+        address: ALICE
+      })
 
-    it('Prevents non-owners from unblocking an address from claiming relays')
+      expect(
+        () => RelayRegistryHandle(initState, blockInteraction)
+      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+    })
+
+    it('Allows Owner to unblock an address from claiming relays', () => {
+      const unblockInteraction = createInteraction(OWNER, {
+        function: 'unblockAddress',
+        address: BOB
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          blockedAddresses: [ ALICE, BOB, CHARLS ]
+        },
+        unblockInteraction
+      )
+
+      expect(state.blockedAddresses).to.deep.equal([ALICE, CHARLS])
+    })
+
+    it('Throws if unblocking an address that is not blocked', () => {
+      const unblockInteraction = createInteraction(OWNER, {
+        function: 'unblockAddress',
+        address: BOB
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, unblockInteraction)
+      ).to.throw(ContractError, ADDRESS_NOT_BLOCKED)
+    })
+
+    it('Requires & validates address when unblocking', () => {
+      const noAddressInteraction = createInteraction(OWNER, {
+        function: 'unblockAddress'
+      })
+      const invalidAddressInteraction = createInteraction(OWNER, {
+        function: 'unblockAddress',
+        address: '0xbadbeef'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, noAddressInteraction)
+      ).to.throw(ContractError, ADDRESS_REQUIRED)
+      expect(
+        () => RelayRegistryHandle(initState, invalidAddressInteraction)
+      ).to.throw(ContractError, INVALID_ADDRESS)
+    })
+
+    it('Prevents non-owners from unblocking an address', () => {
+      const unblockInteraction = createInteraction(ALICE, {
+        function: 'unblockAddress',
+        address: BOB
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, unblockInteraction)
+      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+    })
+
+    it('Allows adding a relay as claimable even if address is blocked', () => {
+      const addClaimableInteraction = createInteraction(OWNER, {
+        function: 'addClaimable',
+        fingerprint: fingerprintA,
+        address: ALICE
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          blockedAddresses: [ALICE]
+        },
+        addClaimableInteraction
+      )
+
+      expect(state.claimable).to.deep.equal({ [fingerprintA]: ALICE })
+    })
+
+    it('Prevents claiming a relay if address is blocked', () => {
+      const claimInteraction = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            claimable: { [fingerprintA]: ALICE },
+            blockedAddresses: [ALICE],
+            registrationCredits: { [ALICE]: 1 }
+          },
+          claimInteraction
+        )
+      ).to.throw(ContractError, ADDRESS_IS_BLOCKED)
+    })
   })
 })
