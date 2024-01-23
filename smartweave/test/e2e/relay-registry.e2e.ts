@@ -147,6 +147,9 @@ describe('Relay Registry Contract (e2e)', () => {
     expect(state.verified).to.deep.equal({
       [fingerprintA]: alice.address
     })
+    expect(state.registrationCredits).to.deep.equal({
+      [alice.address]: 0
+    })
   })
 
   it('Allows adding multiple claimable relay fingerprints', async () => {
