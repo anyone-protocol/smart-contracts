@@ -32,7 +32,8 @@ function resetState() {
     owner: OWNER,
     claimable: {},
     verified: {},
-    registrationCredits: {}
+    registrationCredits: {},
+    blockedAddresses: []
   }
 }
 
@@ -746,5 +747,30 @@ describe('Relay Registry Contract', () => {
         () => RelayRegistryHandle(initState, invalidAddressInteraction)
       ).to.throw(ContractError, INVALID_ADDRESS)
     })
+  })
+
+  describe('Blocking Registration', () => {
+    it('Allows Owner to block an address from claiming relays', async () => {
+      const blockClaiming = createInteraction(OWNER, {
+        function: 'blockAddress',
+        address: ALICE
+      })
+
+      const { state } = RelayRegistryHandle(initState, blockClaiming)
+
+      expect(state.blockedAddresses).to.deep.equal([ALICE])
+    })
+
+    it('Requires & validates address when blocking')
+
+    it('Throws if address already blocked')
+
+    it('Prevents non-owners from blocking an address from claiming relays')
+
+    it('Allows Owner to unblock an address from claiming relays')
+
+    it('Requires & validates address when unblocking')
+
+    it('Prevents non-owners from unblocking an address from claiming relays')
   })
 })

@@ -16,7 +16,6 @@ import {
   SmartWeave,
   UPPER_HEX_CHARS
 } from '../util'
-import { stat } from 'fs'
 
 export const FINGERPRINT_REQUIRED = 'Fingerprint required'
 export const INVALID_FINGERPRINT = 'Invalid fingerprint'
@@ -39,6 +38,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
   verified: { [fingerprint in Fingerprint as string]: EvmAddress }
   registrationCredits: { [address in EvmAddress as string]: number }
+  blockedAddresses: EvmAddress[]
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -90,6 +90,11 @@ export interface IsVerified extends ContractFunctionInput {
 
 export interface AddRegistrationCredit extends ContractFunctionInput {
   function: 'addRegistrationCredit'
+  address: EvmAddress
+}
+
+export interface BlockAddress extends ContractFunctionInput {
+  function: 'blockAddress',
   address: EvmAddress
 }
 
@@ -322,6 +327,19 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  blockAddress(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<BlockAddress>>
+  ) {
+    const { input: { address } } = action
+
+    // this.assertValidEvmAddress(address)
+    state.blockedAddresses.push(address!)
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -351,6 +369,8 @@ export function handle(
       return contract.isVerified(state, action)
     case 'addRegistrationCredit':
       return contract.addRegistrationCredit(state, action)
+    case 'blockAddress':
+      return contract.blockAddress(state, action)
     case 'evolve':
       return contract.evolve(
         state,
