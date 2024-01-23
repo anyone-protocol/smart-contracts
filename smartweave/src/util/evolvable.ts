@@ -29,7 +29,7 @@ export function Evolvable<Contract extends Constructor>(
     evolve(
       state: EvolvableState,
       action: ContractInteraction<PartialFunctionInput<Evolve>>
-    ): HandlerResult<EvolvableState, EvolvableResult> {
+    ) {
       const { input, caller } = action
 
       ContractAssert(

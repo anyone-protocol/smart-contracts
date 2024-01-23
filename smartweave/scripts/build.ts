@@ -17,10 +17,11 @@ const babelOpts: RollupBabelInputPluginOptions = {
   filename: 'relay-registry.ts',
   presets: [ '@babel/preset-typescript' ],
   plugins: [
-    [ 'babel-plugin-transform-remove-imports', { removeAll: true } ],
-    [ '@babel/plugin-proposal-decorators', { version: '2022-03' } ],
     [{
       visitor: {
+        ImportDeclaration(path: NodePath) {
+          path.remove()
+        },
         ExportDeclaration(path: NodePath) {
           path.remove()
         }
@@ -35,12 +36,16 @@ async function build() {
       input: contracts[contract],
       output: { format: 'cjs' },
       plugins: [
-        typescript(),
+        typescript({
+          'target': 'ES6',
+          'module': 'ES6',
+          'moduleResolution': 'node'
+        }),
         getBabelOutputPlugin({ ...babelOpts, filename: contract }),
         cleanup(),
         prettier({ singleQuote: true, parser: 'babel' })
       ],
-      external: [ /(..\/)+environment/ ],
+      external: [ /(..\/)+environment/, 'warp-contracts', 'bignumber.js' ],
       onwarn(warning, rollupWarn) {
         if (warning.code !== 'CIRCULAR_DEPENDENCY') {
           rollupWarn(warning)

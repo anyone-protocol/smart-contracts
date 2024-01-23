@@ -1,23 +1,25 @@
+import dotenv from 'dotenv'
+import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
+import Consul from 'consul'
 import fs from 'fs'
 import path from 'path'
 import {
   LoggerFactory,
   WarpFactory
 } from 'warp-contracts'
-import { DeployPlugin, EthereumSigner } from 'warp-contracts-plugin-deploy'
+import { DeployPlugin } from 'warp-contracts-plugin-deploy'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-import {
-  EvmSignatureVerificationServerPlugin
-  // @ts-ignore
-} from 'warp-contracts-plugin-signature/server'
 
 import HardhatKeys from './test-keys/hardhat.json'
-import Consul from "consul";
+
+dotenv.config()
 
 const pathToContractSrc = process.env.CONTRACT_SRC
   || '../dist/contracts/relay-registry.js'
+  // || '../dist/contracts/distribution.js'
 const pathToInitState = process.env.INIT_STATE
-  || '../dist/contracts/relay-registry-init-state.json'
+  || './test-states/relay-registry-init-state.json'
+  // || './test-states/distribution-init-state.json'
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 
@@ -34,7 +36,6 @@ const consulToken = process.env.CONSUL_TOKEN
     .forMainnet()
     .use(new EthersExtension())
     .use(new DeployPlugin())
-    .use(new EvmSignatureVerificationServerPlugin())
 
   const wallet = new EthereumSigner(deployerPrivateKey)
 

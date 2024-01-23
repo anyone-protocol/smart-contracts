@@ -1,13 +1,9 @@
+import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 import { LoggerFactory, WarpFactory } from 'warp-contracts'
-import { EthereumSigner } from 'warp-contracts-plugin-deploy'
+import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-import {
-  buildEvmSignature,
-  EvmSignatureVerificationServerPlugin
-  // @ts-ignore
-} from 'warp-contracts-plugin-signature/server'
 import { Wallet } from 'ethers'
 import Consul from 'consul'
 import BigNumber from 'bignumber.js'
@@ -20,6 +16,8 @@ import {
   Distribute
 } from '../../src/contracts'
 
+dotenv.config()
+
 let contractTxId = process.env.DISTRIBUTION_CONTRACT_ID
 const consulToken = process.env.CONSUL_TOKEN
 const contractOwnerPrivateKey = process.env.DISTRIBUTION_OWNER_KEY
@@ -31,7 +29,6 @@ BigNumber.config({ EXPONENTIAL_AT: 50 })
 const warp = WarpFactory
   .forMainnet()
   .use(new EthersExtension())
-  .use(new EvmSignatureVerificationServerPlugin())
 
 async function main() {
   let consul
@@ -109,10 +106,7 @@ async function main() {
     
       // NB: Send off the interaction for real
       await contract
-        .connect({
-          signer: buildEvmSignature(contractOwner),
-          type: 'ethereum'
-        })
+        .connect(new EthereumSigner(contractOwnerPrivateKey))
         .writeInteraction<AddScores>(input)
     }
   } catch(e) {
@@ -133,10 +127,7 @@ async function main() {
 
   // NB: Send off the interaction for real
   await contract
-    .connect({
-      signer: buildEvmSignature(contractOwner),
-      type: 'ethereum'
-    })
+    .connect(new EthereumSigner(contractOwnerPrivateKey))
     .writeInteraction<Distribute>(input)
 }
 

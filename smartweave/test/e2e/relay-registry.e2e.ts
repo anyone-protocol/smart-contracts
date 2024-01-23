@@ -1,3 +1,4 @@
+import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import 'mocha'
 import { expect } from 'chai'
 import { Wallet } from 'ethers'
@@ -9,16 +10,15 @@ import {
   Warp,
   WarpFactory
 } from 'warp-contracts'
-import { DeployPlugin, EthereumSigner } from 'warp-contracts-plugin-deploy'
+import { DeployPlugin } from 'warp-contracts-plugin-deploy'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-import {
-  buildEvmSignature,
-  EvmSignatureVerificationServerPlugin
-  // @ts-ignore
-} from 'warp-contracts-plugin-signature/server'
 
 import HardhatKeys from '../../scripts/test-keys/hardhat.json'
-import { AddClaimable, Claim, RelayRegistryState } from '../../src/contracts'
+import {
+  AddClaimable,
+  Claim,
+  RelayRegistryState
+} from '../../src/contracts/relay-registry'
 
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
@@ -29,9 +29,9 @@ describe('Relay Registry Contract (e2e)', () => {
       contractSrc: string,
       contractTxId: string,
       contract: Contract<RelayRegistryState>,
-      owner: { address: string, wallet: EthereumSigner, signer: Wallet },
-      alice: { address: string, wallet: EthereumSigner, signer: Wallet },
-      bob: { address: string, wallet: EthereumSigner, signer: Wallet }
+      owner: { address: string, wallet: EthereumSigner },
+      alice: { address: string, wallet: EthereumSigner },
+      bob: { address: string, wallet: EthereumSigner }
 
   before('Set up environment', async () => {
     LoggerFactory.INST.logLevel('error')
@@ -40,22 +40,18 @@ describe('Relay Registry Contract (e2e)', () => {
       .forMainnet()
       .use(new EthersExtension())
       .use(new DeployPlugin())
-      .use(new EvmSignatureVerificationServerPlugin())
 
     owner = {
       address: HardhatKeys.owner.address,
-      wallet: new EthereumSigner(HardhatKeys.owner.key),
-      signer: new Wallet(HardhatKeys.owner.key)
+      wallet: new EthereumSigner(HardhatKeys.owner.key)
     }
     alice = {
       address: HardhatKeys.alice.address,
-      wallet: new EthereumSigner(HardhatKeys.alice.key),
-      signer: new Wallet(HardhatKeys.alice.key)
+      wallet: new EthereumSigner(HardhatKeys.alice.key)
     }
     bob = {
       address: HardhatKeys.bob.address,
-      wallet: new EthereumSigner(HardhatKeys.bob.key),
-      signer: new Wallet(HardhatKeys.bob.key)
+      wallet: new EthereumSigner(HardhatKeys.bob.key)
     }
 
     contractSrc = fs.readFileSync(
@@ -77,6 +73,10 @@ describe('Relay Registry Contract (e2e)', () => {
     contract = warp.contract<RelayRegistryState>(contractTxId)
   })
 
+  after('Tear down environment', async () => {
+    await warp.close()
+  })
+
   it('Should match initial state after deployment', async () => {
     const { cachedValue: { state } } = await contract.readState()
     
@@ -87,10 +87,7 @@ describe('Relay Registry Contract (e2e)', () => {
 
   it('Should not affect state on invalid input', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(alice.signer),
-        type: 'ethereum'
-      })
+      .connect(alice.wallet)
       .writeInteraction<Claim>({
         function: 'claim',
         fingerprint: 'bad-fingerprint'
@@ -105,10 +102,7 @@ describe('Relay Registry Contract (e2e)', () => {
 
   it('Should allow the contract owner to add claimable relays', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddClaimable>({
         function: 'addClaimable',
         address: alice.address,
@@ -125,10 +119,7 @@ describe('Relay Registry Contract (e2e)', () => {
 
   it('Should allow users to claim relay fingerprints', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(alice.signer),
-        type: 'ethereum'
-      })
+      .connect(alice.wallet)
       .writeInteraction<Claim>({
         function: 'claim',
         fingerprint: fingerprintA
@@ -144,10 +135,7 @@ describe('Relay Registry Contract (e2e)', () => {
 
   it('Should add some more claimable relays for testing', async () => {
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddClaimable>({
         function: 'addClaimable',
         address: alice.address,
@@ -155,10 +143,7 @@ describe('Relay Registry Contract (e2e)', () => {
       })
     
     await contract
-      .connect({
-        signer: buildEvmSignature(owner.signer),
-        type: 'ethereum'
-      })
+      .connect(owner.wallet)
       .writeInteraction<AddClaimable>({
         function: 'addClaimable',
         address: alice.address,

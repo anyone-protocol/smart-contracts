@@ -18,7 +18,12 @@ import {
   SmartWeave,
   UPPER_HEX_CHARS
 } from '../util'
-import { ADDRESS_REQUIRED, Claimable, EvmAddress, INVALID_ADDRESS } from './'
+import {
+  ADDRESS_REQUIRED,
+  Claimable,
+  EvmAddress,
+  INVALID_ADDRESS
+} from './relay-registry'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
 export const INVALID_TIMESTAMP = 'Invalid timestamp'
@@ -27,8 +32,6 @@ export const DUPLICATE_FINGERPRINT_SCORES = 'Duplicate fingerprint in scores'
 export const NO_PENDING_SCORES = 'No pending scores to distribute from'
 export const NO_DISTRIBUTION_TO_CANCEL = 'No distribution to cancel'
 export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
-
-export const DISTRIBUTION_RATE_MS = BigNumber(1000)
 
 export type Score = {
   score: string
@@ -153,7 +156,7 @@ export class DistributionContract extends Evolvable(Object) {
   setTokenDistributionRate(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<SetTokenDistributionRate>>
-  ): HandlerResult<DistributionState, any> {
+  ) {
     const { input: { tokensDistributedPerSecond } } = action
 
     ContractAssert(
@@ -171,7 +174,7 @@ export class DistributionContract extends Evolvable(Object) {
   addScores(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<AddScores>>
-  ): HandlerResult<DistributionState, any> {
+  ) {
     const { timestamp, scores } = action.input
 
     ContractAssert(this.isValidTimestamp(timestamp), INVALID_TIMESTAMP)
@@ -205,7 +208,7 @@ export class DistributionContract extends Evolvable(Object) {
   distribute(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<Distribute>>
-  ): HandlerResult<DistributionState, any> {
+  ) {
     const { timestamp } = action.input
 
     ContractAssert(this.isValidTimestamp(timestamp), INVALID_TIMESTAMP)
@@ -232,7 +235,7 @@ export class DistributionContract extends Evolvable(Object) {
       timeElapsed = elapsedSinceLastDistribution.toString()
       distributionAmount = BigNumber(state.tokensDistributedPerSecond)
         .times(BigNumber(elapsedSinceLastDistribution))
-        .dividedBy(DISTRIBUTION_RATE_MS)
+        .dividedBy(1000)
 
       for (let i = 0; i < scores.length; i++) {
         const { score, address } = scores[i]
@@ -263,7 +266,7 @@ export class DistributionContract extends Evolvable(Object) {
   cancelDistribution(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<Distribute>>
-  ): HandlerResult<DistributionState, any> {
+  ) {
     const { timestamp } = action.input
 
     ContractAssert(this.isValidTimestamp(timestamp), INVALID_TIMESTAMP)
@@ -280,7 +283,7 @@ export class DistributionContract extends Evolvable(Object) {
   claimable(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<Claimable>>
-  ): HandlerResult<DistributionState, string> {
+  ) {
     const { address } = action.input
 
     this.assertValidEvmAddress(address)
@@ -292,10 +295,10 @@ export class DistributionContract extends Evolvable(Object) {
   }
 }
 
-export default function handle(
+export function handle(
   state: DistributionState,
   action: ContractInteraction<any>
-): HandlerResult<DistributionState, any> {
+) {
   const contract = new DistributionContract()
 
   switch (action.input.function) {
