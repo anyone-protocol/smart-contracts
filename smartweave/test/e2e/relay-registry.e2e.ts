@@ -17,8 +17,10 @@ import HardhatKeys from '../../scripts/test-keys/hardhat.json'
 import {
   AddClaimable,
   AddRegistrationCredit,
+  BlockAddress,
   Claim,
-  RelayRegistryState
+  RelayRegistryState,
+  UnblockAddress
 } from '../../src/contracts/relay-registry'
 
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
@@ -34,8 +36,9 @@ describe('Relay Registry Contract (e2e)', () => {
       alice: { address: string, wallet: EthereumSigner },
       bob: { address: string, wallet: EthereumSigner }
 
-  before('Set up environment', async () => {
+  before('Set up environment', async function () {
     LoggerFactory.INST.logLevel('error')
+    this.timeout(10000)
 
     warp = WarpFactory
       .forMainnet()
@@ -132,6 +135,32 @@ describe('Relay Registry Contract (e2e)', () => {
     const { cachedValue: { state } } = await contract.readState()
 
     expect(state.registrationCredits).to.deep.equal({ [alice.address]: 1 })
+  })
+
+  it('Allows Owner to block addresses from claiming', async () => {
+    await contract
+      .connect(owner.wallet)
+      .writeInteraction<BlockAddress>({
+        function: 'blockAddress',
+        address: alice.address
+      })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.blockedAddresses).to.include(alice.address)
+  })
+
+  it('Allows Owner to unblock addresses from claiming', async () => {
+    await contract
+    .connect(owner.wallet)
+    .writeInteraction<UnblockAddress>({
+      function: 'unblockAddress',
+      address: alice.address
+    })
+
+    const { cachedValue: { state } } = await contract.readState()
+
+    expect(state.blockedAddresses).to.not.include(alice.address)
   })
 
   it('Allows users to claim relay fingerprints', async () => {

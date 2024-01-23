@@ -101,6 +101,11 @@ export interface BlockAddress extends ContractFunctionInput {
   address: EvmAddress
 }
 
+export interface UnblockAddress extends ContractFunctionInput {
+  function: 'unblockAddress',
+  address: EvmAddress
+}
+
 export class RelayRegistryContract extends Evolvable(Object) {
   private assertValidFingerprint(
     fingerprint?: string
@@ -355,7 +360,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   @OnlyOwner
   unblockAddress(
     state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<BlockAddress>>
+    action: ContractInteraction<PartialFunctionInput<UnblockAddress>>
   ) {
     const { input: { address } } = action
 
