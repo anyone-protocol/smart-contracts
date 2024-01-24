@@ -67,7 +67,8 @@ describe('Relay Registry Contract (e2e)', () => {
       claimable: {},
       verified: {},
       registrationCredits: {},
-      blockedAddresses: []
+      blockedAddresses: [],
+      families: {}
     }
     const deploy = await warp.deploy({
       src: contractSrc,

@@ -17,7 +17,7 @@ dotenv.config()
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 const key = process.env.CONSUL_KEY || 'dummy-path',
-      consulToken = process.env.CONSUL_TOKEN || 'no-token',
+      consulToken = process.env.CONSUL_TOKEN || '',
       host = process.env.CONSUL_IP,
       port = process.env.CONSUL_PORT
 const pathToContractSrc = process.env.CONTRACT_SRC || ''
@@ -81,7 +81,7 @@ async function evolve() {
   
   if (evolveResult) {
     const { interactionTx, originalTxId } = evolveResult
-    console.log('Contract evolved!')
+    console.log('Contract evolved!  New src', newSourceId)
     console.log('Contract ID', contractId)
     console.log('Interaction TX', await interactionTx.id)
     console.log('Original TX', originalTxId)

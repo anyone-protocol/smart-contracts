@@ -33,6 +33,8 @@ export const REGISTRATION_CREDIT_REQUIRED =
 export const ADDRESS_ALREADY_BLOCKED = 'Address already blocked'
 export const ADDRESS_NOT_BLOCKED = 'Address not blocked'
 export const ADDRESS_IS_BLOCKED = 'Address is blocked'
+export const FAMILY_REQUIRED = 'Family required'
+export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
 
 export type Fingerprint = string
 export type EvmAddress = string
@@ -42,6 +44,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   verified: { [fingerprint in Fingerprint as string]: EvmAddress }
   registrationCredits: { [address in EvmAddress as string]: number }
   blockedAddresses: EvmAddress[]
+  families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -104,6 +107,12 @@ export interface BlockAddress extends ContractFunctionInput {
 export interface UnblockAddress extends ContractFunctionInput {
   function: 'unblockAddress',
   address: EvmAddress
+}
+
+export interface SetFamily extends ContractFunctionInput {
+  function: 'setFamily',
+  fingerprint: Fingerprint,
+  family: Fingerprint[]
 }
 
 export class RelayRegistryContract extends Evolvable(Object) {
@@ -251,6 +260,22 @@ export class RelayRegistryContract extends Evolvable(Object) {
       !!state.registrationCredits[caller],
       REGISTRATION_CREDIT_REQUIRED
     )
+
+    const claimedFingerprints = Object
+      .keys(state.verified)
+      .filter(fp => state.verified[fp] === caller)
+    const fingerprintFamily = (state.families[fingerprint] || []).slice(0)
+    ContractAssert(
+      claimedFingerprints.length === fingerprintFamily.length
+      && claimedFingerprints.every(cf => fingerprintFamily.includes(cf)),
+      FAMILY_NOT_SET
+    )
+    for (let i = 0; i < claimedFingerprints.length; i++) {
+      ContractAssert(
+        state.families[claimedFingerprints[i]].includes(fingerprint),
+        FAMILY_NOT_SET
+      )
+    }
     
     state.registrationCredits[caller] = state.registrationCredits[caller] - 1
     state.verified[fingerprint] = state.claimable[fingerprint]
@@ -303,8 +328,8 @@ export class RelayRegistryContract extends Evolvable(Object) {
       return {
         state,
         result: Object
-        .keys(state.verified)
-        .filter(fp => state.verified[fp] === address)
+          .keys(state.verified)
+          .filter(fp => state.verified[fp] === address)
       }
     }
 
@@ -371,6 +396,24 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  setFamily(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<SetFamily>>
+  ) {
+    const { input: { fingerprint, family } } = action
+
+    this.assertValidFingerprint(fingerprint)
+    ContractAssert(!!family, FAMILY_REQUIRED)
+    for (let i = 0; i < family.length; i++) {
+      this.assertValidFingerprint(family[i])
+    }
+
+    state.families[fingerprint] = family
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -404,6 +447,8 @@ export function handle(
       return contract.blockAddress(state, action)
     case 'unblockAddress':
       return contract.unblockAddress(state, action)
+    case 'setFamily':
+      return contract.setFamily(state, action)
     case 'evolve':
       return contract.evolve(
         state,
