@@ -38,11 +38,11 @@ export function Evolvable<Contract extends Constructor>(
       )
 
       ContractAssert(
-        !!input.newContractSrc,
+        !!(input.newContractSrc || input.value),
         'New Contract Source ID is required to evolve.'
       )
 
-      state.evolve = input.newContractSrc
+      state.evolve = input.newContractSrc || input.value
 
       return { state, result: true }
     }

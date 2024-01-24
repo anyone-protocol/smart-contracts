@@ -14,12 +14,8 @@ import HardhatKeys from './test-keys/hardhat.json'
 
 dotenv.config()
 
-const pathToContractSrc = process.env.CONTRACT_SRC
-  // || '../dist/contracts/relay-registry.js'
-  || '../dist/contracts/distribution.js'
-const pathToInitState = process.env.INIT_STATE
-  // || './test-states/relay-registry-init-state.json'
-  || './test-states/distribution-init-state.json'
+const pathToContractSrc = process.env.CONTRACT_SRC || ''
+const pathToInitState = process.env.INIT_STATE || ''
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 
@@ -28,6 +24,14 @@ const consulKey = process.env.CONSUL_KEY
 
 const consulToken = process.env.CONSUL_TOKEN
 || 'no-token'
+
+if (!pathToContractSrc) {
+  throw new Error('CONTRACT_SRC is not set!')
+}
+
+if (!pathToInitState) {
+  throw new Error('INIT_STATE is not set!')
+}
 
 ;(async () => {
   LoggerFactory.INST.logLevel('error')  
