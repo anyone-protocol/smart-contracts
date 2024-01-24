@@ -30,6 +30,8 @@ export {
   ADDRESS_IS_BLOCKED,
   ADDRESS_NOT_BLOCKED,
   REGISTRATION_CREDIT_REQUIRED,
+  FAMILY_REQUIRED,
+  FAMILY_NOT_SET,
   Fingerprint,
   EvmAddress,
   RelayRegistryState,
