@@ -16,7 +16,7 @@ dotenv.config()
 
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
-const key = process.env.CONSUL_KEY || 'dummy-path',
+const contractKey = process.env.CONTRACT_CONSUL_KEY || 'dummy-path',
       consulToken = process.env.CONSUL_TOKEN || '',
       host = process.env.CONSUL_IP,
       port = process.env.CONSUL_PORT
@@ -45,13 +45,13 @@ async function evolve() {
   if (consulToken) {
     if (!host) { throw new Error('CONSUL_IP is not set!') }
     if (!port) { throw new Error('CONSUL_PORT is not set!') }
-    if (!key) { throw new Error('CONSUL_KEY is not set!') }
+    if (!contractKey) { throw new Error('CONTRACT_CONSUL_KEY is not set!') }
     
     console.log(`Connecting to Consul at ${host}:${port}`)
     consul = new Consul({ host, port })
     const { Value } = await consul.kv.get<{Value: string}>({
       token: consulToken,
-      key
+      key: contractKey
     })
     contractId = Value
   }
@@ -85,6 +85,20 @@ async function evolve() {
     console.log('Contract ID', contractId)
     console.log('Interaction TX', await interactionTx.id)
     console.log('Original TX', originalTxId)
+
+    if (consul) {
+      const sourceKey = process.env.CONTRACT_SOURCE_CONSUL_KEY || 'evolve/test-deploy'
+  
+      const updateResult = await consul.kv.set({
+        key: sourceKey,
+        value: await newSourceTx.id,
+        token: consulToken
+      });
+      console.log(`Cluster variable ${sourceKey} updated: ${updateResult}`)
+    } else {
+      console.warn('Deployment env var PHASE not defined, skipping update of cluster variable in Consul.')
+    }
+
   } else {
     throw new Error('Result from evolve() call was null')
   }
