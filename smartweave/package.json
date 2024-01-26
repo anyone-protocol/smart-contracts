@@ -1,6 +1,6 @@
 {
   "name": "@ator/smart-contracts-smartweave",
-  "version": "0.1.24",
+  "version": "0.2.1",
   "contributors": [
     "ATOR Labs",
     "Jim Toth <jim@artby.city>"
@@ -16,6 +16,7 @@
     "arlocal": "ts-node scripts/arlocal.ts",
     "build": "rimraf dist && ts-node --project node.tsconfig.json scripts/build.ts",
     "deploy": "ts-node scripts/deploy.ts",
+    "evolve": "ts-node scripts/evolve.ts",
     "test": "mocha -r ts-node/register test/spec/**/*.ts",
     "test:e2e": "mocha -r ts-node/register test/e2e/**/*.ts"
   },
