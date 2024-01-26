@@ -248,7 +248,8 @@ job "deploy-relay-registry-live" {
             PHASE="live"
             CONSUL_IP="127.0.0.1"
             CONSUL_PORT="8500"
-            CONSUL_KEY="smart-contracts/live/relay-registry-address"
+            CONTRACT_CONSUL_KEY="smart-contracts/live/relay-registry-address"
+            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/live/relay-registry-source"
             CONTRACT_SRC="../dist/contracts/relay-registry.js"
             INIT_STATE="../dist/contracts/relay-registry-init-state.json"
         }

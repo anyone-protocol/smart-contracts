@@ -56,7 +56,8 @@ job "deploy-distribution-stage" {
             PHASE="stage"
             CONSUL_IP="127.0.0.1"
             CONSUL_PORT="8500"
-            CONSUL_KEY="smart-contracts/stage/distribution-address"
+            CONTRACT_CONSUL_KEY="smart-contracts/stage/distribution-address"
+            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/stage/distribution-source"
             CONTRACT_SRC="../dist/contracts/distribution.js"
             INIT_STATE="../dist/contracts/distribution-init-state.json"
         }

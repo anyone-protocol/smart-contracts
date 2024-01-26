@@ -19,7 +19,10 @@ const pathToInitState = process.env.INIT_STATE || ''
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
 
-const consulKey = process.env.CONSUL_KEY
+const sourceKey = process.env.CONTRACT_SOURCE_CONSUL_KEY
+  || 'dummy-path'
+
+const consulKey = process.env.CONTRACT_CONSUL_KEY
   || 'dummy-path'
 
 const consulToken = process.env.CONSUL_TOKEN
@@ -66,12 +69,21 @@ if (!pathToInitState) {
       port: process.env.CONSUL_PORT,
     });
 
-    const updateResult = await consul.kv.set({
+    const contractResult = await consul.kv.set({
       key: consulKey,
       value: contractTxId,
       token: consulToken
     });
-    console.log(`Cluster variable updated: ${updateResult}`)
+    console.log(`Cluster variable updated for address: ${contractResult}`)
+
+    if (srcTxId) {
+      const sourceResult = await consul.kv.set({
+        key: sourceKey,
+        value: srcTxId,
+        token: consulToken
+      });
+      console.log(`Cluster variable updated for source: ${sourceResult}`)
+    }
   } else {
     console.warn('Deployment env var PHASE not defined, skipping update of cluster variable in Consul.')
   }
