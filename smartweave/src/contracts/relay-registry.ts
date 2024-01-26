@@ -116,6 +116,30 @@ export interface SetFamily extends ContractFunctionInput {
 }
 
 export class RelayRegistryContract extends Evolvable(Object) {
+  constructor(state: Partial<RelayRegistryState>) {
+    if (!state.blockedAddresses) {
+      state.blockedAddresses = []
+    }
+
+    if (!state.claimable) {
+      state.claimable = {}
+    }
+
+    if (!state.families) {
+      state.families = {}
+    }
+
+    if (!state.registrationCredits) {
+      state.registrationCredits = {}
+    }
+
+    if (!state.verified) {
+      state.verified = {}
+    }
+
+    super(state)
+  }
+
   private assertValidFingerprint(
     fingerprint?: string
   ): asserts fingerprint is Fingerprint {
@@ -420,7 +444,7 @@ export function handle(
   state: RelayRegistryState,
   action: ContractInteraction<any>
 ) {
-  const contract = new RelayRegistryContract()
+  const contract = new RelayRegistryContract(state)
 
   switch (action.input.function) {
     case 'addClaimable':

@@ -54,14 +54,29 @@ function createInteraction(
 describe('Relay Registry Contract', () => {
   beforeEach(resetState)
 
-  it('Initializes state with owner as deployer', () => {
-    expect(initState.owner).to.equal(OWNER)
-  })
-
   it('Throws on invalid input', () => {
     expect(
       () => RelayRegistryHandle(initState, { caller: ALICE, input: {} } as any)
     ).to.throw(ContractError, INVALID_INPUT)
+  })
+
+  it('Ensures state properties after evolution', () => {
+    const addClaimableInteraction = createInteraction(OWNER, {
+      function: 'addClaimable',
+      fingerprint: fingerprintA,
+      address: ALICE
+    })
+
+    const { state } = RelayRegistryHandle(
+      { owner: OWNER } as any,
+      addClaimableInteraction
+    )
+
+    expect(state.claimable).to.exist
+    expect(state.blockedAddresses).to.exist
+    expect(state.families).to.exist
+    expect(state.registrationCredits).to.exist
+    expect(state.verified).to.exist
   })
 
   describe('Claiming', () => {
