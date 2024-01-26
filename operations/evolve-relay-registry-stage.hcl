@@ -1,4 +1,4 @@
-job "deploy-relay-registry-dev" {
+job "deploy-relay-registry-stage" {
     datacenters = ["ator-fin"]
     type = "batch"
 
@@ -18,12 +18,12 @@ job "deploy-relay-registry-dev" {
         }
 
         vault {
-            policies = ["relay-registry-dev"]
+            policies = ["relay-registry-stage"]
         }
 
         template {
             data = <<EOH
-            {{with secret "kv/relay-registry/dev"}}
+            {{with secret "kv/relay-registry/stage"}}
                 DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
                 CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
             {{end}}
@@ -33,11 +33,11 @@ job "deploy-relay-registry-dev" {
         }
 
         env {
-            PHASE="dev"
+            PHASE="stage"
             CONSUL_IP="127.0.0.1"
             CONSUL_PORT="8500"
-            CONTRACT_CONSUL_KEY="smart-contracts/dev/relay-registry-address"
-            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/dev/relay-registry-source"
+            CONTRACT_CONSUL_KEY="smart-contracts/stage/relay-registry-address"
+            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/stage/relay-registry-source"
             CONTRACT_SRC="../dist/contracts/relay-registry.js"
         }
 
