@@ -42,9 +42,9 @@ job "deploy-relay-registry-dev" {
     "claimable":{},
     "owner":"{{.Data.data.RELAY_REGISTRY_OWNER_ADDRESS}}",
     "verified":{},
-    "registrationCredits": { },
-    "blockedAddresses": [],
-    "families": { }
+    "registrationCredits":{},
+    "blockedAddresses":[],
+    "families":{}
 }
             {{end}}
             EOH
