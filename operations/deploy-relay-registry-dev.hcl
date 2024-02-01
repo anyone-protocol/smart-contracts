@@ -11,7 +11,7 @@ job "deploy-relay-registry-dev" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/ator-development/smart-contracts:0.1.24"
+            image = "ghcr.io/ator-development/smart-contracts:0.2.2"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
@@ -41,7 +41,10 @@ job "deploy-relay-registry-dev" {
 {
     "claimable":{},
     "owner":"{{.Data.data.RELAY_REGISTRY_OWNER_ADDRESS}}",
-    "verified":{}
+    "verified":{},
+    "registrationCredits": { },
+    "blockedAddresses": [],
+    "families": { }
 }
             {{end}}
             EOH
