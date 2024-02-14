@@ -1,6 +1,6 @@
-# ATOR Protocol Smart Contracts
+# ATOR Protocol EVM Smart Contracts
 
-This repository contains the ATOR Protocol smart contracts, written in Solidity.
+This repository contains the ATOR Protocol EVM smart contracts, written in Solidity.
 
 ## Install
 ```bash
