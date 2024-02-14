@@ -28,7 +28,7 @@ $ npm run test:e2e
 Before deploying, make sure the following environment variables are set:
 
 - `CONTRACT_SRC`
-  - Path to contract src relative to deploy script,
+  - Path to contract src relative to deploy script
   - e.g. `../dist/contracts/relay-registry.js`
 - `INIT_STATE`
   - Path to contract initial state JSON
@@ -36,16 +36,51 @@ Before deploying, make sure the following environment variables are set:
 - `DEPLOYER_PRIVATE_KEY`
   - EVM deployer private key hex
   - Defaults to Hardhat Account #0
-- `CONSUL_KEY`
-  - path to cluster kv key holding contract's address
 
 ```bash
 $ npm run deploy
 ```
 
+## Evolve
+
+Before evolving a contract, make sure the following environment variables are set:
+
+- `CONTRACT_ID`
+  - The ID of the contract being evolved
+  - e.g. `Y6xd_xJ4EWc9F63UVC87huczSR3-RTaVxKwIXtbfGwE`
+- `CONTRACT_SRC`
+  - Path to new contract src relative to deploy script
+  - e.g. `../dist/contracts/relay-registry.js`
+- `DEPLOYER_PRIVATE_KEY`
+  - EVM deployer private key hex
+  - Defaults to Hardhat Account #0
+
+```bash
+$ npm run evolve
+```
+
 ## Contracts
 
 ### Relay Registry
+
+#### State
+
+```typescript
+type Fingerprint = string
+type EvmAddress = string
+type RelayRegistryState = {
+  owner: string
+  canEvolve?: boolean
+  evolve?: string
+  claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
+  verified: { [fingerprint in Fingerprint as string]: EvmAddress }
+  registrationCredits: { [address in EvmAddress as string]: number }
+  blockedAddresses: EvmAddress[]
+  families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
+}
+```
+
+#### Methods
 
 - Owner/Validator adds a fingerprint/address tuple as claimable
   ```typescript
@@ -97,4 +132,78 @@ $ npm run deploy
 - View method to check if a fingerprint is verified
   ```typescript
   isVerified(fingerprint: string) => boolean
+  ```
+
+- Allows Owner to add a registration credit for an address
+  ```typescript
+  addRegistrationCredit(address: string) => void
+  ```
+
+- Allows Owner to block an address from registering
+  ```typescript
+  blockAddress(address: string) => void
+  ```
+
+- Allows Owner to unblock an address from registering
+  ```typescript
+  unblockAddress(address: string) => void
+  ```
+
+- Allows Owner to set the effective family of a relay
+  ```typescript
+  setFamily(fingerprint: string, family: string[]) => void
+  ```
+
+### Distribution
+
+#### State
+
+```typescript
+type Fingerprint = string
+type EvmAddress = string
+type DistributionState = {
+  owner: string
+  canEvolve?: boolean
+  evolve?: string
+  tokensDistributedPerSecond: string,
+  pendingDistributions: {
+    [timestamp: string]: Score[]
+  },
+  claimable: {
+    [address: string]: string
+  }
+  previousDistributions: {
+    [timestamp: string]: {
+      totalScore: string
+      totalDistributed: string
+      timeElapsed: string
+      tokensDistributedPerSecond: string
+    }
+  }
+}
+```
+
+#### Methods
+
+- Allows Owner to set the token distribution rate **in atomic units** per second
+  ```typescript
+  setTokenDistributionRate(tokensDistributedPerSecond: string) => void
+  ```
+
+- Allows Owner to add scores used in distribution calculations
+  ```typescript
+  addScores(
+    timestamp: string,
+    scores: { score: string, address: string, fingerprint: string }[]
+  ) => void
+  ```
+
+- Allows Owner to distribute pending scores for a `timestamp` key
+  ```typescript
+  distribute(timestamp: string) => void
+  ```
+
+- Allows Owner to cancel a pending distribution for a `timestamp` key
+  ```typescript
+  cancelDistribution(timestamp: string) => void
   ```
