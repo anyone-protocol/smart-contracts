@@ -12,6 +12,9 @@ export {
   AddScores,
   Distribute,
   CancelDistribution,
+  SetMultipliers,
+  SetDistributionBonus,
+  SetPreviousDistributionTrackingLimit,
   DistributionContract,
   handle as DistributionHandle
 } from './distribution'
