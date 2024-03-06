@@ -115,6 +115,35 @@ export interface SetFamily extends ContractFunctionInput {
   family: Fingerprint[]
 }
 
+export function assertValidFingerprint(
+  fingerprint?: string
+): asserts fingerprint is Fingerprint {
+  ContractAssert(!!fingerprint, FINGERPRINT_REQUIRED)
+  ContractAssert(typeof fingerprint === 'string', INVALID_FINGERPRINT)
+  ContractAssert(fingerprint.length === 40, INVALID_FINGERPRINT)
+  ContractAssert(
+    fingerprint.split('').every(c => UPPER_HEX_CHARS.includes(c)),
+    INVALID_FINGERPRINT
+  )
+}
+
+export function assertValidEvmAddress(
+  address?: string
+): asserts address is EvmAddress {
+  ContractAssert(!!address, ADDRESS_REQUIRED)
+  ContractAssert(typeof address === 'string', INVALID_ADDRESS)
+  ContractAssert(address.length === 42, INVALID_ADDRESS)
+  
+  try {
+    const checksumAddress = SmartWeave.extensions.ethers.utils.getAddress(
+      address
+    )
+    ContractAssert(address === checksumAddress, INVALID_ADDRESS)
+  } catch (error) {
+    throw new ContractError(INVALID_ADDRESS)
+  }
+}
+
 export class RelayRegistryContract extends Evolvable(Object) {
   constructor(state: Partial<RelayRegistryState>) {
     if (!state.blockedAddresses) {
@@ -140,35 +169,6 @@ export class RelayRegistryContract extends Evolvable(Object) {
     super(state)
   }
 
-  private assertValidFingerprint(
-    fingerprint?: string
-  ): asserts fingerprint is Fingerprint {
-    ContractAssert(!!fingerprint, FINGERPRINT_REQUIRED)
-    ContractAssert(typeof fingerprint === 'string', INVALID_FINGERPRINT)
-    ContractAssert(fingerprint.length === 40, INVALID_FINGERPRINT)
-    ContractAssert(
-      fingerprint.split('').every(c => UPPER_HEX_CHARS.includes(c)),
-      INVALID_FINGERPRINT
-    )
-  }
-
-  private assertValidEvmAddress(
-    address?: string
-  ): asserts address is EvmAddress {
-    ContractAssert(!!address, ADDRESS_REQUIRED)
-    ContractAssert(typeof address === 'string', INVALID_ADDRESS)
-    ContractAssert(address.length === 42, INVALID_ADDRESS)
-    
-    try {
-      const checksumAddress = SmartWeave.extensions.ethers.utils.getAddress(
-        address
-      )
-      ContractAssert(address === checksumAddress, INVALID_ADDRESS)
-    } catch (error) {
-      throw new ContractError(INVALID_ADDRESS)
-    }
-  }
-
   private isFingerprintClaimable(
     state: RelayRegistryState,
     fingerprint: Fingerprint
@@ -190,8 +190,8 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { address, fingerprint } } = action
 
-    this.assertValidFingerprint(fingerprint)
-    this.assertValidEvmAddress(address)
+    assertValidFingerprint(fingerprint)
+    assertValidEvmAddress(address)
     ContractAssert(
       !this.isFingerprintClaimable(state, fingerprint),
       FINGERPRINT_ALREADY_CLAIMABLE
@@ -213,7 +213,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { fingerprint } } = action
 
-    this.assertValidFingerprint(fingerprint)
+    assertValidFingerprint(fingerprint)
     ContractAssert(
       !this.isFingerprintVerified(state, fingerprint),
       FINGERPRINT_ALREADY_CLAIMED
@@ -235,7 +235,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     const { input: { address } } = action
 
     if (address) {
-      this.assertValidEvmAddress(address)
+      assertValidEvmAddress(address)
 
       return {
         state,
@@ -254,8 +254,8 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { address, fingerprint } } = action
       
-    this.assertValidFingerprint(fingerprint)
-    this.assertValidEvmAddress(address)
+    assertValidFingerprint(fingerprint)
+    assertValidEvmAddress(address)
 
     return {
       state,
@@ -270,7 +270,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { caller, input: { fingerprint } } = action
 
-    this.assertValidFingerprint(fingerprint)
+    assertValidFingerprint(fingerprint)
 
     ContractAssert(
       caller === state.claimable[fingerprint],
@@ -314,7 +314,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { caller, input: { fingerprint } } = action
 
-    this.assertValidFingerprint(fingerprint)
+    assertValidFingerprint(fingerprint)
 
     ContractAssert(
       caller === state.verified[fingerprint],
@@ -333,7 +333,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { fingerprint } } = action
 
-    this.assertValidFingerprint(fingerprint)
+    assertValidFingerprint(fingerprint)
 
     delete state.verified[fingerprint]
 
@@ -347,7 +347,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     const { input: { address } } = action
 
     if (address) {
-      this.assertValidEvmAddress(address)
+      assertValidEvmAddress(address)
 
       return {
         state,
@@ -366,7 +366,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { fingerprint } } = action
 
-    this.assertValidFingerprint(fingerprint)
+    assertValidFingerprint(fingerprint)
 
     return {
       state,
@@ -381,7 +381,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { address } } = action
 
-    this.assertValidEvmAddress(address)
+    assertValidEvmAddress(address)
     
     state.registrationCredits[address] =
       (state.registrationCredits[address] || 0) + 1
@@ -396,7 +396,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { address } } = action
 
-    this.assertValidEvmAddress(address)
+    assertValidEvmAddress(address)
     ContractAssert(
       !state.blockedAddresses.includes(address),
       ADDRESS_ALREADY_BLOCKED
@@ -413,7 +413,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { address } } = action
 
-    this.assertValidEvmAddress(address)
+    assertValidEvmAddress(address)
     const blockedIndex = state.blockedAddresses.indexOf(address)
     ContractAssert(blockedIndex > -1, ADDRESS_NOT_BLOCKED)
     state.blockedAddresses.splice(blockedIndex, 1)
@@ -428,10 +428,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
   ) {
     const { input: { fingerprint, family } } = action
 
-    this.assertValidFingerprint(fingerprint)
+    assertValidFingerprint(fingerprint)
     ContractAssert(!!family, FAMILY_REQUIRED)
     for (let i = 0; i < family.length; i++) {
-      this.assertValidFingerprint(family[i])
+      assertValidFingerprint(family[i])
     }
 
     state.families[fingerprint] = family
