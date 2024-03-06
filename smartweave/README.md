@@ -207,3 +207,18 @@ type DistributionState = {
   ```typescript
   cancelDistribution(timestamp: string) => void
   ```
+
+- Allows Owner to set score multipliers for given `fingerprint`
+  ```typescript
+  setMultipliers(multipliers: { [fingerprint: string]: string }) => void
+  ```
+
+- Allows Owner to add bonus tokens to a distribution
+  ```typescript
+  setDistributionBonus(timestamp: string, bonus: string) => void
+  ```
+
+- Allows Owner to limit the number of previous distributions tracked in contract state.  Defaults to `10`
+  ```typescript
+  setPreviousDistributionTrackingLimit(limit: number) => void
+  ```
