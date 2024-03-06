@@ -72,7 +72,8 @@ describe('Distribution Contract (e2e)', () => {
       tokensDistributedPerSecond: INITIAL_DISTRIBUTION_AMOUNT,
       pendingDistributions: {},
       claimable: {},
-      previousDistributions: {}
+      previousDistributions: {},
+      multipliers: {}
     }
     const deploy = await warp.deploy({
       src: contractSrc,
