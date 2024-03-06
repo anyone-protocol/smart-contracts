@@ -178,8 +178,13 @@ type DistributionState = {
       totalDistributed: string
       timeElapsed: string
       tokensDistributedPerSecond: string
+      bonusTokens?: string
     }
   }
+  multipliers: {
+    [fingerprint: string]: string
+  }
+  previousDistributionsTrackingLimit: number
 }
 ```
 
