@@ -34,6 +34,7 @@ export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 export const INVALID_MULTIPLIERS_INPUT = 'Invalid multipliers input'
 export const INVALID_MULTIPLIER_VALUE = 'Invalid multiplier value'
 export const INVALID_BONUS_AMOUNT = 'Invalid bonus amount'
+export const INVALID_LIMIT = 'Invalid limit'
 
 export type Score = {
   score: string
@@ -64,6 +65,7 @@ export type DistributionState = OwnableState & EvolvableState & {
   multipliers: {
     [fingerprint: string]: string
   }
+  previousDistributionsTrackingLimit: number
 }
 
 export interface SetTokenDistributionRate extends ContractFunctionInput {
@@ -96,6 +98,13 @@ export interface SetDistributionBonus extends ContractFunctionInput {
   function: 'setDistributionBonus'
   timestamp: string
   bonus: string
+}
+
+export interface SetPreviousDistributionTrackingLimit
+  extends ContractFunctionInput
+{
+  function: 'setPreviousDistributionTrackingLimit'
+  limit: number
 }
 
 export function isValidTimestamp(timestamp: any): timestamp is string {
@@ -146,6 +155,10 @@ export class DistributionContract extends Evolvable(Object) {
 
     if (!state.multipliers) {
       state.multipliers = {}
+    }
+
+    if (!state.previousDistributionsTrackingLimit) {
+      state.previousDistributionsTrackingLimit = 10
     }
 
     super(state)
@@ -298,6 +311,15 @@ export class DistributionContract extends Evolvable(Object) {
     if (bonus) {
       state.previousDistributions[timestamp].bonusTokens = bonus
     }
+
+    const removeTimestamps = Object
+      .keys(state.previousDistributions)
+      .reverse()
+      .slice(state.previousDistributionsTrackingLimit)
+    for (let i = 0; i < removeTimestamps.length; i++) {
+      delete state.previousDistributions[removeTimestamps[i]]
+    }
+
     delete state.pendingDistributions[timestamp]
 
     return { state, result: true }
@@ -380,6 +402,23 @@ export class DistributionContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  setPreviousDistributionTrackingLimit(
+    state: DistributionState,
+    action: ContractInteraction<
+      PartialFunctionInput<SetPreviousDistributionTrackingLimit>
+    >
+  ) {
+    const { limit } = action.input
+
+    ContractAssert(typeof limit === 'number', INVALID_LIMIT)
+    ContractAssert(limit > -1, INVALID_LIMIT)
+
+    state.previousDistributionsTrackingLimit = limit
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -403,6 +442,8 @@ export function handle(
       return contract.setMultipliers(state, action)
     case 'setDistributionBonus':
       return contract.setDistributionBonus(state, action)
+    case 'setPreviousDistributionTrackingLimit':
+      return contract.setPreviousDistributionTrackingLimit(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }

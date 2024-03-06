@@ -17,7 +17,7 @@ import {
   NO_PENDING_SCORES
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
-import { INVALID_BONUS_AMOUNT, INVALID_MULTIPLIERS_INPUT, INVALID_MULTIPLIER_VALUE } from '../../src/contracts/distribution'
+import { INVALID_BONUS_AMOUNT, INVALID_LIMIT, INVALID_MULTIPLIERS_INPUT, INVALID_MULTIPLIER_VALUE } from '../../src/contracts/distribution'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -35,7 +35,8 @@ function resetState() {
     pendingDistributions: {},
     claimable: {},
     previousDistributions: {},
-    multipliers: {}
+    multipliers: {},
+    previousDistributionsTrackingLimit: 10
   }
 }
 
@@ -72,6 +73,7 @@ describe('Distribution Contract', () => {
     expect(state.claimable).to.exist
     expect(state.previousDistributions).to.exist
     expect(state.multipliers).to.exist
+    expect(state.previousDistributionsTrackingLimit).to.exist
   })
 
   describe('Setting Distribution Amount', () => {
@@ -987,6 +989,136 @@ describe('Distribution Contract', () => {
       expect(
         () => DistributionHandle(initState, invalidAddressClaimable)
       ).to.throw(ContractError, INVALID_ADDRESS)
+    })
+  })
+
+  describe('Previous Distributions', () => {
+    it('Allows owner to limit previous distributions tracked in state', () => {
+      const limit = 5
+      const setPreviousDistributionTrackingLimit = createInteraction(OWNER, {
+        function: 'setPreviousDistributionTrackingLimit',
+        limit
+      })
+
+      const { state } = DistributionHandle(
+        initState,
+        setPreviousDistributionTrackingLimit
+      )
+
+      expect(state.previousDistributionsTrackingLimit).to.equal(limit)
+    })
+
+    it('Prevents non-owners from limiting previous distributions', () => {
+      const setPreviousDistributionTrackingLimit = createInteraction(ALICE, {
+        function: 'setPreviousDistributionTrackingLimit',
+        limit: 5
+      })
+
+      expect(
+        () => DistributionHandle(
+          initState,
+          setPreviousDistributionTrackingLimit
+        )
+      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+    })
+
+    it('Validates when setting previous distribution tracked limit', () => {
+      const missingLimit = createInteraction(OWNER, {
+        function: 'setPreviousDistributionTrackingLimit'
+      })
+
+      expect(
+        () => DistributionHandle(initState, missingLimit)
+      ).to.throw(ContractError, INVALID_LIMIT)
+
+      const nonNumberLimit = createInteraction(OWNER, {
+        function: 'setPreviousDistributionTrackingLimit',
+        limit: 'oops! all berries'
+      })
+
+      expect(
+        () => DistributionHandle(initState, nonNumberLimit)
+      ).to.throw(ContractError, INVALID_LIMIT)
+
+      const negativeLimit = createInteraction(OWNER, {
+        function: 'setPreviousDistributionTrackingLimit',
+        limit: -6
+      })
+
+      expect(
+        () => DistributionHandle(initState, negativeLimit)
+      ).to.throw(ContractError, INVALID_LIMIT)
+    })
+
+    it('Limits previous distributions tracked in state', () => {
+      const now = Date.now()
+      const scores = [
+        { score: '100', address: ALICE, fingerprint: fingerprintA },
+        { score: '100', address: BOB, fingerprint: fingerprintB },
+        { score: '100', address: ALICE, fingerprint: fingerprintC }
+      ]
+      const limitPreviousDistributions = createInteraction(OWNER, {
+        function: 'setPreviousDistributionTrackingLimit',
+        limit: 3
+      })
+      const firstDistributionTimestamp = now.toString()
+      const firstAddScores = createInteraction(OWNER, {
+        function: 'addScores',
+        timestamp: firstDistributionTimestamp,
+        scores
+      })
+      const firstDistribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: firstDistributionTimestamp
+      })
+      const secondDistributionTimestamp = (now + 1000).toString()
+      const secondAddScores = createInteraction(OWNER, {
+        function: 'addScores',
+        timestamp: secondDistributionTimestamp,
+        scores
+      })
+      const secondDistribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: secondDistributionTimestamp
+      })
+      const thirdDistributionTimestamp = (now + 2000).toString()
+      const thirdAddScores = createInteraction(OWNER, {
+        function: 'addScores',
+        timestamp: thirdDistributionTimestamp,
+        scores
+      })
+      const thirdDistribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: thirdDistributionTimestamp
+      })
+      const fourthDistributionTimestamp = (now + 3000).toString()
+      const fourthAddScores = createInteraction(OWNER, {
+        function: 'addScores',
+        timestamp: fourthDistributionTimestamp,
+        scores
+      })
+      const fourthDistribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: fourthDistributionTimestamp
+      })
+
+      DistributionHandle(initState, limitPreviousDistributions)
+      DistributionHandle(initState, firstAddScores)
+      DistributionHandle(initState, firstDistribute)
+      DistributionHandle(initState, secondAddScores)
+      DistributionHandle(initState, secondDistribute)
+      DistributionHandle(initState, thirdAddScores)
+      DistributionHandle(initState, thirdDistribute)
+      DistributionHandle(initState, fourthAddScores)
+      const { state } = DistributionHandle(initState, fourthDistribute)
+
+      expect(Object.keys(state.previousDistributions).length).to.equal(3)
+      expect(
+        state.previousDistributions[firstDistributionTimestamp]
+      ).to.not.exist
+      expect(state.previousDistributions[secondDistributionTimestamp]).to.exist
+      expect(state.previousDistributions[thirdDistributionTimestamp]).to.exist
+      expect(state.previousDistributions[fourthDistributionTimestamp]).to.exist
     })
   })
 })
