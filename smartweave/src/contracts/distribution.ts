@@ -414,7 +414,7 @@ export class DistributionContract extends Evolvable(Object) {
 
     ContractAssert(typeof limit === 'number', INVALID_LIMIT)
     const limitBigNumber = BigNumber(limit)
-    ContractAssert(limitBigNumber.isPositive(), INVALID_LIMIT)
+    ContractAssert(limitBigNumber.gt(0), INVALID_LIMIT)
     ContractAssert(limitBigNumber.isInteger(), INVALID_LIMIT)
 
     state.previousDistributionsTrackingLimit = limit
