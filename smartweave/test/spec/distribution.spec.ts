@@ -1048,6 +1048,15 @@ describe('Distribution Contract', () => {
       expect(
         () => DistributionHandle(initState, negativeLimit)
       ).to.throw(ContractError, INVALID_LIMIT)
+
+      const zeroLimit = createInteraction(OWNER, {
+        function: 'setPreviousDistributionTrackingLimit',
+        limit: 0
+      })
+
+      expect(
+        () => DistributionHandle(initState, negativeLimit)
+      ).to.throw(ContractError, INVALID_LIMIT)
     })
 
     it('Limits previous distributions tracked in state', () => {
