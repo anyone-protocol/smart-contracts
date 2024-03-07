@@ -34,7 +34,7 @@ export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 export const INVALID_MULTIPLIERS_INPUT = 'Invalid multipliers input'
 export const INVALID_MULTIPLIER_VALUE = 'Invalid multiplier value'
 export const INVALID_BONUS_AMOUNT = 'Invalid bonus amount'
-export const INVALID_LIMIT = 'Invalid limit'
+export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
 
 export type Score = {
   score: string
@@ -413,7 +413,9 @@ export class DistributionContract extends Evolvable(Object) {
     const { limit } = action.input
 
     ContractAssert(typeof limit === 'number', INVALID_LIMIT)
-    ContractAssert(limit > -1, INVALID_LIMIT)
+    const limitBigNumber = BigNumber(limit)
+    ContractAssert(limitBigNumber.gt(0), INVALID_LIMIT)
+    ContractAssert(limitBigNumber.isInteger(), INVALID_LIMIT)
 
     state.previousDistributionsTrackingLimit = limit
 
