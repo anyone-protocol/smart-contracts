@@ -1,5 +1,4 @@
-
-job "add-scores-stage" {
+job "cancel-distribution-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -7,18 +6,15 @@ job "add-scores-stage" {
     attempts = 0
   }
 
-  task "add-scores-stage-task" {
+  task "cancel-distribution-stage-task" {
     driver = "docker"
 
-    config {
+        config {
       network_mode = "host"
       image = "ghcr.io/ator-development/smart-contracts:0.2.3"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/add-scores.ts"]
-      volumes = [
-        "local/scores:/usr/src/app/smartweave/dist/contracts/scores.json"
-      ]
+      args = ["scripts/distribution/cancel-distribution.ts"]
     }
 
     vault {
@@ -36,20 +32,12 @@ job "add-scores-stage" {
       env         = true
     }
 
-    template {
-      data = <<EOH
-      TODO: scores json :)
-      EOH
-      destination = "local/scores.json"
-      env = false
-    }
-
     env {
       PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TEST_ACCOUNTS_KEY="facilitator/goerli/stage/test-accounts"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
+      DISTRIBUTION_TIMESTAMP=""
     }
 
     restart {

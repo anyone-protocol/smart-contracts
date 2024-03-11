@@ -1,5 +1,4 @@
-
-job "add-scores-stage" {
+job "set-previous-distribution-tracking-limit-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -7,7 +6,7 @@ job "add-scores-stage" {
     attempts = 0
   }
 
-  task "add-scores-stage-task" {
+  task "set-previous-distribution-tracking-limit-stage-task" {
     driver = "docker"
 
     config {
@@ -15,10 +14,7 @@ job "add-scores-stage" {
       image = "ghcr.io/ator-development/smart-contracts:0.2.3"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/add-scores.ts"]
-      volumes = [
-        "local/scores:/usr/src/app/smartweave/dist/contracts/scores.json"
-      ]
+      args = ["scripts/distribution/set-token-distribution-rate.ts"]
     }
 
     vault {
@@ -36,20 +32,12 @@ job "add-scores-stage" {
       env         = true
     }
 
-    template {
-      data = <<EOH
-      TODO: scores json :)
-      EOH
-      destination = "local/scores.json"
-      env = false
-    }
-
     env {
       PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TEST_ACCOUNTS_KEY="facilitator/goerli/stage/test-accounts"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
+      DISTRIBUTION_PREV_TRACKING_LIMIT="1"
     }
 
     restart {
