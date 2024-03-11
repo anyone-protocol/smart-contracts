@@ -9,7 +9,7 @@ job "cancel-distribution-stage" {
   task "cancel-distribution-stage-task" {
     driver = "docker"
 
-        config {
+    config {
       network_mode = "host"
       image = "ghcr.io/ator-development/smart-contracts:0.2.3"
       entrypoint = ["npx"]
