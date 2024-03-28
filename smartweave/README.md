@@ -32,7 +32,7 @@ Before deploying, make sure the following environment variables are set:
   - e.g. `../dist/contracts/relay-registry.js`
 - `INIT_STATE`
   - Path to contract initial state JSON
-  - e.g. `../dist/contracts/relay-registry-init-state.json`
+  - e.g. `../scripts/test-states/relay-registry-init-state.json`
 - `DEPLOYER_PRIVATE_KEY`
   - EVM deployer private key hex
   - Defaults to Hardhat Account #0
