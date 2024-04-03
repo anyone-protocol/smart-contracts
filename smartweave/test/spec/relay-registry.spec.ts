@@ -79,6 +79,7 @@ describe('Relay Registry Contract', () => {
     expect(state.families).to.exist
     expect(state.registrationCredits).to.exist
     expect(state.verified).to.exist
+    expect(state.registrationCreditsRequired).to.exist
   })
 
   describe('Claiming', () => {

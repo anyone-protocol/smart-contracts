@@ -175,6 +175,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
       state.verified = {}
     }
 
+    if (!state.registrationCreditsRequired) {
+      state.registrationCreditsRequired = false
+    }
+
     super(state)
   }
 
