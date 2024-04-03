@@ -1,5 +1,4 @@
-
-job "add-scores-stage" {
+job "cancel-distribution-live" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -7,7 +6,7 @@ job "add-scores-stage" {
     attempts = 0
   }
 
-  task "add-scores-stage-task" {
+  task "cancel-distribution-live-task" {
     driver = "docker"
 
     config {
@@ -15,19 +14,16 @@ job "add-scores-stage" {
       image = "ghcr.io/ator-development/smart-contracts:0.2.3"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/add-scores.ts"]
-      volumes = [
-        "local/scores:/usr/src/app/smartweave/dist/contracts/scores.json"
-      ]
+      args = ["scripts/distribution/cancel-distribution.ts"]
     }
 
     vault {
-      policies = ["distribution-stage"]
+      policies = ["distribution-live"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/stage"}}
+      {{with secret "kv/distribution/live"}}
         DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
@@ -36,20 +32,12 @@ job "add-scores-stage" {
       env         = true
     }
 
-    template {
-      data = <<EOH
-      TODO: scores json :)
-      EOH
-      destination = "local/scores.json"
-      env = false
-    }
-
     env {
-      PHASE="stage"
+      PHASE="live"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TEST_ACCOUNTS_KEY="facilitator/goerli/stage/test-accounts"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
+      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
+      DISTRIBUTION_TIMESTAMP=""
     }
 
     restart {

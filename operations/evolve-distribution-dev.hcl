@@ -1,4 +1,4 @@
-job "evolve-relay-registry-dev" {
+job "deploy-distribution-dev" {
     datacenters = ["ator-fin"]
     type = "batch"
 
@@ -6,7 +6,7 @@ job "evolve-relay-registry-dev" {
         attempts = 0
     }
 
-    task "deploy-relay-registry-task" {
+    task "deploy-distribution-task" {
         driver = "docker"
 
         config {
@@ -18,13 +18,13 @@ job "evolve-relay-registry-dev" {
         }
 
         vault {
-            policies = ["relay-registry-dev"]
+            policies = ["distribution-dev"]
         }
 
         template {
             data = <<EOH
-            {{with secret "kv/relay-registry/dev"}}
-                DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
+            {{with secret "kv/distribution/dev"}}
+                DEPLOYER_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
                 CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
             {{end}}
             EOH
@@ -36,9 +36,9 @@ job "evolve-relay-registry-dev" {
             PHASE="dev"
             CONSUL_IP="127.0.0.1"
             CONSUL_PORT="8500"
-            CONTRACT_CONSUL_KEY="smart-contracts/dev/relay-registry-address"
-            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/dev/relay-registry-source"
-            CONTRACT_SRC="../dist/contracts/relay-registry.js"
+            CONTRACT_CONSUL_KEY="smart-contracts/dev/distribution-address"
+            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/dev/distribution-source"
+            CONTRACT_SRC="../dist/contracts/distribution.js"
         }
 
         restart {

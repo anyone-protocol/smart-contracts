@@ -1,4 +1,4 @@
-job "deploy-relay-registry-stage" {
+job "evolve-relay-registry-stage" {
     datacenters = ["ator-fin"]
     type = "batch"
 
@@ -11,7 +11,7 @@ job "deploy-relay-registry-stage" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/ator-development/smart-contracts:0.2.1"
+            image = "ghcr.io/ator-development/smart-contracts:0.2.3"
             entrypoint = ["npm"]
             command = "run"
             args = ["evolve"]
