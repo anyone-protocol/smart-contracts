@@ -77,6 +77,7 @@ type RelayRegistryState = {
   registrationCredits: { [address in EvmAddress as string]: number }
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
+  registrationCreditsRequired: boolean
 }
 ```
 
@@ -152,6 +153,11 @@ type RelayRegistryState = {
 - Allows Owner to set the effective family of a relay
   ```typescript
   setFamily(fingerprint: string, family: string[]) => void
+  ```
+
+- Allows Owner to toggle registration credits requirement to claim a relay
+  ```typescript
+  toggleRegistrationCreditRequirement(enabled: boolean) => void
   ```
 
 ### Distribution

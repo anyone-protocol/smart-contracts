@@ -19,7 +19,8 @@ import {
   ADDRESS_NOT_BLOCKED,
   REGISTRATION_CREDIT_REQUIRED,
   FAMILY_REQUIRED,
-  FAMILY_NOT_SET
+  FAMILY_NOT_SET,
+  ENABLED_REQUIRED
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 
@@ -39,7 +40,8 @@ function resetState() {
     verified: {},
     registrationCredits: {},
     blockedAddresses: [],
-    families: {}
+    families: {},
+    registrationCreditsRequired: false
   }
 }
 
@@ -429,7 +431,8 @@ describe('Relay Registry Contract', () => {
       expect(
         () => RelayRegistryHandle({
           ...initState,
-          claimable: { [fingerprintA]: ALICE }
+          claimable: { [fingerprintA]: ALICE },
+          registrationCreditsRequired: true
         }, aliceClaimFingerprintA)
       ).to.throw(ContractError, REGISTRATION_CREDIT_REQUIRED)
     })
@@ -449,7 +452,8 @@ describe('Relay Registry Contract', () => {
         },
         registrationCredits: {
           [ALICE]: 1
-        }
+        },
+        registrationCreditsRequired: true
       }, aliceClaimFingerprintA)
 
       expect(state.claimable).to.deep.equal({
@@ -767,6 +771,126 @@ describe('Relay Registry Contract', () => {
       expect(
         () => RelayRegistryHandle(initState, invalidAddressInteraction)
       ).to.throw(ContractError, INVALID_ADDRESS)
+    })
+
+    it('Allows Owner to disable registration credit requirement', () => {
+      const disableRequirement = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: false
+      })
+
+      const { state } = RelayRegistryHandle(initState, disableRequirement)
+
+      expect(state.registrationCreditsRequired).to.be.false
+    })
+
+    it('Prevents non-owners from disabling registration credits', () => {
+      const aliceDisableRequirement = createInteraction(ALICE, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: false
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceDisableRequirement)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Allows Owner to enable registration credit requirement', () => {
+      const enableRequirement = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: true
+      })
+
+      const { state } = RelayRegistryHandle(initState, enableRequirement)
+
+      expect(state.registrationCreditsRequired).to.be.true
+    })
+
+    it('Prevents non-owners from enabling registration credits', () => {
+      const aliceEnableRequirement = createInteraction(ALICE, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: true
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceEnableRequirement)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Validates input when toggling registration credit requirement', () => {
+      const undefinedToggle = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, undefinedToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const zeroToggle = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: 0
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, zeroToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const positiveToggle = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: 12
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, positiveToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const objectToggle = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: { enabled: true }
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, objectToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const stringToggle = createInteraction(OWNER, {
+        function: 'toggleRegistrationCreditRequirement',
+        enabled: 'true'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, stringToggle)
+      ).to.throw(ENABLED_REQUIRED)
+    })
+
+    it('Does not require credits to register when disabled', () => {
+      const aliceClaimFingerprintA = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle({
+        ...initState,
+        claimable: { [fingerprintA]: ALICE },
+        registrationCreditsRequired: false
+      }, aliceClaimFingerprintA)
+
+      expect(state.verified[fingerprintA]).equals(ALICE)
+    })
+
+    it('Requires credits to register when enabled', () => {
+      const aliceClaimFingerprintA = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      expect(
+        () => RelayRegistryHandle({
+          ...initState,
+          claimable: { [fingerprintA]: ALICE },
+          registrationCreditsRequired: true
+        }, aliceClaimFingerprintA)
+      ).to.throw(ContractError, REGISTRATION_CREDIT_REQUIRED)
     })
   })
 
