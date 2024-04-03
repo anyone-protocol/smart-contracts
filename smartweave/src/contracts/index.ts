@@ -35,6 +35,7 @@ export {
   REGISTRATION_CREDIT_REQUIRED,
   FAMILY_REQUIRED,
   FAMILY_NOT_SET,
+  ENABLED_REQUIRED,
   Fingerprint,
   EvmAddress,
   RelayRegistryState,
@@ -47,6 +48,11 @@ export {
   RemoveVerified,
   Verified,
   IsVerified,
+  SetFamily,
+  AddRegistrationCredit,
+  BlockAddress,
+  UnblockAddress,
+  ToggleRegistrationCreditRequirement,
   RelayRegistryContract,
   handle as RelayRegistryHandle
 } from './relay-registry'

@@ -35,6 +35,7 @@ export const ADDRESS_NOT_BLOCKED = 'Address not blocked'
 export const ADDRESS_IS_BLOCKED = 'Address is blocked'
 export const FAMILY_REQUIRED = 'Family required'
 export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
+export const ENABLED_REQUIRED = 'Enabled must be a boolean'
 
 export type Fingerprint = string
 export type EvmAddress = string
@@ -45,6 +46,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   registrationCredits: { [address in EvmAddress as string]: number }
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
+  registrationCreditsRequired: boolean
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -115,6 +117,13 @@ export interface SetFamily extends ContractFunctionInput {
   family: Fingerprint[]
 }
 
+export interface ToggleRegistrationCreditRequirement
+  extends ContractFunctionInput
+{
+  function: 'toggleRegistrationCreditRequirement',
+  enabled: boolean
+}
+
 export function assertValidFingerprint(
   fingerprint?: string
 ): asserts fingerprint is Fingerprint {
@@ -164,6 +173,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     if (!state.verified) {
       state.verified = {}
+    }
+
+    if (!state.registrationCreditsRequired) {
+      state.registrationCreditsRequired = false
     }
 
     super(state)
@@ -280,10 +293,12 @@ export class RelayRegistryContract extends Evolvable(Object) {
       !state.blockedAddresses.includes(caller),
       ADDRESS_IS_BLOCKED
     )
-    ContractAssert(
-      !!state.registrationCredits[caller],
-      REGISTRATION_CREDIT_REQUIRED
-    )
+    if (state.registrationCreditsRequired === true) {
+      ContractAssert(
+        !!state.registrationCredits[caller],
+        REGISTRATION_CREDIT_REQUIRED
+      )
+    }
 
     const claimedFingerprints = Object
       .keys(state.verified)
@@ -301,7 +316,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
       )
     }
     
-    state.registrationCredits[caller] = state.registrationCredits[caller] - 1
+    if (state.registrationCreditsRequired === true) {
+      state.registrationCredits[caller] = state.registrationCredits[caller] - 1
+    }
+
     state.verified[fingerprint] = state.claimable[fingerprint]
     delete state.claimable[fingerprint]
 
@@ -438,6 +456,22 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  toggleRegistrationCreditRequirement(
+    state: RelayRegistryState,
+    action: ContractInteraction<
+      PartialFunctionInput<ToggleRegistrationCreditRequirement>
+    >
+  ) {
+    const { input: { enabled } } = action
+
+    ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
+
+    state.registrationCreditsRequired = enabled
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -473,6 +507,8 @@ export function handle(
       return contract.unblockAddress(state, action)
     case 'setFamily':
       return contract.setFamily(state, action)
+    case 'toggleRegistrationCreditRequirement':
+      return contract.toggleRegistrationCreditRequirement(state, action)
     case 'evolve':
       return contract.evolve(
         state,
