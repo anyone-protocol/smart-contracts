@@ -20,7 +20,10 @@ import {
   REGISTRATION_CREDIT_REQUIRED,
   FAMILY_REQUIRED,
   FAMILY_NOT_SET,
-  ENABLED_REQUIRED
+  ENABLED_REQUIRED,
+  PUBLIC_KEY_REQUIRED,
+  SERIAL_ALREADY_CLAIMED,
+  SERIAL_NOT_CLAIMED
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 
@@ -31,6 +34,11 @@ const CHARLS = '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
+const encryptionPrivateKey =
+  'c72033fd8bf4e9e4d7d70e890bd73e2fa32cc420030c1b2da3e902856bb536d7'
+const encryptionPublicKeyBase64 = 'u579ySzMngWIBGxrMCCPxDExuJuxhWMrHvvt3ZFPyBE='
+const encryptionPublicKeyHex =
+  '0xbb9efdc92ccc9e0588046c6b30208fc43131b89bb185632b1efbeddd914fc811'
 
 let initState: RelayRegistryState
 function resetState() {
@@ -41,7 +49,9 @@ function resetState() {
     registrationCredits: {},
     blockedAddresses: [],
     families: {},
-    registrationCreditsRequired: false
+    registrationCreditsRequired: false,
+    encryptionPublicKey: '',
+    serials: {}
   }
 }
 
@@ -80,6 +90,8 @@ describe('Relay Registry Contract', () => {
     expect(state.registrationCredits).to.exist
     expect(state.verified).to.exist
     expect(state.registrationCreditsRequired).to.exist
+    expect(state.encryptionPublicKey).to.exist
+    expect(state.serials).to.exist
   })
 
   describe('Claiming', () => {
@@ -1174,6 +1186,255 @@ describe('Relay Registry Contract', () => {
           latestRelayNoFamily
         )
       ).to.throw(ContractError, FAMILY_NOT_SET)
+    })
+  })
+
+  describe('Encryption', () => {
+    it('Allows Owner to set a public key to receive encrypted messages', () => {
+      const setKey = createInteraction(OWNER, {
+        function: 'setEncryptionPublicKey',
+        encryptionPublicKey: encryptionPublicKeyHex
+      })
+
+      const { state } = RelayRegistryHandle(initState, setKey)
+
+      expect(state.encryptionPublicKey).to.equal(encryptionPublicKeyHex)
+    })
+
+    it('Prevents non-owners from setting public encryption key', () => {
+      const aliceSetKey = createInteraction(ALICE, {
+        function: 'setEncryptionPublicKey',
+        encryptionPublicKey: encryptionPublicKeyHex
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceSetKey)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Requires & validates when setting public encryption key', () => {
+      const missingKey = createInteraction(OWNER, {
+        function: 'setEncryptionPublicKey'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, missingKey)
+      ).to.throw(PUBLIC_KEY_REQUIRED)
+
+      const badKey = createInteraction(OWNER, {
+        function: 'setEncryptionPublicKey',
+        encryptionPublicKey: 'bad-key'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, badKey)
+      ).to.throw(PUBLIC_KEY_REQUIRED)
+    })
+  })
+
+  describe('Hardware Serials', () => {
+    it('Allows adding an encrypted hardware serial when claiming', () => {
+      const serial = 'test-serial'
+      const claimWithHardwareSerial = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA,
+        serial
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          claimable: { [fingerprintA]: ALICE }
+        },
+        claimWithHardwareSerial
+      )
+
+      expect(state.verified).to.deep.equal({
+        [fingerprintA]: ALICE
+      })
+      expect(state.serials).to.deep.equal({
+        [fingerprintA]: { serial }
+      })
+    })
+
+    it('Prevents double claims encrypted hardware serials', () => {
+      const serial = 'test-serial'
+      const claimWithHardwareSerial = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintB,
+        serial
+      })
+
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            claimable: {
+              [fingerprintB]: ALICE
+            },
+            verified: {
+              [fingerprintA]: ALICE
+            },
+            families: {
+              [fingerprintA]: [fingerprintB],
+              [fingerprintB]: [fingerprintA]
+            },
+            serials: {
+              [fingerprintA]: {
+                serial,
+                verified: true
+              }
+            }
+          },
+          claimWithHardwareSerial
+        )
+      ).to.throw(SERIAL_ALREADY_CLAIMED)
+    })
+
+    it('Allows Owner to verify hardware serials', () => {
+      const serial = 'test-serial'
+      const verifySerial = createInteraction(OWNER, {
+        function: 'verifySerials',
+        fingerprints: [fingerprintA]
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          serials: {
+            [fingerprintA]: { serial }
+          }
+        },
+        verifySerial
+      )
+
+      expect(state.serials).to.deep.equal({
+        [fingerprintA]: { serial, verified: true }
+      })
+    })
+
+    it('Throws if hardware serial has not been claimed', () => {
+      const verifySerial = createInteraction(OWNER, {
+        function: 'verifySerials',
+        fingerprints: [fingerprintA]
+      })
+
+      expect(() => RelayRegistryHandle(
+        initState,
+        verifySerial
+      )).to.throw(SERIAL_NOT_CLAIMED)
+    })
+
+    it('Prevents non-owners from verifying hardware serials', () => {
+      const aliceVerifySerial = createInteraction(ALICE, {
+        function: 'verifySerials',
+        fingerprints: [fingerprintA]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceVerifySerial)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Allows Owner to remove serials', () => {
+      const removeSerial = createInteraction(OWNER, {
+        function: 'removeSerials',
+        fingerprints: [fingerprintA]
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: {
+            [fingerprintA]: ALICE
+          },
+          serials: {
+            [fingerprintA]: { serial: 'test-serial', verified: true }
+          }
+        },
+        removeSerial
+      )
+
+      expect(state.serials[fingerprintA]).to.not.exist
+    })
+
+    it('Prevents non-owners from removing serials', () => {
+      const aliceRemoveSerial = createInteraction(ALICE, {
+        function: 'removeSerials',
+        fingerprints: [fingerprintA]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceRemoveSerial)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Provides view method of verified relays with & w/o serials', () => {
+      const viewVerifiedRelays = createInteraction(ALICE, {
+        function: 'getVerifiedRelays'
+      }, 'view')
+
+      const { result } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: {
+            [fingerprintA]: ALICE,
+            [fingerprintB]: BOB,
+            [fingerprintC]: CHARLS
+          },
+          serials: {
+            [fingerprintA]: { serial: 'serial-A' },
+            [fingerprintC]: { serial: 'serial-C', verified: true }
+          }
+        },
+        viewVerifiedRelays
+      )
+
+      expect(result).to.deep.equal({
+        verified: {
+          [fingerprintA]: ALICE,
+          [fingerprintB]: BOB
+        },
+        verifiedWithSerial: {
+          [fingerprintC]: CHARLS
+        }
+      })
+    })
+
+    it('Cleans up serials on renounce of relay', () => {
+      const renounce = createInteraction(ALICE, {
+        function: 'renounce',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: { [fingerprintA]: ALICE },
+          serials: { [fingerprintA]: { serial: 'serial-A' }}
+        },
+        renounce
+      )
+
+      expect(state.serials[fingerprintA]).to.not.exist
+    })
+
+    it('Cleans up serials on removal of verified relay', () => {
+      const removeVerified = createInteraction(OWNER, {
+        function: 'removeVerified',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: { [fingerprintA]: ALICE },
+          serials: { [fingerprintA]: { serial: 'serial-A' }}
+        },
+        removeVerified
+      )
+
+      expect(state.serials[fingerprintA]).to.not.exist
     })
   })
 })

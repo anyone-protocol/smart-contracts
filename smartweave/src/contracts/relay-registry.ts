@@ -36,9 +36,16 @@ export const ADDRESS_IS_BLOCKED = 'Address is blocked'
 export const FAMILY_REQUIRED = 'Family required'
 export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
 export const ENABLED_REQUIRED = 'Enabled must be a boolean'
+export const PUBLIC_KEY_REQUIRED = 'Public Key is required and must valid'
+export const INVALID_SERIAL = 'Serial is optional but must be a string'
+export const SERIAL_ALREADY_CLAIMED = 'Serial has already been claimed'
+export const SERIAL_ALREADY_VERIFIED = 'Serial has already been verified'
+export const SERIAL_NOT_CLAIMED = 'Serial has not been claimed'
+export const FINGERPRINTS_MUST_BE_ARRAY = 'Valid array of fingerprints required'
 
 export type Fingerprint = string
 export type EvmAddress = string
+export type PublicKey = string
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
@@ -47,6 +54,13 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
+  encryptionPublicKey: string
+  serials: {
+    [fingerprint in Fingerprint as string]: {
+      serial: string
+      verified?: boolean
+    }
+  }
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -74,15 +88,16 @@ export interface IsClaimable extends ContractFunctionInput {
 export interface Claim extends ContractFunctionInput {
   function: 'claim'
   fingerprint: Fingerprint
+  serial?: string
 }
 
 export interface Renounce extends ContractFunctionInput {
-  function: 'renounce',
+  function: 'renounce'
   fingerprint: Fingerprint
 }
 
 export interface RemoveVerified extends ContractFunctionInput {
-  function: 'removeVerified',
+  function: 'removeVerified'
   fingerprint: Fingerprint
 }
 
@@ -102,26 +117,45 @@ export interface AddRegistrationCredit extends ContractFunctionInput {
 }
 
 export interface BlockAddress extends ContractFunctionInput {
-  function: 'blockAddress',
+  function: 'blockAddress'
   address: EvmAddress
 }
 
 export interface UnblockAddress extends ContractFunctionInput {
-  function: 'unblockAddress',
+  function: 'unblockAddress'
   address: EvmAddress
 }
 
 export interface SetFamily extends ContractFunctionInput {
-  function: 'setFamily',
-  fingerprint: Fingerprint,
+  function: 'setFamily'
+  fingerprint: Fingerprint
   family: Fingerprint[]
 }
 
 export interface ToggleRegistrationCreditRequirement
   extends ContractFunctionInput
 {
-  function: 'toggleRegistrationCreditRequirement',
+  function: 'toggleRegistrationCreditRequirement'
   enabled: boolean
+}
+
+export interface SetEncryptionPublicKey extends ContractFunctionInput {
+  function: 'setEncryptionPublicKey'
+  encryptionPublicKey: PublicKey
+}
+
+export interface VerifySerials extends ContractFunctionInput {
+  function: 'verifySerials'
+  fingerprints: Fingerprint[]
+}
+
+export interface RemoveSerials extends ContractFunctionInput {
+  function: 'removeSerials'
+  fingerprints: Fingerprint[]
+}
+
+export interface GetVerifiedRelays extends ContractFunctionInput {
+  function: 'getVerifiedRelays'
 }
 
 export function assertValidFingerprint(
@@ -153,6 +187,17 @@ export function assertValidEvmAddress(
   }
 }
 
+export function assertValidPublicKey(
+  publicKey?: string
+): asserts publicKey is PublicKey {
+  try {
+    ContractAssert(typeof publicKey === 'string', PUBLIC_KEY_REQUIRED)
+    SmartWeave.extensions.ethers.utils.computeAddress(publicKey)
+  } catch (error) {
+    throw new ContractError(PUBLIC_KEY_REQUIRED)
+  }
+}
+
 export class RelayRegistryContract extends Evolvable(Object) {
   constructor(state: Partial<RelayRegistryState>) {
     if (!state.blockedAddresses) {
@@ -179,6 +224,14 @@ export class RelayRegistryContract extends Evolvable(Object) {
       state.registrationCreditsRequired = false
     }
 
+    if (!state.encryptionPublicKey) {
+      state.encryptionPublicKey = ''
+    }
+
+    if (!state.serials) {
+      state.serials = {}
+    }
+
     super(state)
   }
 
@@ -194,6 +247,13 @@ export class RelayRegistryContract extends Evolvable(Object) {
     fingerprint: Fingerprint
   ): boolean {
     return Object.keys(state.verified).includes(fingerprint)
+  }
+
+  private isSerialVerified(
+    state: RelayRegistryState,
+    fingerprint: Fingerprint
+  ): boolean {
+    return !!state.serials[fingerprint]?.verified
   }
 
   @OnlyOwner
@@ -281,7 +341,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<Claim>>
   ) {
-    const { caller, input: { fingerprint } } = action
+    const { caller, input: { fingerprint, serial } } = action
 
     assertValidFingerprint(fingerprint)
 
@@ -323,6 +383,16 @@ export class RelayRegistryContract extends Evolvable(Object) {
     state.verified[fingerprint] = state.claimable[fingerprint]
     delete state.claimable[fingerprint]
 
+    if (serial) {
+      ContractAssert(typeof serial === 'string', INVALID_SERIAL)
+      const verifiedSerials = Object
+        .values(state.serials)
+        .filter(({ verified }) => verified)
+        .map(({ serial }) => serial)
+      ContractAssert(!verifiedSerials.includes(serial), SERIAL_ALREADY_CLAIMED)
+      state.serials[fingerprint] = { serial }
+    }
+
     return { state, result: true }
   }
 
@@ -340,6 +410,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     )
 
     delete state.verified[fingerprint]
+    delete state.serials[fingerprint]
 
     return { state, result: true }
   }
@@ -354,6 +425,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     assertValidFingerprint(fingerprint)
 
     delete state.verified[fingerprint]
+    delete state.serials[fingerprint]
 
     return { state, result: true }
   }
@@ -472,6 +544,89 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  setEncryptionPublicKey(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<SetEncryptionPublicKey>>
+  ) {
+    const { input: { encryptionPublicKey } } = action
+
+    assertValidPublicKey(encryptionPublicKey)
+
+    state.encryptionPublicKey = encryptionPublicKey
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  verifySerials(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<VerifySerials>>
+  ) {
+    const { input: { fingerprints } } = action
+
+    ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
+
+    for (let i = 0; i < fingerprints.length; i++) {
+      const fingerprint = fingerprints[i]
+      assertValidFingerprint(fingerprint)
+      ContractAssert(
+        !this.isSerialVerified(state, fingerprint),
+        SERIAL_ALREADY_VERIFIED
+      )
+      ContractAssert(!!state.serials[fingerprint], SERIAL_NOT_CLAIMED)
+  
+      state.serials[fingerprint].verified = true
+    }
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  removeSerials(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<RemoveSerials>>
+  ) {
+    const { input: { fingerprints } } = action
+
+    ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
+
+    for (let i = 0; i < fingerprints.length; i++) {
+      const fingerprint = fingerprints[i]
+      assertValidFingerprint(fingerprint)
+      ContractAssert(!!state.serials[fingerprint], SERIAL_NOT_CLAIMED)
+
+      delete state.serials[fingerprint]
+    }
+
+    return { state, result: true }
+  }
+
+  getVerifiedRelays(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<GetVerifiedRelays>>
+  ) {
+    const result: {
+      verified: RelayRegistryState['verified']
+      verifiedWithSerial: RelayRegistryState['verified']
+    } = {
+      verified: {},
+      verifiedWithSerial: {}
+    }
+
+    const fingerprints = Object.keys(state.verified)
+    for (let i = 0; i < fingerprints.length; i++) {
+      const fingerprint = fingerprints[i]
+      if (state.serials[fingerprint]?.verified) {
+        result.verifiedWithSerial[fingerprint] = state.verified[fingerprint]
+      } else {
+        result.verified[fingerprint] = state.verified[fingerprint]
+      }
+    }
+
+    return { state, result }
+  }
 }
 
 export function handle(
@@ -509,6 +664,14 @@ export function handle(
       return contract.setFamily(state, action)
     case 'toggleRegistrationCreditRequirement':
       return contract.toggleRegistrationCreditRequirement(state, action)
+    case 'setEncryptionPublicKey':
+      return contract.setEncryptionPublicKey(state, action)
+    case 'verifySerials':
+      return contract.verifySerials(state, action)
+    case 'removeSerials':
+      return contract.removeSerials(state, action)
+    case 'getVerifiedRelays':
+      return contract.getVerifiedRelays(state, action)
     case 'evolve':
       return contract.evolve(
         state,
