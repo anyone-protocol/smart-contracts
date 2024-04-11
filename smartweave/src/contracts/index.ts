@@ -36,6 +36,11 @@ export {
   FAMILY_REQUIRED,
   FAMILY_NOT_SET,
   ENABLED_REQUIRED,
+  PUBLIC_KEY_REQUIRED,
+  INVALID_SERIAL,
+  SERIAL_ALREADY_CLAIMED,
+  SERIAL_ALREADY_VERIFIED,
+  SERIAL_NOT_CLAIMED,
   Fingerprint,
   EvmAddress,
   RelayRegistryState,
@@ -53,6 +58,10 @@ export {
   BlockAddress,
   UnblockAddress,
   ToggleRegistrationCreditRequirement,
+  SetEncryptionPublicKey,
+  VerifySerials,
+  RemoveSerials,
+  GetVerifiedRelays,
   RelayRegistryContract,
   handle as RelayRegistryHandle
 } from './relay-registry'

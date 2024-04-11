@@ -68,6 +68,7 @@ $ npm run evolve
 ```typescript
 type Fingerprint = string
 type EvmAddress = string
+type PublicKey = string
 type RelayRegistryState = {
   owner: string
   canEvolve?: boolean
@@ -78,6 +79,13 @@ type RelayRegistryState = {
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
+  encryptionPublicKey: PublicKey
+  serials: {
+    [fingerprint in Fingerprint as string]: {
+      serial: string
+      verified?: boolean
+    }
+  }
 }
 ```
 
@@ -158,6 +166,30 @@ type RelayRegistryState = {
 - Allows Owner to toggle registration credits requirement to claim a relay
   ```typescript
   toggleRegistrationCreditRequirement(enabled: boolean) => void
+  ```
+
+- Allows Owner to set the encryption public key for passing secrets
+  ```typescript
+  setEncryptionPublicKey(encryptionPublicKey: PublicKey) => void
+  ```
+
+- Allows Owner to verify a hardware serials by fingerprints
+  ```typescript
+  verifySerials(fingerprints: Fingerprint[]) => void
+  ```
+
+- Allows Owner to remove a hardware serials by fingerprints
+ ```typescript
+ removeSerials(fingerprints: Fingerprint[]) => void
+ ```
+
+- View method to get verified relays and verified relays with verified serial
+  proofs
+  ```typescript
+  getVerifiedRelays() => {
+    verified: { [fingerprint in Fingerprint as string]: EvmAddress }
+    verifiedWithSerial: { [fingerprint in Fingerprint as string]: EvmAddress }
+  }
   ```
 
 ### Distribution
