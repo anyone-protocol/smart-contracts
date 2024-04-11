@@ -179,9 +179,9 @@ type RelayRegistryState = {
   ```
 
 - Allows Owner to remove a hardware serials by fingerprints
- ```typescript
- removeSerials(fingerprints: Fingerprint[]) => void
- ```
+  ```typescript
+  removeSerials(fingerprints: Fingerprint[]) => void
+  ```
 
 - View method to get verified relays and verified relays with verified serial
   proofs
