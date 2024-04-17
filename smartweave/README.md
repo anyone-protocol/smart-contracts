@@ -191,6 +191,10 @@ type RelayRegistryState = {
     verifiedWithSerial: { [fingerprint in Fingerprint as string]: EvmAddress }
   }
   ```
+- Allows Owner to toggle family registration requirements to claim a relay
+  ```typescript
+  toggleFamilyRequirement(enabled: boolean) => void
+  ```
 
 ### Distribution
 
