@@ -51,7 +51,8 @@ function resetState() {
     families: {},
     registrationCreditsRequired: false,
     encryptionPublicKey: '',
-    serials: {}
+    serials: {},
+    familyRequired: false
   }
 }
 
@@ -1153,6 +1154,7 @@ describe('Relay Registry Contract', () => {
         () => RelayRegistryHandle(
           {
             ...initState,
+            familyRequired: true,
             claimable: { [fingerprintC]: ALICE },
             registrationCredits: { [ALICE]: 1 },
             verified: { [fingerprintA]: ALICE }
@@ -1172,6 +1174,7 @@ describe('Relay Registry Contract', () => {
         () => RelayRegistryHandle(
           {
             ...initState,
+            familyRequired: true,
             registrationCredits: { [ALICE]: 1 },
             claimable: { [fingerprintC]: ALICE },
             verified: {
@@ -1186,6 +1189,129 @@ describe('Relay Registry Contract', () => {
           latestRelayNoFamily
         )
       ).to.throw(ContractError, FAMILY_NOT_SET)
+    })
+
+    it('Allows Owner to toggle family requirements', () => {
+      const toggleFamilyOn = createInteraction(OWNER, {
+        function: 'toggleFamilyRequirement',
+        enabled: true
+      })
+
+      const { state } = RelayRegistryHandle(initState, toggleFamilyOn)
+
+      expect(state.familyRequired).to.be.true
+    })
+
+    it('Prevents non-owners from toggling family requirements', () => {
+      const aliceToggleFamilyOn = createInteraction(ALICE, {
+        function: 'toggleFamilyRequirement',
+        enabled: true
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceToggleFamilyOn)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Validates input when toggling family requirements', () => {
+      const undefinedToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyRequirement'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, undefinedToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const zeroToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyRequirement',
+        enabled: 0
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, zeroToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const positiveToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyRequirement',
+        enabled: 12
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, positiveToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const objectToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyRequirement',
+        enabled: { enabled: true }
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, objectToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const stringToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyRequirement',
+        enabled: 'true'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, stringToggle)
+      ).to.throw(ENABLED_REQUIRED)
+    })
+
+    it('Does not require family registration when disabled', () => {
+      const aliceClaimA = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      const aliceClaimB = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintB
+      })
+
+      const noFamilyState = {
+        ...initState,
+        claimable: {
+          [fingerprintA]: ALICE,
+          [fingerprintB]: ALICE
+        },
+        registrationCreditsRequired: false,
+        familyRequired: false
+      }
+      RelayRegistryHandle(noFamilyState, aliceClaimA)
+      const { state } = RelayRegistryHandle(noFamilyState, aliceClaimB)
+
+      expect(state.verified).to.deep.equal({
+        [fingerprintA]: ALICE,
+        [fingerprintB]: ALICE
+      })
+    })
+
+    it('Requires family registration when enabled', () => {
+      const aliceClaimA = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      const aliceClaimB = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintB
+      })
+
+      const familyRequiredState = {
+        ...initState,
+        claimable: {
+          [fingerprintA]: ALICE,
+          [fingerprintB]: ALICE
+        },
+        registrationCreditsRequired: false,
+        familyRequired: true
+      }
+      RelayRegistryHandle(familyRequiredState, aliceClaimA)
+      expect(
+        () => RelayRegistryHandle(familyRequiredState, aliceClaimB)
+      ).to.throw(FAMILY_NOT_SET)
     })
   })
 

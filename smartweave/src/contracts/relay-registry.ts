@@ -61,6 +61,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
       verified?: boolean
     }
   }
+  familyRequired: boolean
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -156,6 +157,11 @@ export interface RemoveSerials extends ContractFunctionInput {
 
 export interface GetVerifiedRelays extends ContractFunctionInput {
   function: 'getVerifiedRelays'
+}
+
+export interface ToggleFamilyRequirement extends ContractFunctionInput {
+  function: 'toggleFamilyRequirement'
+  enabled: boolean
 }
 
 export function assertValidFingerprint(
@@ -360,20 +366,22 @@ export class RelayRegistryContract extends Evolvable(Object) {
       )
     }
 
-    const claimedFingerprints = Object
-      .keys(state.verified)
-      .filter(fp => state.verified[fp] === caller)
-    const fingerprintFamily = (state.families[fingerprint] || []).slice(0)
-    ContractAssert(
-      claimedFingerprints.length === fingerprintFamily.length
-      && claimedFingerprints.every(cf => fingerprintFamily.includes(cf)),
-      FAMILY_NOT_SET
-    )
-    for (let i = 0; i < claimedFingerprints.length; i++) {
+    if (state.familyRequired) {
+      const claimedFingerprints = Object
+        .keys(state.verified)
+        .filter(fp => state.verified[fp] === caller)
+      const fingerprintFamily = (state.families[fingerprint] || []).slice(0)
       ContractAssert(
-        state.families[claimedFingerprints[i]].includes(fingerprint),
+        claimedFingerprints.length === fingerprintFamily.length
+        && claimedFingerprints.every(cf => fingerprintFamily.includes(cf)),
         FAMILY_NOT_SET
       )
+      for (let i = 0; i < claimedFingerprints.length; i++) {
+        ContractAssert(
+          state.families[claimedFingerprints[i]].includes(fingerprint),
+          FAMILY_NOT_SET
+        )
+      }
     }
     
     if (state.registrationCreditsRequired === true) {
@@ -627,6 +635,20 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     return { state, result }
   }
+
+  @OnlyOwner
+  toggleFamilyRequirement(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<ToggleFamilyRequirement>>
+  ) {
+    const { input: { enabled } } = action
+
+    ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
+
+    state.familyRequired = enabled
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -672,6 +694,8 @@ export function handle(
       return contract.removeSerials(state, action)
     case 'getVerifiedRelays':
       return contract.getVerifiedRelays(state, action)
+    case 'toggleFamilyRequirement':
+      return contract.toggleFamilyRequirement(state, action)
     case 'evolve':
       return contract.evolve(
         state,
