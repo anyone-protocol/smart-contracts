@@ -62,6 +62,7 @@ export {
   VerifySerials,
   RemoveSerials,
   GetVerifiedRelays,
+  ToggleFamilyRequirement,
   RelayRegistryContract,
   handle as RelayRegistryHandle
 } from './relay-registry'
