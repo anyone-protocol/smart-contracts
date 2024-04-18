@@ -11,7 +11,7 @@ job "set-distribution-multipliers-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.2.3"
+      image = "ghcr.io/ator-development/smart-contracts:0.2.4"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-multipliers.ts"]
