@@ -38,9 +38,9 @@ export {
   ENABLED_REQUIRED,
   PUBLIC_KEY_REQUIRED,
   INVALID_SERIAL,
-  SERIAL_ALREADY_CLAIMED,
   SERIAL_ALREADY_VERIFIED,
-  SERIAL_NOT_CLAIMED,
+  SERIAL_NOT_REGISTERED,
+  SERIAL_VERIFICATION_PENDING,
   Fingerprint,
   EvmAddress,
   RelayRegistryState,
@@ -63,6 +63,7 @@ export {
   RemoveSerials,
   GetVerifiedRelays,
   ToggleFamilyRequirement,
+  RegisterSerial,
   RelayRegistryContract,
   handle as RelayRegistryHandle
 } from './relay-registry'
