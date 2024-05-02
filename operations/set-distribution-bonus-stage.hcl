@@ -11,7 +11,7 @@ job "set-distribution-bonus-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.2.6"
+      image = "ghcr.io/ator-development/smart-contracts:0.2.7"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-distribution-bonus.ts"]
