@@ -1591,16 +1591,17 @@ describe('Relay Registry Contract', () => {
       })
     })
 
-    it('Throws on verifySerial if hardware serial not registered', () => {
+    it('Allows Owner to verify hardware without a serial (override)', () => {
       const verifySerial = createInteraction(OWNER, {
         function: 'verifySerials',
         fingerprints: [fingerprintA]
       })
 
-      expect(() => RelayRegistryHandle(
-        initState,
-        verifySerial
-      )).to.throw(SERIAL_NOT_REGISTERED)
+      const { state } = RelayRegistryHandle(initState, verifySerial)
+
+      expect(state.serials).to.deep.equal({
+        [fingerprintA]: { verified: true }
+      })
     })
 
     it('Prevents non-owners from verifying hardware serials', () => {

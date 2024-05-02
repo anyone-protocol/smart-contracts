@@ -58,7 +58,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   encryptionPublicKey: string
   serials: {
     [fingerprint in Fingerprint as string]: {
-      serial: string
+      serial?: string
       verified?: boolean
     }
   }
@@ -585,9 +585,13 @@ export class RelayRegistryContract extends Evolvable(Object) {
         !this.isSerialVerified(state, fingerprint),
         SERIAL_ALREADY_VERIFIED
       )
-      ContractAssert(!!state.serials[fingerprint], SERIAL_NOT_REGISTERED)
+      // ContractAssert(!!state.serials[fingerprint], SERIAL_NOT_REGISTERED)
   
-      state.serials[fingerprint].verified = true
+      if (!state.serials[fingerprint]) {
+        state.serials[fingerprint] = {}
+      }
+      
+      state.serials[fingerprint].verified = true      
     }
 
     return { state, result: true }
@@ -672,9 +676,12 @@ export class RelayRegistryContract extends Evolvable(Object) {
       .keys(state.serials)
       .reduce(
         (reduced, fingerprint) => {
-          if (state.serials[fingerprint].verified) {
+          const { verified, serial } = state.serials[fingerprint]
+          if (verified) {
             reduced.fingerprints.push(fingerprint)
-            reduced.serials.push(state.serials[fingerprint].serial)
+            if (serial) {
+              reduced.serials.push(serial)
+            }
           }
 
           return reduced
