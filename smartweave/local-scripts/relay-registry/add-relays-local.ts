@@ -37,12 +37,7 @@ async function main() {
   }
 
   const contract = warp.contract<RelayRegistryState>(contractTxId)
-
-  // let claims: {address: string, fingerprint: string}[] = [
-  //   { address: "0x75766f4d4609a41DFFaeb207BD33dEa58d0d8474", fingerprint: "7F54724CB9E0567BC4A538556DF25A4FD6DC7F5D" },
-  //   { address: "0x75766f4d4609a41DFFaeb207BD33dEa58d0d8474", fingerprint: "60CCE755BD6B7410C70A16B4204D13A986437FDB" }
-  // ]
-
+  
   try {
     for (let i = 0; i < claims.length; i += 1) {
       const input: AddClaimable = {
