@@ -13,7 +13,8 @@ export {
   Distribute,
   CancelDistribution,
   SetMultipliers,
-  SetDistributionBonus,
+  SetHardwareBonusRate,
+  ToggleHardwareBonus,
   SetPreviousDistributionTrackingLimit,
   DistributionContract,
   handle as DistributionHandle

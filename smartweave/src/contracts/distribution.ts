@@ -21,7 +21,8 @@ import {
   INVALID_ADDRESS,
   Fingerprint,
   assertValidEvmAddress,
-  assertValidFingerprint
+  assertValidFingerprint,
+  ENABLED_REQUIRED
 } from './relay-registry'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
@@ -33,7 +34,6 @@ export const NO_DISTRIBUTION_TO_CANCEL = 'No distribution to cancel'
 export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 export const INVALID_MULTIPLIERS_INPUT = 'Invalid multipliers input'
 export const INVALID_MULTIPLIER_VALUE = 'Invalid multiplier value'
-export const INVALID_BONUS_AMOUNT = 'Invalid bonus amount'
 export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
 
 export type Score = {
@@ -44,6 +44,12 @@ export type Score = {
 
 export type DistributionState = OwnableState & EvolvableState & {
   tokensDistributedPerSecond: string
+  bonuses: {
+    hardware: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+    }
+  }
   pendingDistributions: {
     [timestamp: string]: {
       bonus?: string
@@ -94,10 +100,14 @@ export interface SetMultipliers extends ContractFunctionInput {
   multipliers: { [fingerprint: string]: string }
 }
 
-export interface SetDistributionBonus extends ContractFunctionInput {
-  function: 'setDistributionBonus'
-  timestamp: string
-  bonus: string
+export interface SetHardwareBonusRate extends ContractFunctionInput {
+  function: 'setHardwareBonusRate'
+  tokensDistributedPerSecond: string
+}
+
+export interface ToggleHardwareBonus extends ContractFunctionInput {
+  function: 'toggleHardwareBonus'
+  enabled: boolean
 }
 
 export interface SetPreviousDistributionTrackingLimit
@@ -159,6 +169,15 @@ export class DistributionContract extends Evolvable(Object) {
 
     if (!state.previousDistributionsTrackingLimit) {
       state.previousDistributionsTrackingLimit = 10
+    }
+
+    if (!state.bonuses) {
+      state.bonuses = {
+        hardware: {
+          enabled: false,
+          tokensDistributedPerSecond: '0'
+        }
+      }
     }
 
     super(state)
@@ -381,24 +400,35 @@ export class DistributionContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
-  setDistributionBonus(
+  setHardwareBonusRate(
     state: DistributionState,
-    action: ContractInteraction<PartialFunctionInput<SetMultipliers>>
+    action: ContractInteraction<PartialFunctionInput<SetHardwareBonusRate>>
   ) {
-    const { timestamp, bonus } = action.input
+    // const { timestamp, bonus } = action.input
+    const { input: { tokensDistributedPerSecond } } = action
 
-    ContractAssert(isValidTimestamp(timestamp), INVALID_TIMESTAMP)
-    ContractAssert(typeof bonus === 'string', INVALID_BONUS_AMOUNT)
-    const bigNumberBonus = BigNumber(bonus)
-    ContractAssert(!bigNumberBonus.isNaN(), INVALID_BONUS_AMOUNT)
-    ContractAssert(bigNumberBonus.isPositive(), INVALID_BONUS_AMOUNT)
-    ContractAssert(bigNumberBonus.isInteger(), INVALID_BONUS_AMOUNT)
+    ContractAssert(
+      typeof tokensDistributedPerSecond === 'string'
+        && BigNumber(tokensDistributedPerSecond).gte(0),
+      INVALID_DISTRIBUTION_AMOUNT
+    )
 
-    if (!state.pendingDistributions[timestamp]) {
-      this.initializeNewDistribution(state, timestamp)
-    }
+    state.bonuses.hardware.tokensDistributedPerSecond =
+      tokensDistributedPerSecond
 
-    state.pendingDistributions[timestamp].bonus = bonus
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  toggleHardwareBonus(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<ToggleHardwareBonus>>
+  ) {
+    const { input: { enabled } } = action
+
+    ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
+
+    state.bonuses.hardware.enabled = enabled
 
     return { state, result: true }
   }
@@ -442,10 +472,12 @@ export function handle(
       return contract.claimable(state, action)
     case 'setMultipliers':
       return contract.setMultipliers(state, action)
-    case 'setDistributionBonus':
-      return contract.setDistributionBonus(state, action)
+    case 'setHardwareBonusRate':
+      return contract.setHardwareBonusRate(state, action)
     case 'setPreviousDistributionTrackingLimit':
       return contract.setPreviousDistributionTrackingLimit(state, action)
+    case 'toggleHardwareBonus':
+      return contract.toggleHardwareBonus(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }

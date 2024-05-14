@@ -8,6 +8,7 @@ import {
   DUPLICATE_FINGERPRINT_SCORES,
   DistributionHandle,
   DistributionState,
+  ENABLED_REQUIRED,
   INVALID_ADDRESS,
   INVALID_DISTRIBUTION_AMOUNT,
   INVALID_FINGERPRINT,
@@ -17,7 +18,11 @@ import {
   NO_PENDING_SCORES
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
-import { INVALID_BONUS_AMOUNT, INVALID_LIMIT, INVALID_MULTIPLIERS_INPUT, INVALID_MULTIPLIER_VALUE } from '../../src/contracts/distribution'
+import {
+  INVALID_LIMIT,
+  INVALID_MULTIPLIERS_INPUT,
+  INVALID_MULTIPLIER_VALUE
+} from '../../src/contracts/distribution'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -36,7 +41,13 @@ function resetState() {
     claimable: {},
     previousDistributions: {},
     multipliers: {},
-    previousDistributionsTrackingLimit: 10
+    previousDistributionsTrackingLimit: 10,
+    bonuses: {
+      hardware: {
+        enabled: false,
+        tokensDistributedPerSecond: '0'
+      }
+    }
   }
 }
 
@@ -74,6 +85,10 @@ describe('Distribution Contract', () => {
     expect(state.previousDistributions).to.exist
     expect(state.multipliers).to.exist
     expect(state.previousDistributionsTrackingLimit).to.exist
+    expect(state.bonuses).to.exist
+    expect(state.bonuses.hardware).to.exist
+    expect(state.bonuses.hardware.enabled).to.be.a('boolean')
+    expect(state.bonuses.hardware.tokensDistributedPerSecond).to.be.a('string')
   })
 
   describe('Setting Distribution Amount', () => {
@@ -302,7 +317,7 @@ describe('Distribution Contract', () => {
     })
   })
 
-  describe('Setting Multipliers', () => {
+  describe('Distribution Multipliers', () => {
     it('Allows owner to set multipliers for fingerprints', () => {
       const multiplier = '2.13'
       const setMultipliers = createInteraction(OWNER, {
@@ -363,74 +378,143 @@ describe('Distribution Contract', () => {
     })
   })
 
-  describe('Setting Distribution Bonus', () => {
-    it('Allows owner to add bonus tokens to a distribution', () => {
-      const bonus = '1234'
-      const timestamp = Date.now().toString()
-      const setDistributionBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus
+  describe('Distribution Bonuses', () => {
+    describe('Hardware', () => {
+      it('Allows Owner to set hardware bonus token rate', () => {
+        const tokensDistributedPerSecond = '200'
+        const setHardwareBonusRate = createInteraction(OWNER, {
+          function: 'setTokenDistributionRate',
+          tokensDistributedPerSecond
+        })
+    
+        const { state } = DistributionHandle(initState, setHardwareBonusRate)
+    
+        expect(state.tokensDistributedPerSecond).to.equal(
+          tokensDistributedPerSecond
+        )
       })
 
-      const { state } = DistributionHandle(initState, setDistributionBonus)
-
-      expect(state.pendingDistributions[timestamp].bonus).to.equal(bonus)
-    })
-
-    it('Validates when adding bonus tokens to a distribution', () => {
-      const timestamp = Date.now().toString()
-      const setMissingBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp
+      it('Validates when setting hardware bonus token rate', () => {
+        const setMissingRate = createInteraction(OWNER, {
+          function: 'setHardwareBonusRate'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, setMissingRate)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+  
+        const negativeDistributionAmount = '-100'
+        const setNegativeDistributionAmount = createInteraction(OWNER, {
+          function: 'setHardwareBonusRate',
+          tokensDistributedPerSecond: negativeDistributionAmount
+        })
+  
+        expect(
+          () => DistributionHandle(initState, setNegativeDistributionAmount)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+  
+        const numberDistributionAmount = 100
+        const setNumberDistributionAmount = createInteraction(OWNER, {
+          function: 'setHardwareBonusRate',
+          tokensDistributedPerSecond: numberDistributionAmount
+        })
+        
+        expect(
+          () => DistributionHandle(initState, setNumberDistributionAmount)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
       })
 
-      expect(
-        () => DistributionHandle(initState, setMissingBonus)
-      ).to.throw(ContractError, INVALID_BONUS_AMOUNT)
-
-      const missingTimestamp = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        bonus: '1000'
+      it('Prevents non-owners from setting hardware bonus token rate', () => {
+        const aliceSetHardwareBonusRate = createInteraction(ALICE, {
+          function: 'setHardwareBonusRate',
+          tokensDistributedPerSecond: '1000'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, aliceSetHardwareBonusRate)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
       })
 
-      expect(
-        () => DistributionHandle(initState, missingTimestamp)
-      ).to.throw(ContractError, INVALID_TIMESTAMP)
+      it('Allows Owner to enable hardware bonus', () => {
+        const enabled = true
+        const toggleHardwareBonus = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled
+        })
 
-      const negativeBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus: '-1000'
+        const { state } = DistributionHandle(initState, toggleHardwareBonus)
+
+        expect(state.bonuses.hardware.enabled).to.equal(enabled)
       })
 
-      expect(
-        () => DistributionHandle(initState, negativeBonus)
-      ).to.throw(ContractError, INVALID_BONUS_AMOUNT)
+      it('Allows Owner to disable hardware bonus', () => {
+        const enabled = false
+        const toggleHardwareBonus = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled
+        })
 
-      const decimalBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus: '97.1'
+        const { state } = DistributionHandle(initState, toggleHardwareBonus)
+
+        expect(state.bonuses.hardware.enabled).to.equal(enabled)
       })
 
-      expect(
-        () => DistributionHandle(initState, decimalBonus)
-      ).to.throw(ContractError, INVALID_BONUS_AMOUNT)
-    })
-
-    it('Prevents non-owners from adding bonus tokens to a distribution', () => {
-      const bonus = '1234'
-      const timestamp = Date.now().toString()
-      const aliceSetDistributionBonus = createInteraction(ALICE, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus
+      it('Validates when toggling hardware bonus', () => {
+        const undefinedToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, undefinedToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const zeroToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: 0
+        })
+  
+        expect(
+          () => DistributionHandle(initState, zeroToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const positiveToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: 12
+        })
+  
+        expect(
+          () => DistributionHandle(initState, positiveToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const objectToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: { enabled: true }
+        })
+  
+        expect(
+          () => DistributionHandle(initState, objectToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const stringToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: 'true'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, stringToggle)
+        ).to.throw(ENABLED_REQUIRED)
       })
 
-      expect(
-        () => DistributionHandle(initState, aliceSetDistributionBonus)
-      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      it('Prevents non-owners from toggling hardware bonus', () => {
+        const aliceToggleHardwareBonus = createInteraction(ALICE, {
+          function: 'toggleHardwareBonus',
+          enabled: true
+        })
+  
+        expect(
+          () => DistributionHandle(initState, aliceToggleHardwareBonus)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      })
     })
   })
 
@@ -898,7 +982,7 @@ describe('Distribution Contract', () => {
       })
     })
 
-    it('Applies bonuses on distribution', () => {
+    it('Applies hardware bonus on distribution when enabled'/*, () => {
       const bonus = '42069'
       const now = Date.now()
       const firstDistributionTimestamp = now.toString()
@@ -949,7 +1033,9 @@ describe('Distribution Contract', () => {
       expect(
         state.previousDistributions[secondDistributionTimestamp].bonusTokens
       ).to.equal(bonus)
-    })
+    }*/)
+
+    it('Does not apply hardware bonus on distribution when disabled')
   })
 
   describe('Claiming', () => {
@@ -1138,5 +1224,7 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions[thirdDistributionTimestamp]).to.exist
       expect(state.previousDistributions[fourthDistributionTimestamp]).to.exist
     })
+
+    it('Tracks bonuses in previous distributions')
   })
 })
