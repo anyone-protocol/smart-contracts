@@ -36,6 +36,9 @@ Before adding claimable relays, make sure the following environment variables ar
   - The id of the contract that was previously deployed
   - Should be available in logs after deploy command
 
+Also, modify `smartweave/local-scripts/test-states/add-claims.json` file in order to see added relays on dashboard
+- Change the address to your medamask one
+
 ```bash
 $ npm run add-relays-local
 ```
