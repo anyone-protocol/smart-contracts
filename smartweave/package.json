@@ -17,6 +17,7 @@
     "build": "rimraf dist && ts-node --project node.tsconfig.json scripts/build.ts",
     "deploy": "ts-node scripts/deploy.ts",
     "evolve": "ts-node scripts/evolve.ts",
+    "add-relays-local": "ts-node local-scripts/relay-registry/add-relays-local.ts",
     "test": "mocha -r ts-node/register test/spec/**/*.ts",
     "test:e2e": "mocha -r ts-node/register test/e2e/**/*.ts"
   },
@@ -51,7 +52,7 @@
   "dependencies": {
     "arweave": "1.14.4",
     "warp-contracts": "1.4.32",
-    "warp-contracts-plugin-deploy": "1.0.12",
+    "warp-contracts-plugin-deploy": "^1.0.13",
     "warp-contracts-plugin-ethers": "1.0.7"
   }
 }
