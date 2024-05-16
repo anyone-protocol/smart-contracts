@@ -517,6 +517,18 @@ describe('Distribution Contract', () => {
           () => DistributionHandle(initState, aliceToggleHardwareBonus)
         ).to.throw(ContractError, ERROR_ONLY_OWNER)
       })
+
+      it('Allows Owner to add fingerprints to hardware bonus')
+
+      it('Validates when adding fingerprints to hardware bonus')
+
+      it('Prevents non-owners from adding fingerprints to hardware bonus')
+
+      it('Allows Owner to remove fingerprints from hardware bonus')
+
+      it('Validates when removing fingerprints from hardware bonus')
+
+      it('Prevents non-owners from removing fingerprints from hardware bonus')
     })
   })
 
