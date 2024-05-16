@@ -38,8 +38,8 @@ export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
 
 export type Score = {
   score: string
-  address: string
-  fingerprint: string
+  address: EvmAddress
+  fingerprint: Fingerprint
 }
 
 export type DistributionState = OwnableState & EvolvableState & {
@@ -48,16 +48,17 @@ export type DistributionState = OwnableState & EvolvableState & {
     hardware: {
       enabled: boolean
       tokensDistributedPerSecond: string
+      fingerprints: Fingerprint[]
     }
+  }
+  multipliers: {
+    [fingerprint: Fingerprint]: string
   }
   pendingDistributions: {
-    [timestamp: string]: {
-      bonus?: string
-      scores: Score[]
-    }
+    [timestamp: string]: { scores: Score[] }
   }
   claimable: {
-    [address: string]: string
+    [address: EvmAddress]: string
   }
   previousDistributions: {
     [timestamp: string]: {
@@ -65,11 +66,8 @@ export type DistributionState = OwnableState & EvolvableState & {
       totalDistributed: string
       timeElapsed: string
       tokensDistributedPerSecond: string
-      bonusTokens?: string
+      bonusTokens?: string // TODO -> changes to bonuses object
     }
-  }
-  multipliers: {
-    [fingerprint: string]: string
   }
   previousDistributionsTrackingLimit: number
 }
@@ -175,7 +173,8 @@ export class DistributionContract extends Evolvable(Object) {
       state.bonuses = {
         hardware: {
           enabled: false,
-          tokensDistributedPerSecond: '0'
+          tokensDistributedPerSecond: '0',
+          fingerprints: []
         }
       }
     }
@@ -216,6 +215,91 @@ export class DistributionContract extends Evolvable(Object) {
     timestamp: string
   ) {
     state.pendingDistributions[timestamp] = { scores: [] }
+  }
+
+  private finalizeDistribution(
+    state: DistributionState,
+    timestamp: string,
+    totalScore: BigNumber,
+    timeElapsed: string,
+    totalDistributed: BigNumber
+  ) {
+    state.previousDistributions[timestamp] = {
+      totalScore: totalScore.toString(),
+      timeElapsed,
+      totalDistributed: totalDistributed.toString(),
+      tokensDistributedPerSecond: state.tokensDistributedPerSecond
+    }
+    // TODO -> bonus
+    // if (bonus) {
+    //   state.previousDistributions[timestamp].bonusTokens = bonus
+    // }
+
+    const previousDistributionTimestamps = Object
+      .keys(state.previousDistributions)
+      .reverse()
+      .slice(state.previousDistributionsTrackingLimit)
+    for (let i = 0; i < previousDistributionTimestamps.length; i++) {
+      const timestampToRemove = previousDistributionTimestamps[i]
+      delete state.previousDistributions[timestampToRemove]
+    }
+
+    delete state.pendingDistributions[timestamp]
+  }
+
+  private calculateEpochScores(
+    state: DistributionState,
+    timestamp: string
+  ) {
+    const { scores } = state.pendingDistributions[timestamp]
+    const totalScore = scores.reduce<BigNumber>(
+      (total, { fingerprint, score: relayBaseScore }) => {
+        let relayScore = relayBaseScore
+        if (
+          state.bonuses.hardware.enabled
+          && state.bonuses.hardware.fingerprints.includes(fingerprint)
+        ) {
+          relayScore += 0 // TODO -> Share of hardware bonus
+        }
+        return total.plus(
+          BigNumber(relayScore).times(state.multipliers[fingerprint] || '1')
+        )
+      },
+      BigNumber(0)
+    )
+
+    return { scores, totalScore }
+  }
+
+  private calculateEpochTokens(
+    state: DistributionState,
+    epochLengthInMs: number,
+    scores: Score[],
+    totalScore: BigNumber
+  ) {
+    const tokensToDistribute = BigNumber(state.tokensDistributedPerSecond)
+      .times(BigNumber(epochLengthInMs))
+      .dividedBy(1000)
+      // .plus(bonus || '0') // TODO -> bonuses
+
+    let totalTokensDistributed = BigNumber(0)
+    for (let i = 0; i < scores.length; i++) {
+      const { score, address, fingerprint } = scores[i]
+      const redeemableTokens = BigNumber(score)
+        .times(state.multipliers[fingerprint] || '1')
+        .dividedBy(totalScore)
+        .times(tokensToDistribute)
+        .integerValue(BigNumber.ROUND_FLOOR)
+
+      totalTokensDistributed = totalTokensDistributed.plus(redeemableTokens)
+      
+      const previouslyRedeemableTokens = state.claimable[address] || '0'
+      state.claimable[address] = BigNumber(previouslyRedeemableTokens)
+        .plus(redeemableTokens)
+        .toString()
+    }
+
+    return totalTokensDistributed
   }
 
   @OnlyOwner
@@ -285,61 +369,29 @@ export class DistributionContract extends Evolvable(Object) {
     )
 
     const lastDistribution = this.getLatestDistribution(state)
-    let distributionAmount = BigNumber(state.tokensDistributedPerSecond)
-    let totalDistributed = BigNumber(0)
-    const { bonus, scores } = state.pendingDistributions[timestamp]
-    const totalScore = scores.reduce<BigNumber>(
-      (total, { fingerprint, score }) => total.plus(
-        BigNumber(score).times(state.multipliers[fingerprint] || '1')
-      ),
-      BigNumber(0)
+    const { scores, totalScore } = this.calculateEpochScores(state, timestamp)
+    const epochLengthInMs = lastDistribution
+      ? Number.parseInt(timestamp) - lastDistribution
+      : 0
+
+    let totalTokensDistributed = BigNumber(0)
+    if (lastDistribution) {
+      totalTokensDistributed = this.calculateEpochTokens(
+        state,
+        epochLengthInMs,
+        scores,
+        totalScore
+      )
+    }
+
+    // Finalize Distribution
+    this.finalizeDistribution(
+      state,
+      timestamp,
+      totalScore,
+      epochLengthInMs.toString(),
+      totalTokensDistributed
     )
-    let timeElapsed = '0'
-    if (!lastDistribution) {
-      distributionAmount = BigNumber(0)
-    } else {
-      const elapsedSinceLastDistribution =
-        Number.parseInt(timestamp) - lastDistribution
-      timeElapsed = elapsedSinceLastDistribution.toString()
-      distributionAmount = BigNumber(state.tokensDistributedPerSecond)
-        .times(BigNumber(elapsedSinceLastDistribution))
-        .dividedBy(1000)
-        .plus(bonus || '0')
-
-      for (let i = 0; i < scores.length; i++) {
-        const { score, address, fingerprint } = scores[i]
-        const claimable = BigNumber(score)
-          .times(state.multipliers[fingerprint] || '1')
-          .dividedBy(totalScore)
-          .times(distributionAmount)
-          .integerValue(BigNumber.ROUND_FLOOR)
-        totalDistributed = totalDistributed.plus(claimable)
-        const previouslyClaimable = state.claimable[address] || '0'
-        state.claimable[address] = BigNumber(previouslyClaimable)
-          .plus(claimable)
-          .toString()
-      }
-    }
-
-    state.previousDistributions[timestamp] = {
-      totalScore: totalScore.toString(),
-      timeElapsed,
-      totalDistributed: totalDistributed.toString(),
-      tokensDistributedPerSecond: state.tokensDistributedPerSecond
-    }
-    if (bonus) {
-      state.previousDistributions[timestamp].bonusTokens = bonus
-    }
-
-    const removeTimestamps = Object
-      .keys(state.previousDistributions)
-      .reverse()
-      .slice(state.previousDistributionsTrackingLimit)
-    for (let i = 0; i < removeTimestamps.length; i++) {
-      delete state.previousDistributions[removeTimestamps[i]]
-    }
-
-    delete state.pendingDistributions[timestamp]
 
     return { state, result: true }
   }

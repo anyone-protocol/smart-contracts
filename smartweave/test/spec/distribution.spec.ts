@@ -45,7 +45,8 @@ function resetState() {
     bonuses: {
       hardware: {
         enabled: false,
-        tokensDistributedPerSecond: '0'
+        tokensDistributedPerSecond: '0',
+        fingerprints: []
       }
     }
   }
@@ -89,6 +90,7 @@ describe('Distribution Contract', () => {
     expect(state.bonuses.hardware).to.exist
     expect(state.bonuses.hardware.enabled).to.be.a('boolean')
     expect(state.bonuses.hardware.tokensDistributedPerSecond).to.be.a('string')
+    expect(state.bonuses.hardware.fingerprints).to.be.an('array')
   })
 
   describe('Setting Distribution Amount', () => {
@@ -982,7 +984,7 @@ describe('Distribution Contract', () => {
       })
     })
 
-    it('Applies hardware bonus on distribution when enabled'/*, () => {
+    it('Applies hardware bonus on distribution when enabled', () => {
       const bonus = '42069'
       const now = Date.now()
       const firstDistributionTimestamp = now.toString()
@@ -1033,7 +1035,7 @@ describe('Distribution Contract', () => {
       expect(
         state.previousDistributions[secondDistributionTimestamp].bonusTokens
       ).to.equal(bonus)
-    }*/)
+    })
 
     it('Does not apply hardware bonus on distribution when disabled')
   })
