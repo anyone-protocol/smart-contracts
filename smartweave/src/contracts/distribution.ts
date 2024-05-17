@@ -15,14 +15,13 @@ import {
   UPPER_HEX_CHARS
 } from '../util'
 import {
-  ADDRESS_REQUIRED,
   Claimable,
   EvmAddress,
-  INVALID_ADDRESS,
   Fingerprint,
   assertValidEvmAddress,
   assertValidFingerprint,
-  ENABLED_REQUIRED
+  ENABLED_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY
 } from './relay-registry'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
@@ -35,6 +34,8 @@ export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 export const INVALID_MULTIPLIERS_INPUT = 'Invalid multipliers input'
 export const INVALID_MULTIPLIER_VALUE = 'Invalid multiplier value'
 export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
+export const VALID_BONUS_NAME_REQUIRED = 'Valid bonus name required'
+export const FINGERPRINT_NOT_IN_BONUS = 'Fingerprint is not in bonus'
 
 export type Score = {
   score: string
@@ -106,6 +107,18 @@ export interface SetHardwareBonusRate extends ContractFunctionInput {
 export interface ToggleHardwareBonus extends ContractFunctionInput {
   function: 'toggleHardwareBonus'
   enabled: boolean
+}
+
+export interface AddFingerprintsToBonus extends ContractFunctionInput {
+  function: 'addFingerprintsToBonus'
+  bonusName: string
+  fingerprints: Fingerprint[]
+}
+
+export interface RemoveFingerprintsFromBonus extends ContractFunctionInput {
+  function: 'removeFingerprintsFromBonus'
+  bonusName: string
+  fingerprints: Fingerprint[]
 }
 
 export interface SetPreviousDistributionTrackingLimit
@@ -503,6 +516,61 @@ export class DistributionContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  addFingerprintsToBonus(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<AddFingerprintsToBonus>>
+  ) {
+    const { input: { bonusName, fingerprints } } = action
+
+    ContractAssert(typeof bonusName === 'string', VALID_BONUS_NAME_REQUIRED)
+    ContractAssert(
+      Object.keys(state.bonuses).includes(bonusName),
+      VALID_BONUS_NAME_REQUIRED
+    )
+    ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
+    for (const fingerprint of fingerprints) {
+      assertValidFingerprint(fingerprint)
+    }
+
+    state.bonuses[
+      bonusName as keyof DistributionState['bonuses']
+    ].fingerprints.push(...fingerprints)
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  removeFingerprintsFromBonus(
+    state: DistributionState,
+    action: ContractInteraction<
+      PartialFunctionInput<RemoveFingerprintsFromBonus>
+    >
+  ) {
+    const { input: { bonusName, fingerprints } } = action
+
+    ContractAssert(typeof bonusName === 'string', VALID_BONUS_NAME_REQUIRED)
+    ContractAssert(
+      Object.keys(state.bonuses).includes(bonusName),
+      VALID_BONUS_NAME_REQUIRED
+    )
+    ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
+    for (const fingerprint of fingerprints) {
+      assertValidFingerprint(fingerprint)
+      const fingerprintBonusIndex = state
+        .bonuses[bonusName as keyof DistributionState['bonuses']]
+        .fingerprints
+        .indexOf(fingerprint)
+      ContractAssert(fingerprintBonusIndex > -1, FINGERPRINT_NOT_IN_BONUS)
+      state
+        .bonuses[bonusName as keyof DistributionState['bonuses']]
+        .fingerprints
+        .splice(fingerprintBonusIndex, 1)
+    }
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -530,6 +598,10 @@ export function handle(
       return contract.setPreviousDistributionTrackingLimit(state, action)
     case 'toggleHardwareBonus':
       return contract.toggleHardwareBonus(state, action)
+    case 'addFingerprintsToBonus':
+      return contract.addFingerprintsToBonus(state, action)
+    case 'removeFingerprintsFromBonus':
+      return contract.removeFingerprintsFromBonus(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }

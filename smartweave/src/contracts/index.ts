@@ -6,6 +6,7 @@ export {
   NO_PENDING_SCORES,
   NO_DISTRIBUTION_TO_CANCEL,
   CANNOT_BACKDATE_SCORES,
+  VALID_BONUS_NAME_REQUIRED,
   Score,
   DistributionState,
   SetTokenDistributionRate,
@@ -16,6 +17,8 @@ export {
   SetHardwareBonusRate,
   ToggleHardwareBonus,
   SetPreviousDistributionTrackingLimit,
+  AddFingerprintsToBonus,
+  RemoveFingerprintsFromBonus,
   DistributionContract,
   handle as DistributionHandle
 } from './distribution'
@@ -42,6 +45,7 @@ export {
   SERIAL_ALREADY_VERIFIED,
   SERIAL_NOT_REGISTERED,
   SERIAL_VERIFICATION_PENDING,
+  FINGERPRINTS_MUST_BE_ARRAY,
   Fingerprint,
   EvmAddress,
   RelayRegistryState,

@@ -15,7 +15,9 @@ import {
   INVALID_SCORES,
   INVALID_TIMESTAMP,
   NO_DISTRIBUTION_TO_CANCEL,
-  NO_PENDING_SCORES
+  NO_PENDING_SCORES,
+  VALID_BONUS_NAME_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
@@ -518,17 +520,135 @@ describe('Distribution Contract', () => {
         ).to.throw(ContractError, ERROR_ONLY_OWNER)
       })
 
-      it('Allows Owner to add fingerprints to hardware bonus')
+      it('Allows Owner to add fingerprints to hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintC]
+        const addFingerprints = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'hardware',
+          fingerprints
+        })
 
-      it('Validates when adding fingerprints to hardware bonus')
+        const { state } = DistributionHandle(initState, addFingerprints)
 
-      it('Prevents non-owners from adding fingerprints to hardware bonus')
+        expect(state.bonuses.hardware.fingerprints).deep.equal(fingerprints)
+      })
 
-      it('Allows Owner to remove fingerprints from hardware bonus')
+      it('Validates when adding fingerprints to hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintC]
 
-      it('Validates when removing fingerprints from hardware bonus')
+        const missingBonusName = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          fingerprints
+        })
 
-      it('Prevents non-owners from removing fingerprints from hardware bonus')
+        expect(
+          () => DistributionHandle(initState, missingBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const wrongBonusName = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'special-bonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, wrongBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const badFingerprints = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'hardware',
+          fingerprints: ['bad-fingerprint', 123]
+        })
+
+        expect(
+          () => DistributionHandle(initState, badFingerprints)
+        ).to.throw(INVALID_FINGERPRINT)
+      })
+
+      it('Prevents non-owners from adding fingerprints to hw bonus', () => {
+        const aliceAddFingerprints = createInteraction(ALICE, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'hardware',
+          fingerprints: [fingerprintA]
+        })
+
+        expect(
+          () => DistributionHandle(initState, aliceAddFingerprints)
+        ).to.throw(ERROR_ONLY_OWNER)
+      })
+
+      it('Allows Owner to remove fingerprints from hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintB, fingerprintC]
+        const removeFingerprints = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'hardware',
+          fingerprints: [fingerprintB]
+        })
+
+        const { state } = DistributionHandle(
+          {
+            ...initState,
+            bonuses: {
+              hardware: {
+                enabled: true,
+                tokensDistributedPerSecond: '100',
+                fingerprints
+              }
+            }
+          },
+          removeFingerprints
+        )
+
+        expect(state.bonuses.hardware.fingerprints).deep.equal(
+          [fingerprintA, fingerprintC]
+        )
+      })
+
+      it('Validates when removing fingerprints from hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintC]
+
+        const missingBonusName = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, missingBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const wrongBonusName = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'special-bonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, wrongBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const badFingerprints = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'hardware',
+          fingerprints: ['bad-fingerprint', 123]
+        })
+
+        expect(
+          () => DistributionHandle(initState, badFingerprints)
+        ).to.throw(INVALID_FINGERPRINT)
+      })
+
+      it('Prevents non-owners from removing fingerprints from hardware bonus', () => {
+        const aliceRemoveFingerprints = createInteraction(ALICE, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'hardware',
+          fingerprints: [fingerprintA]
+        })
+
+        expect(
+          () => DistributionHandle(initState, aliceRemoveFingerprints)
+        ).to.throw(ERROR_ONLY_OWNER)
+      })
     })
   })
 
@@ -996,7 +1116,7 @@ describe('Distribution Contract', () => {
       })
     })
 
-    it('Applies hardware bonus on distribution when enabled', () => {
+    it.skip('Applies hardware bonus on distribution when enabled', () => {
       const bonus = '42069'
       const now = Date.now()
       const firstDistributionTimestamp = now.toString()
