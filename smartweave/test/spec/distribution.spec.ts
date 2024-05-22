@@ -25,6 +25,8 @@ import {
   INVALID_MULTIPLIERS_INPUT,
   INVALID_MULTIPLIER_VALUE
 } from '../../src/contracts/distribution'
+import TestScores from '../e2e/data/scores.json'
+import TestResults from '../e2e/data/results.json'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -1116,57 +1118,62 @@ describe('Distribution Contract', () => {
       })
     })
 
-    it.skip('Applies hardware bonus on distribution when enabled', () => {
-      const bonus = '42069'
-      const now = Date.now()
-      const firstDistributionTimestamp = now.toString()
-      const firstAddScores = createInteraction(OWNER, {
-        function: 'addScores',
-        timestamp: firstDistributionTimestamp,
-        scores: [
-          { score: '100', address: ALICE, fingerprint: fingerprintA },
-          { score: '100', address: BOB, fingerprint: fingerprintB },
-          { score: '100', address: ALICE, fingerprint: fingerprintC }
-        ]
-      })
-      const firstDistribute = createInteraction(OWNER, {
+    it.only('Applies hardware bonus on distribution when enabled', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
         function: 'distribute',
-        timestamp: firstDistributionTimestamp
-      })
-      const elapsedTime = 5432
-      const secondDistributionTimestamp = (now + elapsedTime).toString()
-      const setDistributionBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        bonus,
-        timestamp: secondDistributionTimestamp
-      })
-      const secondAddScores = createInteraction(OWNER, {
-        function: 'addScores',
-        timestamp: secondDistributionTimestamp,
-        scores: [
-          { score: '100', address: ALICE, fingerprint: fingerprintA },
-          { score: '100', address: BOB, fingerprint: fingerprintB },
-          { score: '100', address: ALICE, fingerprint: fingerprintC }
-        ]
-      })
-      const secondDistribute = createInteraction(OWNER, {
-        function: 'distribute',
-        timestamp: secondDistributionTimestamp
+        timestamp: timestamp.toString()
       })
 
-      DistributionHandle(initState, firstAddScores)
-      DistributionHandle(initState, firstDistribute)
-      DistributionHandle(initState, setDistributionBonus)
-      DistributionHandle(initState, secondAddScores)
-      const { state } = DistributionHandle(initState, secondDistribute)
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScores
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScores
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              totalScore: '0',
+              totalDistributed: '0',
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '1000',
+              bonusTokens: '0'
+            }
+          }
+        },
+        distribute
+      )
 
-      expect(state.claimable).to.deep.equal({
-        [ALICE]: '31666',
-        [BOB]: '15833'
-      })
-      expect(
-        state.previousDistributions[secondDistributionTimestamp].bonusTokens
-      ).to.equal(bonus)
+      console.log('state', state.bonuses.hardware)
+      // const distribution = state.previousDistributions[timestamp]
+      // expect(distribution.totalScore).to.equal(TestResults.totalNetworkScore)
+      // expect(distribution.totalDistributed).to.equal(TestResults.totalActualDistributedTokens)
+      // expect(distribution.timeElapsed).to.equal(elapsed.toString())
+      // expect(distribution.tokensDistributedPerSecond).to.equal('1000')
+      const rewards = Object.fromEntries(
+        TestResults.rewards.map(
+          ({ address, totalReward }) => [ address, totalReward ]
+        )
+      )
+      expect(state.claimable).to.deep.equal(rewards)
     })
 
     it('Does not apply hardware bonus on distribution when disabled')

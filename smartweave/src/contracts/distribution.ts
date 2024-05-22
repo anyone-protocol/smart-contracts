@@ -67,7 +67,7 @@ export type DistributionState = OwnableState & EvolvableState & {
       totalDistributed: string
       timeElapsed: string
       tokensDistributedPerSecond: string
-      bonusTokens?: string // TODO -> changes to bonuses object
+      bonusTokens?: string // TODO -> changes to bonuses object?
     }
   }
   previousDistributionsTrackingLimit: number
@@ -265,54 +265,99 @@ export class DistributionContract extends Evolvable(Object) {
     timestamp: string
   ) {
     const { scores } = state.pendingDistributions[timestamp]
-    const totalScore = scores.reduce<BigNumber>(
-      (total, { fingerprint, score: relayBaseScore }) => {
-        let relayScore = relayBaseScore
+    const hwScores = scores.filter(
+      ({ address }) => state.bonuses.hardware.fingerprints.includes(address)
+    )
+    const { baseNetworkScore, hwBonusNetworkScore } = scores.reduce(
+      (totals, { fingerprint, score }) => {
+        const scoreWithMultiplier = BigNumber(score)
+          .times(state.multipliers[fingerprint] || '1')
+
+        let hwScoreWithMultiplier = BigNumber(0)
         if (
           state.bonuses.hardware.enabled
           && state.bonuses.hardware.fingerprints.includes(fingerprint)
         ) {
-          relayScore += 0 // TODO -> Share of hardware bonus
+          hwScoreWithMultiplier = scoreWithMultiplier
         }
-        return total.plus(
-          BigNumber(relayScore).times(state.multipliers[fingerprint] || '1')
-        )
+
+        return {
+          ...totals,
+          baseNetworkScore: totals
+            .baseNetworkScore
+            .plus(scoreWithMultiplier),
+          hwBonusNetworkScore: totals
+            .hwBonusNetworkScore
+            .plus(hwScoreWithMultiplier)
+        }        
       },
-      BigNumber(0)
+      { baseNetworkScore: BigNumber(0), hwBonusNetworkScore: BigNumber(0) }
     )
 
-    return { scores, totalScore }
+    return { scores, hwScores, baseNetworkScore, hwBonusNetworkScore }
   }
 
   private calculateEpochTokens(
     state: DistributionState,
     epochLengthInMs: number,
     scores: Score[],
-    totalScore: BigNumber
+    baseNetworkScore: BigNumber,
+    hwBonusNetworkScore: BigNumber
   ) {
-    const tokensToDistribute = BigNumber(state.tokensDistributedPerSecond)
+    const baseTokensToDistribute = BigNumber(state.tokensDistributedPerSecond)
       .times(BigNumber(epochLengthInMs))
       .dividedBy(1000)
-      // .plus(bonus || '0') // TODO -> bonuses
 
-    let totalTokensDistributed = BigNumber(0)
+    const hwBonusTokensToDistribute =
+      BigNumber(state.bonuses.hardware.tokensDistributedPerSecond)
+        .times(BigNumber(epochLengthInMs))
+        .dividedBy(1000)
+
+    let baseActualDistributedTokens = BigNumber(0)
+    let hwBonusActualDistributedTokens = BigNumber(0)
+    
     for (let i = 0; i < scores.length; i++) {
       const { score, address, fingerprint } = scores[i]
-      const redeemableTokens = BigNumber(score)
+
+      const baseRedeemableTokens = BigNumber(score)
         .times(state.multipliers[fingerprint] || '1')
-        .dividedBy(totalScore)
-        .times(tokensToDistribute)
+        .dividedBy(baseNetworkScore)
+        .times(baseTokensToDistribute)
         .integerValue(BigNumber.ROUND_FLOOR)
 
-      totalTokensDistributed = totalTokensDistributed.plus(redeemableTokens)
+      baseActualDistributedTokens = baseActualDistributedTokens
+        .plus(baseRedeemableTokens)
+
+      let hwBonusRedeemableTokens = BigNumber(0)
+      if (
+        state.bonuses.hardware.enabled
+        && state.bonuses.hardware.fingerprints.includes(fingerprint)
+      ) {
+        const baseRedeemableTokens = BigNumber(score)
+          .times(state.multipliers[fingerprint] || '1')
+          .dividedBy(hwBonusNetworkScore)
+          .times(hwBonusTokensToDistribute)
+          .integerValue(BigNumber.ROUND_FLOOR)
+      }
+      hwBonusActualDistributedTokens = hwBonusActualDistributedTokens
+        .plus(hwBonusRedeemableTokens)
       
+      const redeemableTokens = baseRedeemableTokens
+        .plus(hwBonusRedeemableTokens)
       const previouslyRedeemableTokens = state.claimable[address] || '0'
       state.claimable[address] = BigNumber(previouslyRedeemableTokens)
         .plus(redeemableTokens)
         .toString()
     }
 
-    return totalTokensDistributed
+    const totalActualDistributedTokens = baseActualDistributedTokens
+      .plus(hwBonusActualDistributedTokens)
+
+    return {
+      baseActualDistributedTokens,
+      hwBonusActualDistributedTokens,
+      totalActualDistributedTokens
+    }
   }
 
   @OnlyOwner
@@ -382,26 +427,39 @@ export class DistributionContract extends Evolvable(Object) {
     )
 
     const lastDistribution = this.getLatestDistribution(state)
-    const { scores, totalScore } = this.calculateEpochScores(state, timestamp)
+    const {
+      scores,
+      baseNetworkScore,
+      hwBonusNetworkScore
+    } = this.calculateEpochScores(state, timestamp)
     const epochLengthInMs = lastDistribution
       ? Number.parseInt(timestamp) - lastDistribution
       : 0
 
     let totalTokensDistributed = BigNumber(0)
     if (lastDistribution) {
-      totalTokensDistributed = this.calculateEpochTokens(
+      const {
+        baseActualDistributedTokens,
+        hwBonusActualDistributedTokens,
+        totalActualDistributedTokens
+      } = this.calculateEpochTokens(
         state,
         epochLengthInMs,
         scores,
-        totalScore
+        baseNetworkScore,
+        hwBonusNetworkScore
       )
+      totalTokensDistributed = totalActualDistributedTokens
+      console.log('baseActualDistributedTokens', baseActualDistributedTokens.toString())
+      console.log('hwBonusActualDistributedTokens', hwBonusActualDistributedTokens.toString())
+      console.log('totalActualDistributedTokens', totalActualDistributedTokens.toString())
     }
 
     // Finalize Distribution
     this.finalizeDistribution(
       state,
       timestamp,
-      totalScore,
+      baseNetworkScore,
       epochLengthInMs.toString(),
       totalTokensDistributed
     )
