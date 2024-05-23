@@ -15,13 +15,13 @@ import {
   UPPER_HEX_CHARS
 } from '../util'
 import {
-  ADDRESS_REQUIRED,
   Claimable,
   EvmAddress,
-  INVALID_ADDRESS,
   Fingerprint,
   assertValidEvmAddress,
-  assertValidFingerprint
+  assertValidFingerprint,
+  ENABLED_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY
 } from './relay-registry'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
@@ -33,37 +33,54 @@ export const NO_DISTRIBUTION_TO_CANCEL = 'No distribution to cancel'
 export const CANNOT_BACKDATE_SCORES = 'Cannot backdate scores'
 export const INVALID_MULTIPLIERS_INPUT = 'Invalid multipliers input'
 export const INVALID_MULTIPLIER_VALUE = 'Invalid multiplier value'
-export const INVALID_BONUS_AMOUNT = 'Invalid bonus amount'
 export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
+export const VALID_BONUS_NAME_REQUIRED = 'Valid bonus name required'
+export const FINGERPRINT_NOT_IN_BONUS = 'Fingerprint is not in bonus'
 
 export type Score = {
   score: string
-  address: string
-  fingerprint: string
+  address: EvmAddress
+  fingerprint: Fingerprint
+}
+
+export type DistributionResult = {
+  timeElapsed: string
+  tokensDistributedPerSecond: string
+  baseNetworkScore: string
+  baseDistributedTokens: string
+  bonuses: {
+    hardware: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+      networkScore: string
+      distributedTokens: string
+    }
+  }
+  totalTokensDistributedPerSecond: string
+  totalNetworkScore: string
+  totalDistributedTokens: string
 }
 
 export type DistributionState = OwnableState & EvolvableState & {
   tokensDistributedPerSecond: string
-  pendingDistributions: {
-    [timestamp: string]: {
-      bonus?: string
-      scores: Score[]
-    }
-  }
-  claimable: {
-    [address: string]: string
-  }
-  previousDistributions: {
-    [timestamp: string]: {
-      totalScore: string
-      totalDistributed: string
-      timeElapsed: string
+  bonuses: {
+    hardware: {
+      enabled: boolean
       tokensDistributedPerSecond: string
-      bonusTokens?: string
+      fingerprints: Fingerprint[]
     }
   }
   multipliers: {
-    [fingerprint: string]: string
+    [fingerprint: Fingerprint]: string
+  }
+  pendingDistributions: {
+    [timestamp: string]: { scores: Score[] }
+  }
+  claimable: {
+    [address: EvmAddress]: string
+  }
+  previousDistributions: {
+    [timestamp: string]: DistributionResult
   }
   previousDistributionsTrackingLimit: number
 }
@@ -94,10 +111,26 @@ export interface SetMultipliers extends ContractFunctionInput {
   multipliers: { [fingerprint: string]: string }
 }
 
-export interface SetDistributionBonus extends ContractFunctionInput {
-  function: 'setDistributionBonus'
-  timestamp: string
-  bonus: string
+export interface SetHardwareBonusRate extends ContractFunctionInput {
+  function: 'setHardwareBonusRate'
+  tokensDistributedPerSecond: string
+}
+
+export interface ToggleHardwareBonus extends ContractFunctionInput {
+  function: 'toggleHardwareBonus'
+  enabled: boolean
+}
+
+export interface AddFingerprintsToBonus extends ContractFunctionInput {
+  function: 'addFingerprintsToBonus'
+  bonusName: string
+  fingerprints: Fingerprint[]
+}
+
+export interface RemoveFingerprintsFromBonus extends ContractFunctionInput {
+  function: 'removeFingerprintsFromBonus'
+  bonusName: string
+  fingerprints: Fingerprint[]
 }
 
 export interface SetPreviousDistributionTrackingLimit
@@ -161,6 +194,16 @@ export class DistributionContract extends Evolvable(Object) {
       state.previousDistributionsTrackingLimit = 10
     }
 
+    if (!state.bonuses) {
+      state.bonuses = {
+        hardware: {
+          enabled: false,
+          tokensDistributedPerSecond: '0',
+          fingerprints: []
+        }
+      }
+    }
+
     super(state)
   }
 
@@ -197,6 +240,154 @@ export class DistributionContract extends Evolvable(Object) {
     timestamp: string
   ) {
     state.pendingDistributions[timestamp] = { scores: [] }
+  }
+
+  private finalizeDistribution(
+    state: DistributionState,
+    timestamp: string,
+    timeElapsed: string,
+    baseNetworkScore: BigNumber,
+    baseDistributedTokens: BigNumber,
+    hwBonusNetworkScore: BigNumber,
+    hwBonusDistributedTokens: BigNumber
+  ) {
+    const totalTokensDistributedPerSecond =
+      BigNumber(state.tokensDistributedPerSecond)
+        .plus(BigNumber(state.bonuses.hardware.tokensDistributedPerSecond))
+        .toString()
+    
+    const totalNetworkScore = baseNetworkScore
+      .plus(hwBonusNetworkScore)
+      .toString()
+
+    const totalDistributedTokens = baseDistributedTokens
+      .plus(hwBonusDistributedTokens)
+      .toString()
+
+    state.previousDistributions[timestamp] = {
+      timeElapsed,
+      tokensDistributedPerSecond: state.tokensDistributedPerSecond,
+      baseNetworkScore: baseNetworkScore.toString(),
+      baseDistributedTokens: baseDistributedTokens.toString(),
+      bonuses: {
+        hardware: {
+          enabled: state.bonuses.hardware.enabled,
+          tokensDistributedPerSecond:
+            state.bonuses.hardware.tokensDistributedPerSecond,
+          networkScore: hwBonusNetworkScore.toString(),
+          distributedTokens: hwBonusDistributedTokens.toString()
+        }
+      },
+      totalTokensDistributedPerSecond,
+      totalNetworkScore,
+      totalDistributedTokens
+    }
+
+    const previousDistributionTimestamps = Object
+      .keys(state.previousDistributions)
+      .reverse()
+      .slice(state.previousDistributionsTrackingLimit)
+    for (let i = 0; i < previousDistributionTimestamps.length; i++) {
+      const timestampToRemove = previousDistributionTimestamps[i]
+      delete state.previousDistributions[timestampToRemove]
+    }
+
+    delete state.pendingDistributions[timestamp]
+  }
+
+  private calculateEpochScores(
+    state: DistributionState,
+    timestamp: string
+  ) {
+    const { scores } = state.pendingDistributions[timestamp]
+    const hwScores = scores.filter(
+      ({ address }) => state.bonuses.hardware.fingerprints.includes(address)
+    )
+    const { baseNetworkScore, hwBonusNetworkScore } = scores.reduce(
+      (totals, { fingerprint, score }) => {
+        const scoreWithMultiplier = BigNumber(score)
+          .times(state.multipliers[fingerprint] || '1')
+
+        let hwScoreWithMultiplier = BigNumber(0)
+        if (
+          state.bonuses.hardware.enabled
+          && state.bonuses.hardware.fingerprints.includes(fingerprint)
+        ) {
+          hwScoreWithMultiplier = scoreWithMultiplier
+        }
+
+        return {
+          ...totals,
+          baseNetworkScore: totals
+            .baseNetworkScore
+            .plus(scoreWithMultiplier),
+          hwBonusNetworkScore: totals
+            .hwBonusNetworkScore
+            .plus(hwScoreWithMultiplier)
+        }        
+      },
+      { baseNetworkScore: BigNumber(0), hwBonusNetworkScore: BigNumber(0) }
+    )
+
+    return { scores, hwScores, baseNetworkScore, hwBonusNetworkScore }
+  }
+
+  private calculateEpochTokens(
+    state: DistributionState,
+    epochLengthInMs: number,
+    scores: Score[],
+    baseNetworkScore: BigNumber,
+    hwBonusNetworkScore: BigNumber
+  ) {
+    const baseTokensToDistribute = BigNumber(state.tokensDistributedPerSecond)
+      .times(BigNumber(epochLengthInMs))
+      .dividedBy(1000)
+
+    const hwBonusTokensToDistribute =
+      BigNumber(state.bonuses.hardware.tokensDistributedPerSecond)
+        .times(BigNumber(epochLengthInMs))
+        .dividedBy(1000)
+
+    let baseActualDistributedTokens = BigNumber(0)
+    let hwBonusActualDistributedTokens = BigNumber(0)
+    for (let i = 0; i < scores.length; i++) {
+      const { score, address, fingerprint } = scores[i]
+
+      const baseRedeemableTokens = BigNumber(score)
+        .times(state.multipliers[fingerprint] || '1')
+        .dividedBy(baseNetworkScore)
+        .times(baseTokensToDistribute)
+        .integerValue(BigNumber.ROUND_FLOOR)
+
+      baseActualDistributedTokens = baseActualDistributedTokens
+        .plus(baseRedeemableTokens)
+
+      let hwBonusRedeemableTokens = BigNumber(0)
+      if (
+        state.bonuses.hardware.enabled
+        && state.bonuses.hardware.fingerprints.includes(fingerprint)
+      ) {
+        hwBonusRedeemableTokens = BigNumber(score)
+          .times(state.multipliers[fingerprint] || '1')
+          .dividedBy(hwBonusNetworkScore)
+          .times(hwBonusTokensToDistribute)
+          .integerValue(BigNumber.ROUND_FLOOR)
+      }
+      hwBonusActualDistributedTokens = hwBonusActualDistributedTokens
+        .plus(hwBonusRedeemableTokens)
+      
+      const redeemableTokens = baseRedeemableTokens
+        .plus(hwBonusRedeemableTokens)
+      const previouslyRedeemableTokens = state.claimable[address] || '0'
+      state.claimable[address] = BigNumber(previouslyRedeemableTokens)
+        .plus(redeemableTokens)
+        .toString()
+    }
+
+    return {
+      baseActualDistributedTokens,
+      hwBonusActualDistributedTokens
+    }
   }
 
   @OnlyOwner
@@ -266,61 +457,38 @@ export class DistributionContract extends Evolvable(Object) {
     )
 
     const lastDistribution = this.getLatestDistribution(state)
-    let distributionAmount = BigNumber(state.tokensDistributedPerSecond)
-    let totalDistributed = BigNumber(0)
-    const { bonus, scores } = state.pendingDistributions[timestamp]
-    const totalScore = scores.reduce<BigNumber>(
-      (total, { fingerprint, score }) => total.plus(
-        BigNumber(score).times(state.multipliers[fingerprint] || '1')
-      ),
-      BigNumber(0)
+    const {
+      scores,
+      baseNetworkScore,
+      hwBonusNetworkScore
+    } = this.calculateEpochScores(state, timestamp)
+    const epochLengthInMs = lastDistribution
+      ? Number.parseInt(timestamp) - lastDistribution
+      : 0
+
+    let distributionResult = {
+      baseActualDistributedTokens: BigNumber(0),
+      hwBonusActualDistributedTokens: BigNumber(0)
+    }
+    if (lastDistribution) {
+      distributionResult = this.calculateEpochTokens(
+        state,
+        epochLengthInMs,
+        scores,
+        baseNetworkScore,
+        hwBonusNetworkScore
+      )
+    }
+
+    this.finalizeDistribution(
+      state,
+      timestamp,
+      epochLengthInMs.toString(),
+      baseNetworkScore,
+      distributionResult.baseActualDistributedTokens,
+      hwBonusNetworkScore,
+      distributionResult.hwBonusActualDistributedTokens
     )
-    let timeElapsed = '0'
-    if (!lastDistribution) {
-      distributionAmount = BigNumber(0)
-    } else {
-      const elapsedSinceLastDistribution =
-        Number.parseInt(timestamp) - lastDistribution
-      timeElapsed = elapsedSinceLastDistribution.toString()
-      distributionAmount = BigNumber(state.tokensDistributedPerSecond)
-        .times(BigNumber(elapsedSinceLastDistribution))
-        .dividedBy(1000)
-        .plus(bonus || '0')
-
-      for (let i = 0; i < scores.length; i++) {
-        const { score, address, fingerprint } = scores[i]
-        const claimable = BigNumber(score)
-          .times(state.multipliers[fingerprint] || '1')
-          .dividedBy(totalScore)
-          .times(distributionAmount)
-          .integerValue(BigNumber.ROUND_FLOOR)
-        totalDistributed = totalDistributed.plus(claimable)
-        const previouslyClaimable = state.claimable[address] || '0'
-        state.claimable[address] = BigNumber(previouslyClaimable)
-          .plus(claimable)
-          .toString()
-      }
-    }
-
-    state.previousDistributions[timestamp] = {
-      totalScore: totalScore.toString(),
-      timeElapsed,
-      totalDistributed: totalDistributed.toString(),
-      tokensDistributedPerSecond: state.tokensDistributedPerSecond
-    }
-    if (bonus) {
-      state.previousDistributions[timestamp].bonusTokens = bonus
-    }
-
-    const removeTimestamps = Object
-      .keys(state.previousDistributions)
-      .reverse()
-      .slice(state.previousDistributionsTrackingLimit)
-    for (let i = 0; i < removeTimestamps.length; i++) {
-      delete state.previousDistributions[removeTimestamps[i]]
-    }
-
-    delete state.pendingDistributions[timestamp]
 
     return { state, result: true }
   }
@@ -381,24 +549,35 @@ export class DistributionContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
-  setDistributionBonus(
+  setHardwareBonusRate(
     state: DistributionState,
-    action: ContractInteraction<PartialFunctionInput<SetMultipliers>>
+    action: ContractInteraction<PartialFunctionInput<SetHardwareBonusRate>>
   ) {
-    const { timestamp, bonus } = action.input
+    // const { timestamp, bonus } = action.input
+    const { input: { tokensDistributedPerSecond } } = action
 
-    ContractAssert(isValidTimestamp(timestamp), INVALID_TIMESTAMP)
-    ContractAssert(typeof bonus === 'string', INVALID_BONUS_AMOUNT)
-    const bigNumberBonus = BigNumber(bonus)
-    ContractAssert(!bigNumberBonus.isNaN(), INVALID_BONUS_AMOUNT)
-    ContractAssert(bigNumberBonus.isPositive(), INVALID_BONUS_AMOUNT)
-    ContractAssert(bigNumberBonus.isInteger(), INVALID_BONUS_AMOUNT)
+    ContractAssert(
+      typeof tokensDistributedPerSecond === 'string'
+        && BigNumber(tokensDistributedPerSecond).gte(0),
+      INVALID_DISTRIBUTION_AMOUNT
+    )
 
-    if (!state.pendingDistributions[timestamp]) {
-      this.initializeNewDistribution(state, timestamp)
-    }
+    state.bonuses.hardware.tokensDistributedPerSecond =
+      tokensDistributedPerSecond
 
-    state.pendingDistributions[timestamp].bonus = bonus
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  toggleHardwareBonus(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<ToggleHardwareBonus>>
+  ) {
+    const { input: { enabled } } = action
+
+    ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
+
+    state.bonuses.hardware.enabled = enabled
 
     return { state, result: true }
   }
@@ -418,6 +597,61 @@ export class DistributionContract extends Evolvable(Object) {
     ContractAssert(limitBigNumber.isInteger(), INVALID_LIMIT)
 
     state.previousDistributionsTrackingLimit = limit
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  addFingerprintsToBonus(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<AddFingerprintsToBonus>>
+  ) {
+    const { input: { bonusName, fingerprints } } = action
+
+    ContractAssert(typeof bonusName === 'string', VALID_BONUS_NAME_REQUIRED)
+    ContractAssert(
+      Object.keys(state.bonuses).includes(bonusName),
+      VALID_BONUS_NAME_REQUIRED
+    )
+    ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
+    for (const fingerprint of fingerprints) {
+      assertValidFingerprint(fingerprint)
+    }
+
+    state.bonuses[
+      bonusName as keyof DistributionState['bonuses']
+    ].fingerprints.push(...fingerprints)
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  removeFingerprintsFromBonus(
+    state: DistributionState,
+    action: ContractInteraction<
+      PartialFunctionInput<RemoveFingerprintsFromBonus>
+    >
+  ) {
+    const { input: { bonusName, fingerprints } } = action
+
+    ContractAssert(typeof bonusName === 'string', VALID_BONUS_NAME_REQUIRED)
+    ContractAssert(
+      Object.keys(state.bonuses).includes(bonusName),
+      VALID_BONUS_NAME_REQUIRED
+    )
+    ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
+    for (const fingerprint of fingerprints) {
+      assertValidFingerprint(fingerprint)
+      const fingerprintBonusIndex = state
+        .bonuses[bonusName as keyof DistributionState['bonuses']]
+        .fingerprints
+        .indexOf(fingerprint)
+      ContractAssert(fingerprintBonusIndex > -1, FINGERPRINT_NOT_IN_BONUS)
+      state
+        .bonuses[bonusName as keyof DistributionState['bonuses']]
+        .fingerprints
+        .splice(fingerprintBonusIndex, 1)
+    }
 
     return { state, result: true }
   }
@@ -442,10 +676,16 @@ export function handle(
       return contract.claimable(state, action)
     case 'setMultipliers':
       return contract.setMultipliers(state, action)
-    case 'setDistributionBonus':
-      return contract.setDistributionBonus(state, action)
+    case 'setHardwareBonusRate':
+      return contract.setHardwareBonusRate(state, action)
     case 'setPreviousDistributionTrackingLimit':
       return contract.setPreviousDistributionTrackingLimit(state, action)
+    case 'toggleHardwareBonus':
+      return contract.toggleHardwareBonus(state, action)
+    case 'addFingerprintsToBonus':
+      return contract.addFingerprintsToBonus(state, action)
+    case 'removeFingerprintsFromBonus':
+      return contract.removeFingerprintsFromBonus(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }

@@ -2,152 +2,182 @@
   {
     "address": "0xf2948eDD428305D28DcBd6C284470e3823ee182b",
     "score": "14000",
-    "fingerprint": "7F54724CB9E0567BC4A538556DF25A4FD6DC7F5E"
+    "fingerprint": "7F54724CB9E0567BC4A538556DF25A4FD6DC7F5E",
+    "hardware": true
   },
   {
     "address": "0xa2AA87bE9FaaE25F1aC6E6846eC9589b03625ce0",
     "score": "53000",
-    "fingerprint": "60CCE755BD6B7410C70A16B4204D13A986437FDA"
+    "fingerprint": "60CCE755BD6B7410C70A16B4204D13A986437FDA",
+    "hardware": true
   },
   {
     "address": "0xF94C4F7e890Bc437137eCCF8bF58C5c842A3cC03",
     "score": "1",
-    "fingerprint": "A1BBF90FAEA682A5C96B7B36A6AA27ABE56C4AA7"
+    "fingerprint": "A1BBF90FAEA682A5C96B7B36A6AA27ABE56C4AA7",
+    "hardware": true
   },
   {
     "address": "0x0f67593B4C7A9CF726208a840804185Da0Ba372A",
     "score": "8",
-    "fingerprint": "7CAA543175753FB53BDD87C1048837B9157D82A8"
+    "fingerprint": "7CAA543175753FB53BDD87C1048837B9157D82A8",
+    "hardware": true
   },
   {
     "address": "0xd045A4344362A3CD187bd7e2277Fae8BA067EFd5",
     "score": "6700",
-    "fingerprint": "D60941A928090AADF96AD6481B974D79AA6048E2"
+    "fingerprint": "D60941A928090AADF96AD6481B974D79AA6048E2",
+    "hardware": true
   },
   {
     "address": "0x3ceb890224dAaB095745d3fa18e17F83699705ad",
     "score": "28000",
-    "fingerprint": "42449D01D4052169541A3315F18179EAB8F923A9"
+    "fingerprint": "42449D01D4052169541A3315F18179EAB8F923A9",
+    "hardware": true
   },
   {
     "address": "0xe486d9D3b99a0B9CD35a511401D928E527844b43",
     "score": "8",
-    "fingerprint": "C9B4D5154450ACAB3A81548DE5E383378B0328E4"
+    "fingerprint": "C9B4D5154450ACAB3A81548DE5E383378B0328E4",
+    "hardware": true
   },
   {
     "address": "0x0a14181c3845c0C4eE574C2564B01affA400242F",
     "score": "52000",
-    "fingerprint": "BB05DF5D23D225F1B9ED82796D8194257706B2E5"
+    "fingerprint": "BB05DF5D23D225F1B9ED82796D8194257706B2E5",
+    "hardware": true
   },
   {
     "address": "0x7Fa0963a8CB41d12C0bBa4286141dd71Ba158F44",
     "score": "11000",
-    "fingerprint": "6AAFCA940AF45837A312034ED84AADC081520DB1"
+    "fingerprint": "6AAFCA940AF45837A312034ED84AADC081520DB1",
+    "hardware": true
   },
   {
     "address": "0x0184FC55d9AC8856Fc365BDc70825756c9D438fc",
     "score": "1",
-    "fingerprint": "BE62F9855E9143A3D15C98739800A2DCBAF7A76D"
+    "fingerprint": "BE62F9855E9143A3D15C98739800A2DCBAF7A76D",
+    "hardware": true
   },
   {
     "address": "0xFA579D17a320AA2B226aD068B5597aaFd493a56d",
     "score": "7",
-    "fingerprint": "2FFD767BABE25856580BE057FD7708F9D2E1C479"
+    "fingerprint": "2FFD767BABE25856580BE057FD7708F9D2E1C479",
+    "hardware": true
   },
   {
     "address": "0xDf548c35DBA62A1B0A5FB1E365E2539935487408",
     "score": "1",
-    "fingerprint": "76FFB75E358D50868E5D5042AF77BDC38C39C45A"
+    "fingerprint": "76FFB75E358D50868E5D5042AF77BDC38C39C45A",
+    "hardware": true
   },
   {
     "address": "0xDD3A2390CeFa80c1eCF5771636A4F49F2B8956C8",
     "score": "31000",
-    "fingerprint": "2CAC5BA69A56809C6F6D71A34929B2FF8C35CA9B"
+    "fingerprint": "2CAC5BA69A56809C6F6D71A34929B2FF8C35CA9B",
+    "hardware": true
   },
   {
     "address": "0xBbbB5ABEC6730e96Da0e7E91564E4090117c39Cd",
     "score": "47000",
-    "fingerprint": "74D0083A550B009B4E5C91A2BB577236F0C7AF9B"
+    "fingerprint": "74D0083A550B009B4E5C91A2BB577236F0C7AF9B",
+    "hardware": true
   },
   {
     "address": "0x778B01147C894C76909D9C889e8F9e0D55328FA9",
     "score": "260",
-    "fingerprint": "87B569D9DB1B812944CFBF41DE696B1E6A2F62DD"
+    "fingerprint": "87B569D9DB1B812944CFBF41DE696B1E6A2F62DD",
+    "hardware": true
   },
   {
     "address": "0x85Bd2dEE3233A1469E2217ee9520a39A2137d442",
     "score": "26",
-    "fingerprint": "742622D69C66EF602367967F8E26847C66FC9308"
+    "fingerprint": "742622D69C66EF602367967F8E26847C66FC9308",
+    "hardware": true
   },
   {
     "address": "0xAbcd54201697adC79bD0d012E0Bb8bC4c9572eF9",
     "score": "16000",
-    "fingerprint": "6F230469A5D07CF24361A4546E709AE52C6EBE4F"
+    "fingerprint": "6F230469A5D07CF24361A4546E709AE52C6EBE4F",
+    "hardware": true
   },
   {
     "address": "0x605782a5D874cB2B8b25B0D72CD111e468a0068b",
     "score": "7",
-    "fingerprint": "519262BF20AC9CF2753DED331C145BC6F315C7B5"
+    "fingerprint": "519262BF20AC9CF2753DED331C145BC6F315C7B5",
+    "hardware": true
   },
   {
     "address": "0x79B4E22F291d18116B70199C62A8c360ad248c93",
     "score": "810",
-    "fingerprint": "54790AF4A4EF9EBDE7D7DE834E09562B7A915156"
+    "fingerprint": "54790AF4A4EF9EBDE7D7DE834E09562B7A915156",
+    "hardware": true
   },
   {
     "address": "0xCd5D478686c6fA5E47Fc457F16E04224cD012690",
     "score": "18000",
-    "fingerprint": "BE1F76841DB89C3D34FE9235BC8594E109951960"
+    "fingerprint": "BE1F76841DB89C3D34FE9235BC8594E109951960",
+    "hardware": true
   },
   {
     "address": "0xA0f166b408316C01c778Ea51A35991CbeD0630B2",
     "score": "55000",
-    "fingerprint": "7A3D6ECE5C38D65F9022FDBE8F36A7C794B3661E"
+    "fingerprint": "7A3D6ECE5C38D65F9022FDBE8F36A7C794B3661E",
+    "hardware": true
   },
   {
     "address": "0x77B789133012751720cF50781d31Bb56Fb4B97dA",
     "score": "38000",
-    "fingerprint": "BF4EB653F28CF9C958C3232D54B1FC29B4B12F17"
+    "fingerprint": "BF4EB653F28CF9C958C3232D54B1FC29B4B12F17",
+    "hardware": true
   },
   {
     "address": "0x887b7E335f75E69ecaf1376F057667562269d7DC",
     "score": "3200",
-    "fingerprint": "BCCA31EC30093D0FA657A75A4FEB559473FDDD50"
+    "fingerprint": "BCCA31EC30093D0FA657A75A4FEB559473FDDD50",
+    "hardware": true
   },
   {
     "address": "0x52285B51Fb4E0Ac159AC46aD12Ef792E02cD214d",
     "score": "1500",
-    "fingerprint": "8C6F44DF49DA4AB4BD254ED1CD2F391FA9BC66F8"
+    "fingerprint": "8C6F44DF49DA4AB4BD254ED1CD2F391FA9BC66F8",
+    "hardware": true
   },
   {
     "address": "0xcb7a940167172CE2c6E4EaD25FD0ff1cede432A6",
     "score": "3200",
-    "fingerprint": "F8C6CE08E91B09D7068F782F37DE756984237DBC"
+    "fingerprint": "F8C6CE08E91B09D7068F782F37DE756984237DBC",
+    "hardware": true
   },
   {
     "address": "0x8E02Ff09b8Fa6047122c2adBB40029cA444F5974",
     "score": "100",
-    "fingerprint": "D8BA267DE758586462486E7DF7C5FB9556404D5F"
+    "fingerprint": "D8BA267DE758586462486E7DF7C5FB9556404D5F",
+    "hardware": true
   },
   {
     "address": "0x172253954c395832a9e264FbD8f248221d4a92B6",
     "score": "1400",
-    "fingerprint": "284C217B14811520C0586CFACEAA984ADA6C1F88"
+    "fingerprint": "284C217B14811520C0586CFACEAA984ADA6C1F88",
+    "hardware": true
   },
   {
     "address": "0xDd29C85d9FDe419dcaF7cB3eCba603f1328eeF32",
     "score": "340",
-    "fingerprint": "8D543BCFCC18BF2189DE740D95F70B25EBA3BB0C"
+    "fingerprint": "8D543BCFCC18BF2189DE740D95F70B25EBA3BB0C",
+    "hardware": true
   },
   {
     "address": "0xa594dc6755fDF82dF1ddB20cd8DE2c04Faa6a5a9",
     "score": "1",
-    "fingerprint": "CB11AD937DE2F01B830782A218DEEF096AE7B47D"
+    "fingerprint": "CB11AD937DE2F01B830782A218DEEF096AE7B47D",
+    "hardware": true
   },
   {
     "address": "0x7E0781f0e035a16F5F3cf833d99D69E1e0036039",
     "score": "14000",
-    "fingerprint": "123B0957B74759A3AF6524E257E29D3708109B1B"
+    "fingerprint": "123B0957B74759A3AF6524E257E29D3708109B1B",
+    "hardware": true
   },
   {
     "address": "0x448Cc1ca7b315a465bB9e20f8e49E0062f4BD331",

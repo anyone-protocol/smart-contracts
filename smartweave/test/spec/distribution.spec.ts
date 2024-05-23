@@ -8,16 +8,25 @@ import {
   DUPLICATE_FINGERPRINT_SCORES,
   DistributionHandle,
   DistributionState,
+  ENABLED_REQUIRED,
   INVALID_ADDRESS,
   INVALID_DISTRIBUTION_AMOUNT,
   INVALID_FINGERPRINT,
   INVALID_SCORES,
   INVALID_TIMESTAMP,
   NO_DISTRIBUTION_TO_CANCEL,
-  NO_PENDING_SCORES
+  NO_PENDING_SCORES,
+  VALID_BONUS_NAME_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
-import { INVALID_BONUS_AMOUNT, INVALID_LIMIT, INVALID_MULTIPLIERS_INPUT, INVALID_MULTIPLIER_VALUE } from '../../src/contracts/distribution'
+import {
+  INVALID_LIMIT,
+  INVALID_MULTIPLIERS_INPUT,
+  INVALID_MULTIPLIER_VALUE
+} from '../../src/contracts/distribution'
+import TestScores from '../e2e/data/scores.json'
+import TestResults from '../e2e/data/results.json'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -36,7 +45,14 @@ function resetState() {
     claimable: {},
     previousDistributions: {},
     multipliers: {},
-    previousDistributionsTrackingLimit: 10
+    previousDistributionsTrackingLimit: 10,
+    bonuses: {
+      hardware: {
+        enabled: false,
+        tokensDistributedPerSecond: '0',
+        fingerprints: []
+      }
+    }
   }
 }
 
@@ -74,6 +90,11 @@ describe('Distribution Contract', () => {
     expect(state.previousDistributions).to.exist
     expect(state.multipliers).to.exist
     expect(state.previousDistributionsTrackingLimit).to.exist
+    expect(state.bonuses).to.exist
+    expect(state.bonuses.hardware).to.exist
+    expect(state.bonuses.hardware.enabled).to.be.a('boolean')
+    expect(state.bonuses.hardware.tokensDistributedPerSecond).to.be.a('string')
+    expect(state.bonuses.hardware.fingerprints).to.be.an('array')
   })
 
   describe('Setting Distribution Amount', () => {
@@ -302,7 +323,7 @@ describe('Distribution Contract', () => {
     })
   })
 
-  describe('Setting Multipliers', () => {
+  describe('Distribution Multipliers', () => {
     it('Allows owner to set multipliers for fingerprints', () => {
       const multiplier = '2.13'
       const setMultipliers = createInteraction(OWNER, {
@@ -363,74 +384,273 @@ describe('Distribution Contract', () => {
     })
   })
 
-  describe('Setting Distribution Bonus', () => {
-    it('Allows owner to add bonus tokens to a distribution', () => {
-      const bonus = '1234'
-      const timestamp = Date.now().toString()
-      const setDistributionBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus
+  describe('Distribution Bonuses', () => {
+    describe('Hardware', () => {
+      it('Allows Owner to set hardware bonus token rate', () => {
+        const tokensDistributedPerSecond = '200'
+        const setHardwareBonusRate = createInteraction(OWNER, {
+          function: 'setTokenDistributionRate',
+          tokensDistributedPerSecond
+        })
+    
+        const { state } = DistributionHandle(initState, setHardwareBonusRate)
+    
+        expect(state.tokensDistributedPerSecond).to.equal(
+          tokensDistributedPerSecond
+        )
       })
 
-      const { state } = DistributionHandle(initState, setDistributionBonus)
-
-      expect(state.pendingDistributions[timestamp].bonus).to.equal(bonus)
-    })
-
-    it('Validates when adding bonus tokens to a distribution', () => {
-      const timestamp = Date.now().toString()
-      const setMissingBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp
+      it('Validates when setting hardware bonus token rate', () => {
+        const setMissingRate = createInteraction(OWNER, {
+          function: 'setHardwareBonusRate'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, setMissingRate)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+  
+        const negativeDistributionAmount = '-100'
+        const setNegativeDistributionAmount = createInteraction(OWNER, {
+          function: 'setHardwareBonusRate',
+          tokensDistributedPerSecond: negativeDistributionAmount
+        })
+  
+        expect(
+          () => DistributionHandle(initState, setNegativeDistributionAmount)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+  
+        const numberDistributionAmount = 100
+        const setNumberDistributionAmount = createInteraction(OWNER, {
+          function: 'setHardwareBonusRate',
+          tokensDistributedPerSecond: numberDistributionAmount
+        })
+        
+        expect(
+          () => DistributionHandle(initState, setNumberDistributionAmount)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
       })
 
-      expect(
-        () => DistributionHandle(initState, setMissingBonus)
-      ).to.throw(ContractError, INVALID_BONUS_AMOUNT)
-
-      const missingTimestamp = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        bonus: '1000'
+      it('Prevents non-owners from setting hardware bonus token rate', () => {
+        const aliceSetHardwareBonusRate = createInteraction(ALICE, {
+          function: 'setHardwareBonusRate',
+          tokensDistributedPerSecond: '1000'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, aliceSetHardwareBonusRate)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
       })
 
-      expect(
-        () => DistributionHandle(initState, missingTimestamp)
-      ).to.throw(ContractError, INVALID_TIMESTAMP)
+      it('Allows Owner to enable hardware bonus', () => {
+        const enabled = true
+        const toggleHardwareBonus = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled
+        })
 
-      const negativeBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus: '-1000'
+        const { state } = DistributionHandle(initState, toggleHardwareBonus)
+
+        expect(state.bonuses.hardware.enabled).to.equal(enabled)
       })
 
-      expect(
-        () => DistributionHandle(initState, negativeBonus)
-      ).to.throw(ContractError, INVALID_BONUS_AMOUNT)
+      it('Allows Owner to disable hardware bonus', () => {
+        const enabled = false
+        const toggleHardwareBonus = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled
+        })
 
-      const decimalBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus: '97.1'
+        const { state } = DistributionHandle(initState, toggleHardwareBonus)
+
+        expect(state.bonuses.hardware.enabled).to.equal(enabled)
       })
 
-      expect(
-        () => DistributionHandle(initState, decimalBonus)
-      ).to.throw(ContractError, INVALID_BONUS_AMOUNT)
-    })
-
-    it('Prevents non-owners from adding bonus tokens to a distribution', () => {
-      const bonus = '1234'
-      const timestamp = Date.now().toString()
-      const aliceSetDistributionBonus = createInteraction(ALICE, {
-        function: 'setDistributionBonus',
-        timestamp,
-        bonus
+      it('Validates when toggling hardware bonus', () => {
+        const undefinedToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, undefinedToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const zeroToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: 0
+        })
+  
+        expect(
+          () => DistributionHandle(initState, zeroToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const positiveToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: 12
+        })
+  
+        expect(
+          () => DistributionHandle(initState, positiveToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const objectToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: { enabled: true }
+        })
+  
+        expect(
+          () => DistributionHandle(initState, objectToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const stringToggle = createInteraction(OWNER, {
+          function: 'toggleHardwareBonus',
+          enabled: 'true'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, stringToggle)
+        ).to.throw(ENABLED_REQUIRED)
       })
 
-      expect(
-        () => DistributionHandle(initState, aliceSetDistributionBonus)
-      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      it('Prevents non-owners from toggling hardware bonus', () => {
+        const aliceToggleHardwareBonus = createInteraction(ALICE, {
+          function: 'toggleHardwareBonus',
+          enabled: true
+        })
+  
+        expect(
+          () => DistributionHandle(initState, aliceToggleHardwareBonus)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      })
+
+      it('Allows Owner to add fingerprints to hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintC]
+        const addFingerprints = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'hardware',
+          fingerprints
+        })
+
+        const { state } = DistributionHandle(initState, addFingerprints)
+
+        expect(state.bonuses.hardware.fingerprints).deep.equal(fingerprints)
+      })
+
+      it('Validates when adding fingerprints to hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintC]
+
+        const missingBonusName = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, missingBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const wrongBonusName = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'special-bonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, wrongBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const badFingerprints = createInteraction(OWNER, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'hardware',
+          fingerprints: ['bad-fingerprint', 123]
+        })
+
+        expect(
+          () => DistributionHandle(initState, badFingerprints)
+        ).to.throw(INVALID_FINGERPRINT)
+      })
+
+      it('Prevents non-owners from adding fingerprints to hw bonus', () => {
+        const aliceAddFingerprints = createInteraction(ALICE, {
+          function: 'addFingerprintsToBonus',
+          bonusName: 'hardware',
+          fingerprints: [fingerprintA]
+        })
+
+        expect(
+          () => DistributionHandle(initState, aliceAddFingerprints)
+        ).to.throw(ERROR_ONLY_OWNER)
+      })
+
+      it('Allows Owner to remove fingerprints from hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintB, fingerprintC]
+        const removeFingerprints = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'hardware',
+          fingerprints: [fingerprintB]
+        })
+
+        const { state } = DistributionHandle(
+          {
+            ...initState,
+            bonuses: {
+              hardware: {
+                enabled: true,
+                tokensDistributedPerSecond: '100',
+                fingerprints
+              }
+            }
+          },
+          removeFingerprints
+        )
+
+        expect(state.bonuses.hardware.fingerprints).deep.equal(
+          [fingerprintA, fingerprintC]
+        )
+      })
+
+      it('Validates when removing fingerprints from hardware bonus', () => {
+        const fingerprints = [fingerprintA, fingerprintC]
+
+        const missingBonusName = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, missingBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const wrongBonusName = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'special-bonus',
+          fingerprints
+        })
+
+        expect(
+          () => DistributionHandle(initState, wrongBonusName)
+        ).to.throw(VALID_BONUS_NAME_REQUIRED)
+
+        const badFingerprints = createInteraction(OWNER, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'hardware',
+          fingerprints: ['bad-fingerprint', 123]
+        })
+
+        expect(
+          () => DistributionHandle(initState, badFingerprints)
+        ).to.throw(INVALID_FINGERPRINT)
+      })
+
+      it('Prevents non-owners from removing fingerprints from hardware bonus', () => {
+        const aliceRemoveFingerprints = createInteraction(ALICE, {
+          function: 'removeFingerprintsFromBonus',
+          bonusName: 'hardware',
+          fingerprints: [fingerprintA]
+        })
+
+        expect(
+          () => DistributionHandle(initState, aliceRemoveFingerprints)
+        ).to.throw(ERROR_ONLY_OWNER)
+      })
     })
   })
 
@@ -455,10 +675,21 @@ describe('Distribution Contract', () => {
       expect(state.pendingDistributions).to.be.empty
       expect(state.previousDistributions).to.deep.equal({
         [timestamp]: {
-          totalScore: '100',
           timeElapsed: '0',
-          totalDistributed: '0',
-          tokensDistributedPerSecond: '1000'
+          tokensDistributedPerSecond: '1000',
+          baseNetworkScore: '100',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '1000',
+          totalNetworkScore: '100',
+          totalDistributedTokens: '0'
         }
       })
     })
@@ -638,15 +869,37 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions).to.deep.equal({
         [firstTimestamp]: {
           timeElapsed: '0',
-          tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '0',
-          totalScore: '100'
+          tokensDistributedPerSecond: '1000',
+          baseNetworkScore: '100',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '1000',
+          totalNetworkScore: '100',
+          totalDistributedTokens: '0'
         },
         [secondTimestamp]: {
           timeElapsed: timeBetweenDistributions.toString(),
           tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '1000',
-          totalScore: '500'
+          baseNetworkScore: '500',
+          baseDistributedTokens: '1000',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+          totalNetworkScore: '500',
+          totalDistributedTokens: '1000'
         }
       })
       expect(state.claimable).to.deep.equal({
@@ -761,21 +1014,54 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions).to.deep.equal({
         [firstTimestamp]: {
           timeElapsed: '0',
-          tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '0',
-          totalScore: '300'
+          tokensDistributedPerSecond: '1000',
+          baseNetworkScore: '300',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '1000',
+          totalNetworkScore: '300',
+          totalDistributedTokens: '0'
         },
         [secondTimestamp]: {
           timeElapsed: firstTimeDifference.toString(),
           tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '5430',
-          totalScore: '2069'
+          baseNetworkScore: '2069',
+          baseDistributedTokens: '5430',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+          totalNetworkScore: '2069',
+          totalDistributedTokens: '5430'          
         },
         [thirdTimestamp]: {
-          timeElapsed: (secondTimeDifference).toString(),
+          timeElapsed: secondTimeDifference.toString(),
           tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '86399',
-          totalScore: '8162'
+          baseNetworkScore: '8162',
+          baseDistributedTokens: '86399',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+          totalNetworkScore: '8162',
+          totalDistributedTokens: '86399'
         }
       })
       expect(state.pendingDistributions).to.be.empty
@@ -832,15 +1118,37 @@ describe('Distribution Contract', () => {
         [firstTimestamp]: {
           timeElapsed: '0',
           tokensDistributedPerSecond: '4333',
-          totalDistributed: '0',
-          totalScore: '300'
+          baseNetworkScore: '300',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '4333',
+          totalNetworkScore: '300',
+          totalDistributedTokens: '0'
         },
         // 4333 tps rate over 443ms ~= 1,919.519 tokens
         [secondTimestamp]: {
           timeElapsed: '443',
           tokensDistributedPerSecond: '4333',
-          totalDistributed: '1918',
-          totalScore: '2069'
+          baseNetworkScore: '2069',
+          baseDistributedTokens: '1918',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '4333',
+          totalNetworkScore: '2069',
+          totalDistributedTokens: '1918'
         }
       })
       expect(state.pendingDistributions).to.be.empty
@@ -898,57 +1206,128 @@ describe('Distribution Contract', () => {
       })
     })
 
-    it('Applies bonuses on distribution', () => {
-      const bonus = '42069'
-      const now = Date.now()
-      const firstDistributionTimestamp = now.toString()
-      const firstAddScores = createInteraction(OWNER, {
-        function: 'addScores',
-        timestamp: firstDistributionTimestamp,
-        scores: [
-          { score: '100', address: ALICE, fingerprint: fingerprintA },
-          { score: '100', address: BOB, fingerprint: fingerprintB },
-          { score: '100', address: ALICE, fingerprint: fingerprintC }
-        ]
-      })
-      const firstDistribute = createInteraction(OWNER, {
+    it('Applies hardware bonus on distribution when enabled', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
         function: 'distribute',
-        timestamp: firstDistributionTimestamp
-      })
-      const elapsedTime = 5432
-      const secondDistributionTimestamp = (now + elapsedTime).toString()
-      const setDistributionBonus = createInteraction(OWNER, {
-        function: 'setDistributionBonus',
-        bonus,
-        timestamp: secondDistributionTimestamp
-      })
-      const secondAddScores = createInteraction(OWNER, {
-        function: 'addScores',
-        timestamp: secondDistributionTimestamp,
-        scores: [
-          { score: '100', address: ALICE, fingerprint: fingerprintA },
-          { score: '100', address: BOB, fingerprint: fingerprintB },
-          { score: '100', address: ALICE, fingerprint: fingerprintC }
-        ]
-      })
-      const secondDistribute = createInteraction(OWNER, {
-        function: 'distribute',
-        timestamp: secondDistributionTimestamp
+        timestamp: timestamp.toString()
       })
 
-      DistributionHandle(initState, firstAddScores)
-      DistributionHandle(initState, firstDistribute)
-      DistributionHandle(initState, setDistributionBonus)
-      DistributionHandle(initState, secondAddScores)
-      const { state } = DistributionHandle(initState, secondDistribute)
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScores
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScores
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0'
+            }
+          }
+        },
+        distribute
+      )
 
-      expect(state.claimable).to.deep.equal({
-        [ALICE]: '31666',
-        [BOB]: '15833'
+      const rewards = Object.fromEntries(
+        TestResults.rewards.map(
+          ({ address, totalReward }) => [ address, totalReward ]
+        )
+      )
+      expect(state.claimable).to.deep.equal(rewards)
+    })
+
+    it('Does not apply hardware bonus on distribution when disabled', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
       })
-      expect(
-        state.previousDistributions[secondDistributionTimestamp].bonusTokens
-      ).to.equal(bonus)
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScores
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScores
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0'
+            }
+          }
+        },
+        distribute
+      )
+
+      const rewards = Object.fromEntries(
+        TestResults.rewards.map(
+          ({ address, baseReward }) => [ address, baseReward ]
+        )
+      )
+      expect(state.claimable).to.deep.equal(rewards)
     })
   })
 
@@ -1137,6 +1516,81 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions[secondDistributionTimestamp]).to.exist
       expect(state.previousDistributions[thirdDistributionTimestamp]).to.exist
       expect(state.previousDistributions[fourthDistributionTimestamp]).to.exist
+    })
+
+    it('Tracks bonuses in previous distributions', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
+      })
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScores
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScores
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0'
+            }
+          }
+        },
+        distribute
+      )
+
+      const distribution = state.previousDistributions[timestamp]
+      expect(distribution.timeElapsed).to.equal(elapsed.toString())
+      expect(distribution.tokensDistributedPerSecond).to.equal('1000')
+      expect(distribution.baseNetworkScore)
+        .to.equal(TestResults.baseNetworkScore)
+      expect(distribution.baseDistributedTokens)
+        .to.equal(TestResults.baseActualDistributedTokens)
+      expect(distribution.bonuses.hardware.enabled).to.be.true
+      expect(distribution.bonuses.hardware.tokensDistributedPerSecond)
+        .to.equal('500')
+      expect(distribution.bonuses.hardware.networkScore)
+        .to.equal(TestResults.hwBonusNetworkScore)
+      expect(distribution.bonuses.hardware.distributedTokens)
+        .to.equal(TestResults.hwBonusActualDistributedTokens)
+      expect(distribution.totalTokensDistributedPerSecond).to.equal('1500')
+      expect(distribution.totalNetworkScore)
+        .to.equal(TestResults.totalNetworkScore)
+      expect(distribution.totalDistributedTokens)
+        .to.equal(TestResults.totalActualDistributedTokens)
     })
   })
 })
