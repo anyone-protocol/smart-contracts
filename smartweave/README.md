@@ -203,28 +203,51 @@ type RelayRegistryState = {
 ```typescript
 type Fingerprint = string
 type EvmAddress = string
+type Score = {
+  score: string
+  address: EvmAddress
+  fingerprint: Fingerprint
+}
+type DistributionResult = {
+  timeElapsed: string
+  tokensDistributedPerSecond: string
+  baseNetworkScore: string
+  baseDistributedTokens: string
+  bonuses: {
+    hardware: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+      networkScore: string
+      distributedTokens: string
+    }
+  }
+  totalTokensDistributedPerSecond: string
+  totalNetworkScore: string
+  totalDistributedTokens: string
+}
 type DistributionState = {
   owner: string
   canEvolve?: boolean
   evolve?: string
-  tokensDistributedPerSecond: string,
-  pendingDistributions: {
-    [timestamp: string]: Score[]
-  },
-  claimable: {
-    [address: string]: string
-  }
-  previousDistributions: {
-    [timestamp: string]: {
-      totalScore: string
-      totalDistributed: string
-      timeElapsed: string
+  tokensDistributedPerSecond: string
+  bonuses: {
+    hardware: {
+      enabled: boolean
       tokensDistributedPerSecond: string
-      bonusTokens?: string
+      fingerprints: Fingerprint[]
     }
   }
   multipliers: {
-    [fingerprint: string]: string
+    [fingerprint: Fingerprint]: string
+  }
+  pendingDistributions: {
+    [timestamp: string]: { scores: Score[] }
+  }
+  claimable: {
+    [address: EvmAddress]: string
+  }
+  previousDistributions: {
+    [timestamp: string]: DistributionResult
   }
   previousDistributionsTrackingLimit: number
 }
@@ -260,9 +283,32 @@ type DistributionState = {
   setMultipliers(multipliers: { [fingerprint: string]: string }) => void
   ```
 
-- Allows Owner to add bonus tokens to a distribution
+- Allows Owner to set hardware bonus distribution rate **in atomic units** per
+  second
   ```typescript
-  setDistributionBonus(timestamp: string, bonus: string) => void
+  setHardwareBonusRate(tokensDistributedPerSecond: string) => void
+  ```
+
+- Allows Owner to toggle hardware bonus on or off
+  ```typescript
+  toggleHardwareBonus(enabled: boolean) => void
+  ```
+
+- Allows Owner to add fingerprints to a bonus pool.  Currently only 'hardware'
+  ```typescript
+  addFingerprintsToBonus(
+    bonusName: 'hardware',
+    fingerprints: Fingerprint[]
+  ) => void
+  ```
+
+- Allows Owner to remove fingerprints from a bonus pool.  Currently only
+  'hardware'
+  ```typescript
+  removeFingerprintsFromBonus(
+    bonusName: 'hardware',
+    fingerprints: Fingerprint[]
+  ) => void
   ```
 
 - Allows Owner to limit the number of previous distributions tracked in contract state.  Defaults to `10`
