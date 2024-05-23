@@ -43,6 +43,10 @@ export const SERIAL_NOT_REGISTERED = 'Serial has not been registered'
 export const FINGERPRINTS_MUST_BE_ARRAY = 'Valid array of fingerprints required'
 export const SERIAL_VERIFICATION_PENDING =
   'Cannot claim while serial verification is pending'
+export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
+export const CREDITS_MUST_BE_ARRAY =
+  'Credits must be a valid array of address & fingerprint tuples'
+export const REGISTRATION_CREDIT_NOT_FOUND = 'Registration credit not found'
 
 export type Fingerprint = string
 export type EvmAddress = string
@@ -51,7 +55,9 @@ export type PublicKey = string
 export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
   verified: { [fingerprint in Fingerprint as string]: EvmAddress }
-  registrationCredits: { [address in EvmAddress as string]: number }
+  registrationCredits: {
+    [address in EvmAddress as string]: Fingerprint[]
+  }
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
@@ -112,9 +118,14 @@ export interface IsVerified extends ContractFunctionInput {
   fingerprint: Fingerprint
 }
 
-export interface AddRegistrationCredit extends ContractFunctionInput {
-  function: 'addRegistrationCredit'
-  address: EvmAddress
+export interface AddRegistrationCredits extends ContractFunctionInput {
+  function: 'addRegistrationCredits'
+  credits: { address: EvmAddress, fingerprint: Fingerprint }[]
+}
+
+export interface RemoveRegistrationCredits extends ContractFunctionInput {
+  function: 'removeRegistrationCredits'
+  credits: { address: EvmAddress, fingerprint: Fingerprint }[]
 }
 
 export interface BlockAddress extends ContractFunctionInput {
@@ -367,13 +378,14 @@ export class RelayRegistryContract extends Evolvable(Object) {
     const serialProof = state.serials[fingerprint]
     const serialVerificationIsPending = !!serialProof && !state.serials[fingerprint].verified
     ContractAssert(!serialVerificationIsPending, SERIAL_VERIFICATION_PENDING)
+
+    const hasRegistrationCredit =
+      !!state.registrationCredits[caller]
+        && state.registrationCredits[caller].includes(fingerprint)
+    const hasVerifiedSerialProof = !!serialProof && !!serialProof.verified
     if (state.registrationCreditsRequired === true) {
       ContractAssert(
-        (
-          !!state.registrationCredits[caller]
-          && state.registrationCredits[caller] > 0
-        )
-        || (!!serialProof && !!serialProof.verified),
+        hasRegistrationCredit || hasVerifiedSerialProof,
         REGISTRATION_CREDIT_REQUIRED
       )
     }
@@ -396,8 +408,9 @@ export class RelayRegistryContract extends Evolvable(Object) {
       }
     }
     
-    if (state.registrationCreditsRequired === true) {
-      state.registrationCredits[caller] = state.registrationCredits[caller] - 1
+    if (state.registrationCreditsRequired === true && hasRegistrationCredit) {
+      const removeIdx = state.registrationCredits[caller].indexOf(fingerprint)
+      state.registrationCredits[caller].splice(removeIdx, 1)
     }
 
     state.verified[fingerprint] = state.claimable[fingerprint]
@@ -475,16 +488,55 @@ export class RelayRegistryContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
-  addRegistrationCredit(
+  addRegistrationCredits(
     state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<AddRegistrationCredit>>
+    action: ContractInteraction<PartialFunctionInput<AddRegistrationCredits>>
   ) {
-    const { input: { address } } = action
+    const { input: { credits } } = action
 
-    assertValidEvmAddress(address)
-    
-    state.registrationCredits[address] =
-      (state.registrationCredits[address] || 0) + 1
+    ContractAssert(Array.isArray(credits), CREDITS_MUST_BE_ARRAY)
+
+    for (let i = 0; i < credits.length; i++) {
+      const { address, fingerprint } = credits[i]
+      assertValidEvmAddress(address)
+      assertValidFingerprint(fingerprint)
+      if (!state.registrationCredits[address]) {
+        state.registrationCredits[address] = []
+      }
+      ContractAssert(
+        !state.registrationCredits[address].includes(fingerprint),
+        DUPLICATE_FINGERPRINT
+      )
+      state.registrationCredits[address].push(fingerprint)
+    }
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  removeRegistrationCredits(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<RemoveRegistrationCredits>>
+  ) {
+    const { input: { credits } } = action
+
+    ContractAssert(Array.isArray(credits), CREDITS_MUST_BE_ARRAY)
+
+    for (let i = 0; i < credits.length; i++) {
+      const { address, fingerprint } = credits[i]
+      assertValidEvmAddress(address)
+      assertValidFingerprint(fingerprint)
+      if (!state.registrationCredits[address]) {
+        state.registrationCredits[address] = []
+      }
+      const foundIdx = state.registrationCredits[address].indexOf(fingerprint)
+      ContractAssert(foundIdx > -1, REGISTRATION_CREDIT_NOT_FOUND)
+
+      state.registrationCredits[address].splice(foundIdx, 1)
+    }
+
+    return { state, result: true }
+
 
     return { state, result: true }
   }
@@ -725,8 +777,10 @@ export function handle(
       return contract.verified(state, action)
     case 'isVerified':
       return contract.isVerified(state, action)
-    case 'addRegistrationCredit':
-      return contract.addRegistrationCredit(state, action)
+    case 'addRegistrationCredits':
+      return contract.addRegistrationCredits(state, action)
+    case 'removeRegistrationCredits':
+      return contract.removeRegistrationCredits(state, action)
     case 'blockAddress':
       return contract.blockAddress(state, action)
     case 'unblockAddress':

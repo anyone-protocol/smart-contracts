@@ -75,7 +75,7 @@ type RelayRegistryState = {
   evolve?: string
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
   verified: { [fingerprint in Fingerprint as string]: EvmAddress }
-  registrationCredits: { [address in EvmAddress as string]: number }
+  registrationCredits: { [address in EvmAddress as string]: Fingerprint[] }
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
@@ -143,9 +143,18 @@ type RelayRegistryState = {
   isVerified(fingerprint: string) => boolean
   ```
 
-- Allows Owner to add a registration credit for an address
+- Allows Owner to add registration credits
   ```typescript
-  addRegistrationCredit(address: string) => void
+  addRegistrationCredits(
+    credits: { address: EvmAddress, fingerprint: Fingerprint }[]
+  ) => void
+  ```
+
+- Allows Owner to remove registration credits
+  ```typescript
+  removeRegistrationCredits(
+    credits: { address: EvmAddress, fingerprint: Fingerprint }[]
+  ) => void
   ```
 
 - Allows Owner to block an address from registering

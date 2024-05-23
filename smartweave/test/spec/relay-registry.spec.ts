@@ -25,7 +25,9 @@ import {
   SERIAL_NOT_REGISTERED,
   SERIAL_ALREADY_VERIFIED,
   INVALID_SERIAL,
-  SERIAL_VERIFICATION_PENDING
+  SERIAL_VERIFICATION_PENDING,
+  DUPLICATE_FINGERPRINT,
+  REGISTRATION_CREDIT_NOT_FOUND
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 
@@ -95,6 +97,7 @@ describe('Relay Registry Contract', () => {
     expect(state.registrationCreditsRequired).to.exist
     expect(state.encryptionPublicKey).to.exist
     expect(state.serials).to.exist
+    expect(state.registrationCredits).to.exist
   })
 
   describe('Claiming', () => {
@@ -467,7 +470,7 @@ describe('Relay Registry Contract', () => {
           [fingerprintC]: ALICE
         },
         registrationCredits: {
-          [ALICE]: 1
+          [ALICE]: [fingerprintA]
         },
         registrationCreditsRequired: true
       }, aliceClaimFingerprintA)
@@ -480,7 +483,7 @@ describe('Relay Registry Contract', () => {
         [fingerprintA]: ALICE
       })
       expect(state.registrationCredits).to.deep.equal({
-        [ALICE]: 0
+        [ALICE]: []
       })
     })
 
@@ -546,7 +549,7 @@ describe('Relay Registry Contract', () => {
             },
             registrationCreditsRequired: true,
             registrationCredits: {
-              [ALICE]: 1
+              [ALICE]: [fingerprintA]
             },
             serials: {
               [fingerprintA]: { serial: 'test-serial' }
@@ -796,18 +799,27 @@ describe('Relay Registry Contract', () => {
   describe('Registration Credits', () => {
     it('Allows Owner give a Registration Credit to an address', () => {
       const addRegistrationCredit = createInteraction(OWNER, {
-        function: 'addRegistrationCredit',
-        address: ALICE
+        function: 'addRegistrationCredits',
+        credits: [
+          { address: ALICE, fingerprint: fingerprintA },
+          { address: BOB, fingerprint: fingerprintB },
+          { address: ALICE, fingerprint: fingerprintC }
+        ]
       })
 
       const { state } = RelayRegistryHandle(initState, addRegistrationCredit)
 
-      expect(state.registrationCredits).to.deep.equal({ [ALICE]: 1 })
+      expect(state.registrationCredits).to.deep.equal(
+        {
+          [ALICE]: [fingerprintA, fingerprintC],
+          [BOB]: [fingerprintB]
+        }
+      )
     })
 
     it('Prevents non-owners from giving Registration Credits', () => {
       const addRegistrationCredit = createInteraction(ALICE, {
-        function: 'addRegistrationCredit',
+        function: 'addRegistrationCredits',
         address: ALICE
       })
 
@@ -816,21 +828,149 @@ describe('Relay Registry Contract', () => {
       ).to.throw(ContractError, ERROR_ONLY_OWNER)
     })
 
-    it('Requires & validates address when giving Registration Credits', () => {
-      const noAddressInteraction = createInteraction(OWNER, {
-        function: 'addRegistrationCredit'
+    it('Validates when giving Registration Credits', () => {
+      const noAddress = createInteraction(OWNER, {
+        function: 'addRegistrationCredits',
+        credits: [{ fingerprint: fingerprintA }]
       })
-      const invalidAddressInteraction = createInteraction(OWNER, {
-        function: 'addRegistrationCredit',
-        address: '0xbadbeef'
+      const invalidAddress = createInteraction(OWNER, {
+        function: 'addRegistrationCredits',
+        credits: [{
+          address: '0xbadbeef',
+          fingerprint: fingerprintA
+        }]
+      })
+      const missingFingerprint = createInteraction(OWNER, {
+        function: 'addRegistrationCredits',
+        credits: [{
+          address: ALICE
+        }]
+      })
+      const invalidFingerprint = createInteraction(OWNER, {
+        function: 'addRegistrationCredits',
+        credits: [{
+          address: ALICE,
+          fingerprint: 'invalid-fingerprint'
+        }]
+      })
+      const duplicateFingerprint = createInteraction(OWNER, {
+        function: 'addRegistrationCredits',
+        credits: [{
+          address: ALICE,
+          fingerprint: fingerprintA
+        }]
       })
 
       expect(
-        () => RelayRegistryHandle(initState, noAddressInteraction)
+        () => RelayRegistryHandle(initState, noAddress)
       ).to.throw(ContractError, ADDRESS_REQUIRED)
       expect(
-        () => RelayRegistryHandle(initState, invalidAddressInteraction)
+        () => RelayRegistryHandle(initState, invalidAddress)
       ).to.throw(ContractError, INVALID_ADDRESS)
+      expect(
+        () => RelayRegistryHandle(initState, missingFingerprint)
+      ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+      expect(
+        () => RelayRegistryHandle(initState, invalidFingerprint)
+      ).to.throw(ContractError, INVALID_FINGERPRINT)
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            registrationCredits: { [ALICE]: [fingerprintA] }
+          },
+          duplicateFingerprint
+        )
+      ).to.throw(DUPLICATE_FINGERPRINT)
+    })
+
+    it('Allows Owner to remove registration credits', () => {
+      const removeRegistrationCredits = createInteraction(OWNER, {
+        function: 'removeRegistrationCredits',
+        credits: [
+          { address: BOB, fingerprint: fingerprintB },
+          { address: ALICE, fingerprint: fingerprintC }
+        ]
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          registrationCredits: {
+            [ALICE]: [fingerprintA, fingerprintC],
+            [BOB]: [fingerprintB]
+          }
+        },
+        removeRegistrationCredits
+      )
+
+      expect(state.registrationCredits).to.deep.equal(
+        {
+          [ALICE]: [fingerprintA],
+          [BOB]: []
+        }
+      )
+    })
+
+    it('Prevents non-owners from removing registration credits', () => {
+      const removeRegistrationCredits = createInteraction(ALICE, {
+        function: 'removeRegistrationCredits',
+        address: ALICE
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, removeRegistrationCredits)
+      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+    })
+
+    it('Validates when removing registration credits', () => {
+      const noAddress = createInteraction(OWNER, {
+        function: 'removeRegistrationCredits',
+        credits: [{ fingerprint: fingerprintA }]
+      })
+      const invalidAddress = createInteraction(OWNER, {
+        function: 'removeRegistrationCredits',
+        credits: [{
+          address: '0xbadbeef',
+          fingerprint: fingerprintA
+        }]
+      })
+      const missingFingerprint = createInteraction(OWNER, {
+        function: 'removeRegistrationCredits',
+        credits: [{
+          address: ALICE
+        }]
+      })
+      const invalidFingerprint = createInteraction(OWNER, {
+        function: 'removeRegistrationCredits',
+        credits: [{
+          address: ALICE,
+          fingerprint: 'invalid-fingerprint'
+        }]
+      })
+      const creditNotFound = createInteraction(OWNER, {
+        function: 'removeRegistrationCredits',
+        credits: [{
+          address: ALICE,
+          fingerprint: fingerprintA
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, noAddress)
+      ).to.throw(ContractError, ADDRESS_REQUIRED)
+      expect(
+        () => RelayRegistryHandle(initState, invalidAddress)
+      ).to.throw(ContractError, INVALID_ADDRESS)
+      expect(
+        () => RelayRegistryHandle(initState, missingFingerprint)
+      ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+      expect(
+        () => RelayRegistryHandle(initState, invalidFingerprint)
+      ).to.throw(ContractError, INVALID_FINGERPRINT)
+      expect(
+        () => RelayRegistryHandle(initState, creditNotFound)
+      ).to.throw(REGISTRATION_CREDIT_NOT_FOUND)
     })
 
     it('Allows Owner to disable registration credit requirement', () => {
@@ -923,7 +1063,7 @@ describe('Relay Registry Contract', () => {
       ).to.throw(ENABLED_REQUIRED)
     })
 
-    it('Does not require credits to register when disabled', () => {
+    it('Does not require credits to claim a relay when disabled', () => {
       const aliceClaimFingerprintA = createInteraction(ALICE, {
         function: 'claim',
         fingerprint: fingerprintA
@@ -938,7 +1078,7 @@ describe('Relay Registry Contract', () => {
       expect(state.verified[fingerprintA]).equals(ALICE)
     })
 
-    it('Requires credits to register when enabled', () => {
+    it('Requires credits to claim a relay when enabled', () => {
       const aliceClaimFingerprintA = createInteraction(ALICE, {
         function: 'claim',
         fingerprint: fingerprintA
@@ -951,6 +1091,79 @@ describe('Relay Registry Contract', () => {
           registrationCreditsRequired: true
         }, aliceClaimFingerprintA)
       ).to.throw(ContractError, REGISTRATION_CREDIT_REQUIRED)
+    })
+
+    it('Requires credits to match fingerprint being claimed', () => {
+      const differentFingerprint = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintB
+      })
+
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            claimable: {
+              [fingerprintA]: ALICE,
+              [fingerprintB]: ALICE,
+              [fingerprintC]: ALICE
+            },
+            registrationCreditsRequired: true,
+            registrationCredits: {
+              [ALICE]: [fingerprintA, fingerprintC]
+            }
+          },
+          differentFingerprint
+        )
+      ).to.throw(REGISTRATION_CREDIT_REQUIRED)
+    })
+
+    it('Consumes registration credits when enabled', () => {
+      const claimRelay = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          claimable: {
+            [fingerprintA]: ALICE
+          },
+          registrationCreditsRequired: true,
+          registrationCredits: {
+            [ALICE]: [fingerprintA, fingerprintB, fingerprintC]
+          }
+        },
+        claimRelay
+      )
+
+      expect(state.registrationCredits[ALICE])
+        .to.deep.equal([fingerprintB, fingerprintC])
+    })
+
+    it('Does not consume registration credits when disabled', () => {
+      const claimRelay = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          claimable: {
+            [fingerprintA]: ALICE
+          },
+          registrationCreditsRequired: false,
+          registrationCredits: {
+            [ALICE]: [fingerprintA, fingerprintB, fingerprintC]
+          }
+        },
+        claimRelay
+      )
+
+      expect(state.registrationCredits[ALICE])
+        .to.deep.equal([fingerprintA, fingerprintB, fingerprintC])
     })
   })
 
@@ -1097,7 +1310,7 @@ describe('Relay Registry Contract', () => {
             ...initState,
             claimable: { [fingerprintA]: ALICE },
             blockedAddresses: [ALICE],
-            registrationCredits: { [ALICE]: 1 }
+            registrationCredits: { [ALICE]: [fingerprintA] }
           },
           claimInteraction
         )
@@ -1202,7 +1415,7 @@ describe('Relay Registry Contract', () => {
             ...initState,
             familyRequired: true,
             claimable: { [fingerprintC]: ALICE },
-            registrationCredits: { [ALICE]: 1 },
+            registrationCredits: { [ALICE]: [fingerprintC] },
             verified: { [fingerprintA]: ALICE }
           },
           secondRelayNoFamily
@@ -1221,7 +1434,7 @@ describe('Relay Registry Contract', () => {
           {
             ...initState,
             familyRequired: true,
-            registrationCredits: { [ALICE]: 1 },
+            registrationCredits: { [ALICE]: [fingerprintC] },
             claimable: { [fingerprintC]: ALICE },
             verified: {
               [fingerprintA]: ALICE,

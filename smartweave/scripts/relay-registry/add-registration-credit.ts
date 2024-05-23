@@ -10,7 +10,7 @@ import {
   RelayRegistryHandle,
   RelayRegistryState
 } from '../../src/contracts'
-import { AddRegistrationCredit } from '~/src/contracts/relay-registry'
+import { AddRegistrationCredits } from '~/src/contracts/relay-registry'
 
 dotenv.config()
 
@@ -41,7 +41,7 @@ async function main() {
 
   const contract = warp.contract<RelayRegistryState>(contractTxId)
 
-  const input: AddRegistrationCredit = {
+  const input: AddRegistrationCredits = {
     function: 'addRegistrationCredit',
     address: addressToCredit
   }
@@ -57,7 +57,7 @@ async function main() {
   // NB: Send real interaction
   await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<AddRegistrationCredit>(input)
+    .writeInteraction<AddRegistrationCredits>(input)
 }
 
 (async () => {
