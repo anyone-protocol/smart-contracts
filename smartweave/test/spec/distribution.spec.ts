@@ -675,10 +675,21 @@ describe('Distribution Contract', () => {
       expect(state.pendingDistributions).to.be.empty
       expect(state.previousDistributions).to.deep.equal({
         [timestamp]: {
-          totalScore: '100',
           timeElapsed: '0',
-          totalDistributed: '0',
-          tokensDistributedPerSecond: '1000'
+          tokensDistributedPerSecond: '1000',
+          baseNetworkScore: '100',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '1000',
+          totalNetworkScore: '100',
+          totalDistributedTokens: '0'
         }
       })
     })
@@ -858,15 +869,37 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions).to.deep.equal({
         [firstTimestamp]: {
           timeElapsed: '0',
-          tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '0',
-          totalScore: '100'
+          tokensDistributedPerSecond: '1000',
+          baseNetworkScore: '100',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '1000',
+          totalNetworkScore: '100',
+          totalDistributedTokens: '0'
         },
         [secondTimestamp]: {
           timeElapsed: timeBetweenDistributions.toString(),
           tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '1000',
-          totalScore: '500'
+          baseNetworkScore: '500',
+          baseDistributedTokens: '1000',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+          totalNetworkScore: '500',
+          totalDistributedTokens: '1000'
         }
       })
       expect(state.claimable).to.deep.equal({
@@ -981,21 +1014,54 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions).to.deep.equal({
         [firstTimestamp]: {
           timeElapsed: '0',
-          tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '0',
-          totalScore: '300'
+          tokensDistributedPerSecond: '1000',
+          baseNetworkScore: '300',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '1000',
+          totalNetworkScore: '300',
+          totalDistributedTokens: '0'
         },
         [secondTimestamp]: {
           timeElapsed: firstTimeDifference.toString(),
           tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '5430',
-          totalScore: '2069'
+          baseNetworkScore: '2069',
+          baseDistributedTokens: '5430',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+          totalNetworkScore: '2069',
+          totalDistributedTokens: '5430'          
         },
         [thirdTimestamp]: {
-          timeElapsed: (secondTimeDifference).toString(),
+          timeElapsed: secondTimeDifference.toString(),
           tokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
-          totalDistributed: '86399',
-          totalScore: '8162'
+          baseNetworkScore: '8162',
+          baseDistributedTokens: '86399',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
+          totalNetworkScore: '8162',
+          totalDistributedTokens: '86399'
         }
       })
       expect(state.pendingDistributions).to.be.empty
@@ -1052,15 +1118,37 @@ describe('Distribution Contract', () => {
         [firstTimestamp]: {
           timeElapsed: '0',
           tokensDistributedPerSecond: '4333',
-          totalDistributed: '0',
-          totalScore: '300'
+          baseNetworkScore: '300',
+          baseDistributedTokens: '0',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '4333',
+          totalNetworkScore: '300',
+          totalDistributedTokens: '0'
         },
         // 4333 tps rate over 443ms ~= 1,919.519 tokens
         [secondTimestamp]: {
           timeElapsed: '443',
           tokensDistributedPerSecond: '4333',
-          totalDistributed: '1918',
-          totalScore: '2069'
+          baseNetworkScore: '2069',
+          baseDistributedTokens: '1918',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0'
+            }
+          },
+          totalTokensDistributedPerSecond: '4333',
+          totalNetworkScore: '2069',
+          totalDistributedTokens: '1918'
         }
       })
       expect(state.pendingDistributions).to.be.empty
@@ -1118,7 +1206,7 @@ describe('Distribution Contract', () => {
       })
     })
 
-    it.only('Applies hardware bonus on distribution when enabled', () => {
+    it('Applies hardware bonus on distribution when enabled', () => {
       const elapsed = 86400
       const timestamp = Date.now()
       const previousTimestamp = (timestamp - elapsed).toString()
@@ -1151,23 +1239,27 @@ describe('Distribution Contract', () => {
           },
           previousDistributions: {
             [previousTimestamp]: {
-              totalScore: '0',
-              totalDistributed: '0',
               timeElapsed: '0',
-              tokensDistributedPerSecond: '1000',
-              bonusTokens: '0'
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0'
             }
           }
         },
         distribute
       )
 
-      console.log('state', state.bonuses.hardware)
-      // const distribution = state.previousDistributions[timestamp]
-      // expect(distribution.totalScore).to.equal(TestResults.totalNetworkScore)
-      // expect(distribution.totalDistributed).to.equal(TestResults.totalActualDistributedTokens)
-      // expect(distribution.timeElapsed).to.equal(elapsed.toString())
-      // expect(distribution.tokensDistributedPerSecond).to.equal('1000')
       const rewards = Object.fromEntries(
         TestResults.rewards.map(
           ({ address, totalReward }) => [ address, totalReward ]
@@ -1176,7 +1268,67 @@ describe('Distribution Contract', () => {
       expect(state.claimable).to.deep.equal(rewards)
     })
 
-    it('Does not apply hardware bonus on distribution when disabled')
+    it('Does not apply hardware bonus on distribution when disabled', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
+      })
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          bonuses: {
+            hardware: {
+              enabled: false,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScores
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScores
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0'
+            }
+          }
+        },
+        distribute
+      )
+
+      const rewards = Object.fromEntries(
+        TestResults.rewards.map(
+          ({ address, baseReward }) => [ address, baseReward ]
+        )
+      )
+      expect(state.claimable).to.deep.equal(rewards)
+    })
   })
 
   describe('Claiming', () => {
@@ -1366,6 +1518,79 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions[fourthDistributionTimestamp]).to.exist
     })
 
-    it('Tracks bonuses in previous distributions')
+    it('Tracks bonuses in previous distributions', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
+      })
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScores
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScores
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0'
+            }
+          }
+        },
+        distribute
+      )
+
+      const distribution = state.previousDistributions[timestamp]
+      expect(distribution.timeElapsed).to.equal(elapsed.toString())
+      expect(distribution.tokensDistributedPerSecond).to.equal('1000')
+      expect(distribution.baseNetworkScore)
+        .to.equal(TestResults.baseNetworkScore)
+      expect(distribution.baseDistributedTokens)
+        .to.equal(TestResults.baseActualDistributedTokens)
+      expect(distribution.bonuses.hardware.enabled).to.be.true
+      expect(distribution.bonuses.hardware.tokensDistributedPerSecond)
+        .to.equal('500')
+      expect(distribution.bonuses.hardware.networkScore)
+        .to.equal(TestResults.hwBonusNetworkScore)
+      expect(distribution.bonuses.hardware.distributedTokens)
+        .to.equal(TestResults.hwBonusActualDistributedTokens)
+      expect(distribution.totalTokensDistributedPerSecond).to.equal('1500')
+      expect(distribution.totalNetworkScore)
+        .to.equal(TestResults.totalNetworkScore)
+      expect(distribution.totalDistributedTokens)
+        .to.equal(TestResults.totalActualDistributedTokens)
+    })
   })
 })

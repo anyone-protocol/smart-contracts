@@ -1,20 +1,20 @@
 {
   "baseNetworkScore": "1793643",
-  "baseActualDistributedTokens": "86340",
+  "baseActualDistributedTokens": "86331",
   "hwBonusNetworkScore": "394570",
   "hwBonusActualDistributedTokens": "43184",
   "totalNetworkScore": "2188213",
-  "totalActualDistributedTokens": "129524",
+  "totalActualDistributedTokens": "129515",
   "rewards": [
     {
       "address": "0xf2948eDD428305D28DcBd6C284470e3823ee182b",
       "baseScore": "14990",
       "basePercentShare": "0.008357292951",
-      "baseReward": "722",
+      "baseReward": "721",
       "hwBonusScore": "14000",
       "hwBonusPercentShare": "0.03548166358",
       "hwBonusReward": "1532",
-      "totalReward": "2254"
+      "totalReward": "2253"
     },
     {
       "address": "0xa2AA87bE9FaaE25F1aC6E6846eC9589b03625ce0",
@@ -80,11 +80,11 @@
       "address": "0x0a14181c3845c0C4eE574C2564B01affA400242F",
       "baseScore": "85000",
       "basePercentShare": "0.04738958645",
-      "baseReward": "4094",
+      "baseReward": "4093",
       "hwBonusScore": "52000",
       "hwBonusPercentShare": "0.1317890362",
       "hwBonusReward": "5693",
-      "totalReward": "9787"
+      "totalReward": "9786"
     },
     {
       "address": "0x7Fa0963a8CB41d12C0bBa4286141dd71Ba158F44",
@@ -120,11 +120,11 @@
       "address": "0xDf548c35DBA62A1B0A5FB1E365E2539935487408",
       "baseScore": "12101",
       "basePercentShare": "0.006746604536",
-      "baseReward": "582",
+      "baseReward": "581",
       "hwBonusScore": "1",
       "hwBonusPercentShare": "0.000002534404542",
       "hwBonusReward": "0",
-      "totalReward": "582"
+      "totalReward": "581"
     },
     {
       "address": "0xDD3A2390CeFa80c1eCF5771636A4F49F2B8956C8",
@@ -310,11 +310,11 @@
       "address": "0x448Cc1ca7b315a465bB9e20f8e49E0062f4BD331",
       "baseScore": "24700",
       "basePercentShare": "0.0137708563",
-      "baseReward": "1189",
+      "baseReward": "1188",
       "hwBonusScore": "0",
       "hwBonusPercentShare": "0",
       "hwBonusReward": "0",
-      "totalReward": "1189"
+      "totalReward": "1188"
     },
     {
       "address": "0xc93473826F40100aE06E2E02F351C30c7f985bf7",
@@ -410,11 +410,11 @@
       "address": "0x9Cb10817CAe852C45D8D602097a76a932f6185E6",
       "baseScore": "1670",
       "basePercentShare": "0.0009310659925",
-      "baseReward": "80",
+      "baseReward": "79",
       "hwBonusScore": "0",
       "hwBonusPercentShare": "0",
       "hwBonusReward": "0",
-      "totalReward": "80"
+      "totalReward": "79"
     },
     {
       "address": "0x3c78053528cCbD382C90A13233c509965fe3451A",
@@ -440,21 +440,21 @@
       "address": "0x3eF27C8EEe8261fb5906B2e40daEDFC8E7B3f055",
       "baseScore": "28000",
       "basePercentShare": "0.0156106873",
-      "baseReward": "1348",
+      "baseReward": "1347",
       "hwBonusScore": "0",
       "hwBonusPercentShare": "0",
       "hwBonusReward": "0",
-      "totalReward": "1348"
+      "totalReward": "1347"
     },
     {
       "address": "0x9aDE33Cf4ca08E46c7f84f82A82FCF5d8A4adA55",
       "baseScore": "45600",
       "basePercentShare": "0.02542311932",
-      "baseReward": "2196",
+      "baseReward": "2195",
       "hwBonusScore": "0",
       "hwBonusPercentShare": "0",
       "hwBonusReward": "0",
-      "totalReward": "2196"
+      "totalReward": "2195"
     },
     {
       "address": "0x5B5378870b6A52588e65c914a487F083a2193281",
@@ -590,11 +590,11 @@
       "address": "0x9D0caC8351BD51D5BC537bD62c0410a8DBc78B74",
       "baseScore": "69",
       "basePercentShare": "0.0000384691937",
-      "baseReward": "3",
+      "baseReward": "2",
       "hwBonusScore": "0",
       "hwBonusPercentShare": "0",
       "hwBonusReward": "0",
-      "totalReward": "3"
+      "totalReward": "2"
     },
     {
       "address": "0x3eB74a37451737D6a432b192358739ad6Ff4fb39",
@@ -1020,11 +1020,11 @@
       "address": "0x54a1354F615D464F7739d515598DB4e6315Ddc4B",
       "baseScore": "36035",
       "basePercentShare": "0.02009039703",
-      "baseReward": "1735",
+      "baseReward": "1734",
       "hwBonusScore": "0",
       "hwBonusPercentShare": "0",
       "hwBonusReward": "0",
-      "totalReward": "1735"
+      "totalReward": "1734"
     },
     {
       "address": "0x6c8C7a143792eDC723A2eA27B1c3f2235882189d",
