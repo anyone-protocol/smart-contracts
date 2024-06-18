@@ -18,6 +18,7 @@ let contractTxId = process.env.RELAY_REGISTRY_CONTRACT_ID || ''
 const consulToken = process.env.CONSUL_TOKEN
 const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OWNER_KEY
 const addressToCredit = process.env.ADDRESS_TO_CREDIT || ''
+const fingerprint = process.env.FINGERPRINT || ''
 
 LoggerFactory.INST.logLevel('error')
 BigNumber.config({ EXPONENTIAL_AT: 50 })
@@ -39,11 +40,15 @@ async function main() {
     throw new Error('ADDRESS_TO_CREDIT is not set!')
   }
 
+  if (!fingerprint) {
+    throw new Error('FINGERPRINT is not set!')
+  }
+
   const contract = warp.contract<RelayRegistryState>(contractTxId)
 
   const input: AddRegistrationCredits = {
-    function: 'addRegistrationCredit',
-    address: addressToCredit
+    function: 'addRegistrationCredits',
+    credits: [{ address: addressToCredit, fingerprint }]
   }
 
   // NB: Sanity check dry run

@@ -6,7 +6,6 @@ import {
 
 import {
   ContractAssert,
-  ContractFunctionInput,
   Evolvable,
   EvolvableState,
   INVALID_INPUT,
@@ -14,11 +13,19 @@ import {
   OwnableState,
   PartialFunctionInput,
   SmartWeave,
-  UPPER_HEX_CHARS
+  UPPER_HEX_CHARS,
+  assertValidEvmAddress,
+  assertValidFingerprint,
+  assertValidPublicKey
 } from '../util'
+import {
+  ContractFunctionInput,
+  EvmAddress,
+  Fingerprint,
+  PublicKey
+} from '../common/types'
+import { ENABLED_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY } from '../common/errors'
 
-export const FINGERPRINT_REQUIRED = 'Fingerprint required'
-export const INVALID_FINGERPRINT = 'Invalid fingerprint'
 export const FINGERPRINT_ALREADY_CLAIMABLE = 'Fingerprint already claimable'
 export const FINGERPRINT_NOT_CLAIMABLE = 'Fingerprint not claimable'
 export const FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS =
@@ -26,8 +33,6 @@ export const FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS =
 export const FINGERPRINT_ALREADY_CLAIMED = 'Fingerprint already claimed'
 export const FINGERPRINT_NOT_CLAIMED_BY_ADDRESS =
   'Fingerprint not claimed by address'
-export const ADDRESS_REQUIRED = 'Address required'
-export const INVALID_ADDRESS = 'Invalid address'
 export const REGISTRATION_CREDIT_REQUIRED =
   'A Registration Credit is required to claim a fingerprint'
 export const ADDRESS_ALREADY_BLOCKED = 'Address already blocked'
@@ -35,22 +40,15 @@ export const ADDRESS_NOT_BLOCKED = 'Address not blocked'
 export const ADDRESS_IS_BLOCKED = 'Address is blocked'
 export const FAMILY_REQUIRED = 'Family required'
 export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
-export const ENABLED_REQUIRED = 'Enabled must be a boolean'
-export const PUBLIC_KEY_REQUIRED = 'Public Key is required and must valid'
 export const INVALID_SERIAL = 'Invalid serial'
 export const SERIAL_ALREADY_VERIFIED = 'Serial has already been verified'
 export const SERIAL_NOT_REGISTERED = 'Serial has not been registered'
-export const FINGERPRINTS_MUST_BE_ARRAY = 'Valid array of fingerprints required'
 export const SERIAL_VERIFICATION_PENDING =
   'Cannot claim while serial verification is pending'
 export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
 export const CREDITS_MUST_BE_ARRAY =
   'Credits must be a valid array of address & fingerprint tuples'
 export const REGISTRATION_CREDIT_NOT_FOUND = 'Registration credit not found'
-
-export type Fingerprint = string
-export type EvmAddress = string
-export type PublicKey = string
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
@@ -82,15 +80,15 @@ export interface RemoveClaimable extends ContractFunctionInput {
   fingerprint: Fingerprint
 }
 
-export interface Claimable extends ContractFunctionInput {
-  function: 'claimable'
-  address?: EvmAddress
-}
-
 export interface IsClaimable extends ContractFunctionInput {
   function: 'isClaimable'
   fingerprint: Fingerprint
   address: EvmAddress
+}
+
+export interface Claimable extends ContractFunctionInput {
+  function: 'claimable'
+  address?: EvmAddress
 }
 
 export interface Claim extends ContractFunctionInput {
@@ -179,46 +177,6 @@ export interface RegisterSerial extends ContractFunctionInput {
   function: 'registerSerial'
   fingerprint: string
   serial: string
-}
-
-export function assertValidFingerprint(
-  fingerprint?: string
-): asserts fingerprint is Fingerprint {
-  ContractAssert(!!fingerprint, FINGERPRINT_REQUIRED)
-  ContractAssert(typeof fingerprint === 'string', INVALID_FINGERPRINT)
-  ContractAssert(fingerprint.length === 40, INVALID_FINGERPRINT)
-  ContractAssert(
-    fingerprint.split('').every(c => UPPER_HEX_CHARS.includes(c)),
-    INVALID_FINGERPRINT
-  )
-}
-
-export function assertValidEvmAddress(
-  address?: string
-): asserts address is EvmAddress {
-  ContractAssert(!!address, ADDRESS_REQUIRED)
-  ContractAssert(typeof address === 'string', INVALID_ADDRESS)
-  ContractAssert(address.length === 42, INVALID_ADDRESS)
-  
-  try {
-    const checksumAddress = SmartWeave.extensions.ethers.utils.getAddress(
-      address
-    )
-    ContractAssert(address === checksumAddress, INVALID_ADDRESS)
-  } catch (error) {
-    throw new ContractError(INVALID_ADDRESS)
-  }
-}
-
-export function assertValidPublicKey(
-  publicKey?: string
-): asserts publicKey is PublicKey {
-  try {
-    ContractAssert(typeof publicKey === 'string', PUBLIC_KEY_REQUIRED)
-    SmartWeave.extensions.ethers.utils.computeAddress(publicKey)
-  } catch (error) {
-    throw new ContractError(PUBLIC_KEY_REQUIRED)
-  }
 }
 
 export class RelayRegistryContract extends Evolvable(Object) {
@@ -637,7 +595,6 @@ export class RelayRegistryContract extends Evolvable(Object) {
         !this.isSerialVerified(state, fingerprint),
         SERIAL_ALREADY_VERIFIED
       )
-      // ContractAssert(!!state.serials[fingerprint], SERIAL_NOT_REGISTERED)
   
       if (!state.serials[fingerprint]) {
         state.serials[fingerprint] = {}
