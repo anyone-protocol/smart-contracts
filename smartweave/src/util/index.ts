@@ -1,77 +1,22 @@
+import { ContractError } from 'warp-contracts'
+import {
+  ContractFunctionInput,
+  EvmAddress,
+  Fingerprint,
+  PublicKey
+} from '../common/types'
+import { ContractAssert, SmartWeave } from './environment'
+import {
+  ADDRESS_REQUIRED,
+  FINGERPRINT_REQUIRED,
+  INVALID_ADDRESS,
+  INVALID_FINGERPRINT,
+  PUBLIC_KEY_REQUIRED
+} from '../common/errors'
+
 export * from './ownable'
 export * from './environment'
 export * from './evolvable'
-
-type LengthOfString<
-  S extends string,
-  Acc extends 0[] = []
-> = S extends `${string}${infer $Rest}`
-  ? LengthOfString<$Rest, [...Acc, 0]>
-  : Acc['length']
-
-export type HexNumbers =
-  | '0'
-  | '1'
-  | '2'
-  | '3'
-  | '4'
-  | '5'
-  | '6'
-  | '7'
-  | '8'
-  | '9'
-
-export type HexCharsLower = 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
-export type HexCharsUpper = 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
-
-export type HexLower = HexNumbers | HexCharsLower
-export type HexUpper = HexNumbers | HexCharsUpper
-export type Hex = HexNumbers | HexCharsLower | HexCharsUpper
-
-export type HexString<S> =
-  S extends ''
-    ? unknown
-    : S extends `${Hex}${infer Rest}`
-      ? HexString<Rest>
-      : never
-
-declare function onlyHexString<S extends string>(
-  hexString: S & HexString<S>
-): any
-
-// onlyHexString('abcdef1234567890')
-
-export type EvmAddress<S extends string = ''> =
-  S extends ''
-    ? never
-    : LengthOfString<S> extends 42
-      ? S extends `0x${infer Rest}`
-        ? HexString<Rest>
-        : never
-      : never
-
-declare function onlyEvmAddress<S extends string>(
-  address: S & EvmAddress<S>
-): any
-// onlyEvmAddress('0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
-
-export type RelayFingerprint<S extends string = ''> = Uppercase<S> &
-  S extends ''
-    ? never
-    : LengthOfString<S> extends 40
-      ? HexString<S>
-      : never
-
-declare function onlyRelayFingerprint<S extends string>(
-  fingerprint: S & RelayFingerprint<S>
-): any
-
-// onlyTorFingerprint('AAAAABBBBBCCCCCDDDDDEEEEEFFFFF0000011111')
-
-export type ContractFunctionInput = {
-  function: string
-  [key: string]: any
-}
 
 export type PartialFunctionInput<T extends ContractFunctionInput> =
   Partial<T> & Pick<T, 'function'>
@@ -82,3 +27,43 @@ export interface Constructor<T = {}> {
 
 export const INVALID_INPUT = 'Invalid input'
 export const UPPER_HEX_CHARS = '0123456789ABCDEF'
+
+export function assertValidFingerprint(
+  fingerprint?: string
+): asserts fingerprint is Fingerprint {
+  ContractAssert(!!fingerprint, FINGERPRINT_REQUIRED)
+  ContractAssert(typeof fingerprint === 'string', INVALID_FINGERPRINT)
+  ContractAssert(fingerprint.length === 40, INVALID_FINGERPRINT)
+  ContractAssert(
+    fingerprint.split('').every(c => UPPER_HEX_CHARS.includes(c)),
+    INVALID_FINGERPRINT
+  )
+}
+
+export function assertValidEvmAddress(
+  address?: string
+): asserts address is EvmAddress {
+  ContractAssert(!!address, ADDRESS_REQUIRED)
+  ContractAssert(typeof address === 'string', INVALID_ADDRESS)
+  ContractAssert(address.length === 42, INVALID_ADDRESS)
+  
+  try {
+    const checksumAddress = SmartWeave.extensions.ethers.utils.getAddress(
+      address
+    )
+    ContractAssert(address === checksumAddress, INVALID_ADDRESS)
+  } catch (error) {
+    throw new ContractError(INVALID_ADDRESS)
+  }
+}
+
+export function assertValidPublicKey(
+  publicKey?: string
+): asserts publicKey is PublicKey {
+  try {
+    ContractAssert(typeof publicKey === 'string', PUBLIC_KEY_REQUIRED)
+    SmartWeave.extensions.ethers.utils.computeAddress(publicKey)
+  } catch (error) {
+    throw new ContractError(PUBLIC_KEY_REQUIRED)
+  }
+}

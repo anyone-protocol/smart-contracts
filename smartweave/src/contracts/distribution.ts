@@ -4,7 +4,6 @@ import BigNumber from 'bignumber.js'
 
 import {
   ContractAssert,
-  ContractFunctionInput,
   Evolvable,
   EvolvableState,
   INVALID_INPUT,
@@ -12,17 +11,12 @@ import {
   OwnableState,
   PartialFunctionInput,
   SmartWeave,
-  UPPER_HEX_CHARS
-} from '../util'
-import {
-  Claimable,
-  EvmAddress,
-  Fingerprint,
+  UPPER_HEX_CHARS,
   assertValidEvmAddress,
-  assertValidFingerprint,
-  ENABLED_REQUIRED,
-  FINGERPRINTS_MUST_BE_ARRAY
-} from './relay-registry'
+  assertValidFingerprint
+} from '../util'
+import { ContractFunctionInput, EvmAddress, Fingerprint } from '../common/types'
+import { ENABLED_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY } from '../common/errors'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
 export const INVALID_TIMESTAMP = 'Invalid timestamp'
@@ -138,6 +132,11 @@ export interface SetPreviousDistributionTrackingLimit
 {
   function: 'setPreviousDistributionTrackingLimit'
   limit: number
+}
+
+export interface Claimable extends ContractFunctionInput {
+  function: 'claimable'
+  address?: EvmAddress
 }
 
 export function isValidTimestamp(timestamp: any): timestamp is string {

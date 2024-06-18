@@ -7,10 +7,10 @@ import {
 import {
   Constructor,
   ContractAssert,
-  ContractFunctionInput,
   OwnableState,
   PartialFunctionInput
 } from './'
+import { ContractFunctionInput } from '../common/types'
 
 export const NEW_CONTRACT_SRC_REQUIRED = 'New Contract Src required'
 

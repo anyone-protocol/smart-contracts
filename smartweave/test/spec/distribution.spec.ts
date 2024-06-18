@@ -3,21 +3,16 @@ import { expect } from 'chai'
 import { ContractError, ContractInteraction } from 'warp-contracts'
 
 import {
-  ADDRESS_REQUIRED,
   CANNOT_BACKDATE_SCORES,
   DUPLICATE_FINGERPRINT_SCORES,
   DistributionHandle,
   DistributionState,
-  ENABLED_REQUIRED,
-  INVALID_ADDRESS,
   INVALID_DISTRIBUTION_AMOUNT,
-  INVALID_FINGERPRINT,
   INVALID_SCORES,
   INVALID_TIMESTAMP,
   NO_DISTRIBUTION_TO_CANCEL,
   NO_PENDING_SCORES,
-  VALID_BONUS_NAME_REQUIRED,
-  FINGERPRINTS_MUST_BE_ARRAY
+  VALID_BONUS_NAME_REQUIRED
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
@@ -27,6 +22,7 @@ import {
 } from '../../src/contracts/distribution'
 import TestScores from '../e2e/data/scores.json'
 import TestResults from '../e2e/data/results.json'
+import { ADDRESS_REQUIRED, ENABLED_REQUIRED, INVALID_ADDRESS, INVALID_FINGERPRINT } from '../../src/common/errors'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
