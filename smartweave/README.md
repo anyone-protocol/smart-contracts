@@ -96,6 +96,16 @@ type RelayRegistryState = {
   ) => void
   ```
 
+- Owner/Validator adds a BATCH of fingerprint/address tuples as claimable
+  ```typescript
+  // @OnlyOwner
+  addClaimableBatched({
+    fingerprint: string,
+    address: string,
+    hardwareVerified?: boolean
+  }[]) => void
+  ```
+
 - Owner/Validator removes a fingerprint/address tuple as claimable
   ```typescript
   // @OnlyOwner

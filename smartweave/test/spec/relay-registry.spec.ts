@@ -19,7 +19,8 @@ import {
   HARDWARE_ALREADY_VERIFIED,
   DUPLICATE_FINGERPRINT,
   REGISTRATION_CREDIT_NOT_FOUND,
-  HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED
+  HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED,
+  RELAYS_MUST_BE_VALID_ARRAY
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
@@ -548,6 +549,63 @@ describe('Relay Registry Contract', () => {
       }, aliceClaimFingerprintA)
 
       expect(state.verified[fingerprintA]).equals(ALICE)
+    })
+
+    it('Allows Owner to add claimable relays in a batch', () => {
+      const addClaimableBatched = createInteraction(OWNER, {
+        function: 'addClaimableBatched',
+        relays: [
+          {
+            fingerprint: fingerprintB,
+            address: BOB
+          }, {
+            fingerprint: fingerprintC,
+            address: CHARLS,
+            hardwareVerified: true
+          }
+        ]
+      })
+
+      const { state } = RelayRegistryHandle(initState, addClaimableBatched)
+
+      expect(state.claimable).to.deep.equal({
+        [fingerprintB]: BOB,
+        [fingerprintC]: CHARLS
+      })
+      expect(state.verifiedHardware).to.deep.equal(new Set([fingerprintC]))
+    })
+
+    it('Prevents non-owners from adding claimable relays in a batch', () => {
+      const aliceAddClaimableBatched = createInteraction(ALICE, {
+        function: 'addClaimableBatched',
+        relays: [{
+          fingerprint: fingerprintA,
+          address: ALICE
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, aliceAddClaimableBatched)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Validates when adding claimable relays in a batch', () => {
+      const undefinedRelays = createInteraction(OWNER, {
+        function: 'addClaimableBatched'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, undefinedRelays)
+      ).to.throw(RELAYS_MUST_BE_VALID_ARRAY)
+
+      const noRelays = createInteraction(OWNER, {
+        function: 'addClaimableBatched',
+        relays: []
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, noRelays)
+      ).to.throw(RELAYS_MUST_BE_VALID_ARRAY)
     })
   })
 
