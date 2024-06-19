@@ -48,6 +48,8 @@ export const CREDITS_MUST_BE_ARRAY =
 export const REGISTRATION_CREDIT_NOT_FOUND = 'Registration credit not found'
 export const HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED =
   'Argument hardwareVerified must be boolean or undefined'
+export const RELAYS_MUST_BE_VALID_ARRAY =
+  'Argument relays must be an array of (fingerprint, address, hardwareVerified)'
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
@@ -68,6 +70,15 @@ export interface AddClaimable extends ContractFunctionInput {
   fingerprint: Fingerprint
   address: EvmAddress
   hardwareVerified?: boolean
+}
+
+export interface AddClaimableBatched extends ContractFunctionInput {
+  function: 'addClaimableBatched'
+  relays: {
+    fingerprint: Fingerprint
+    address: EvmAddress
+    hardwareVerified?: boolean
+  }[]
 }
 
 export interface RemoveClaimable extends ContractFunctionInput {
@@ -250,6 +261,33 @@ export class RelayRegistryContract extends Evolvable(Object) {
         HARDWARE_ALREADY_VERIFIED
       )
       state.verifiedHardware.add(fingerprint)
+    }
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  addClaimableBatched(
+    state: RelayRegistryState,
+    action: ContractInteraction<PartialFunctionInput<AddClaimableBatched>>
+  ) {
+    const { caller, interactionType, input: { relays } } = action
+
+    ContractAssert(Array.isArray(relays), RELAYS_MUST_BE_VALID_ARRAY)
+    ContractAssert(relays.length > 0, RELAYS_MUST_BE_VALID_ARRAY)
+    
+    for (let i = 0; i < relays.length; i++) {
+      const { fingerprint, address, hardwareVerified } = relays[i]
+      this.addClaimable(state, {
+        caller,
+        interactionType,
+        input: {
+          function: 'addClaimable',
+          fingerprint,
+          address,
+          hardwareVerified
+        }
+      })
     }
 
     return { state, result: true }
@@ -662,6 +700,8 @@ export function handle(
   switch (action.input.function) {
     case 'addClaimable':
       return contract.addClaimable(state, action)
+    case 'addClaimableBatched':
+      return contract.addClaimableBatched(state, action)
     case 'removeClaimable':
       return contract.removeClaimable(state, action)
     case 'claimable':
