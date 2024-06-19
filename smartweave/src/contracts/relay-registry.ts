@@ -50,6 +50,8 @@ export const HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED =
   'Argument hardwareVerified must be boolean or undefined'
 export const RELAYS_MUST_BE_VALID_ARRAY =
   'Argument relays must be an array of (fingerprint, address, hardwareVerified)'
+export const NICKNAME_MUST_BE_VALID =
+  'Nickname must be no more than 20 alphanumeric characters'
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
@@ -63,6 +65,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   encryptionPublicKey: string
   verifiedHardware: Set<Fingerprint>
   familyRequired: boolean
+  nicknames: { [fingerprint in Fingerprint as string]: string }
 }
 
 export interface AddClaimable extends ContractFunctionInput {
@@ -70,6 +73,7 @@ export interface AddClaimable extends ContractFunctionInput {
   fingerprint: Fingerprint
   address: EvmAddress
   hardwareVerified?: boolean
+  nickname?: string
 }
 
 export interface AddClaimableBatched extends ContractFunctionInput {
@@ -78,6 +82,7 @@ export interface AddClaimableBatched extends ContractFunctionInput {
     fingerprint: Fingerprint
     address: EvmAddress
     hardwareVerified?: boolean
+    nickname?: string
   }[]
 }
 
@@ -213,6 +218,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
       state.verifiedHardware = new Set<Fingerprint>()
     }
 
+    if (!state.nicknames) {
+      state.nicknames = {}
+    }
+
     super(state)
   }
 
@@ -235,7 +244,9 @@ export class RelayRegistryContract extends Evolvable(Object) {
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<AddClaimable>>
   ) {
-    const { input: { address, fingerprint, hardwareVerified } } = action
+    const {
+      input: { address, fingerprint, hardwareVerified, nickname }
+    } = action
 
     assertValidFingerprint(fingerprint)
     assertValidEvmAddress(address)
@@ -252,8 +263,6 @@ export class RelayRegistryContract extends Evolvable(Object) {
       || typeof hardwareVerified === 'undefined',
       HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED
     )
-    
-    state.claimable[fingerprint] = address
 
     if (hardwareVerified) {
       ContractAssert(
@@ -262,6 +271,18 @@ export class RelayRegistryContract extends Evolvable(Object) {
       )
       state.verifiedHardware.add(fingerprint)
     }
+
+    if (nickname) {
+      ContractAssert(
+        typeof nickname === 'string'
+        && nickname.length > 0
+        && nickname.length <= 20,
+        NICKNAME_MUST_BE_VALID
+      )
+      state.nicknames[fingerprint] = nickname
+    }
+
+    state.claimable[fingerprint] = address
 
     return { state, result: true }
   }
@@ -277,15 +298,12 @@ export class RelayRegistryContract extends Evolvable(Object) {
     ContractAssert(relays.length > 0, RELAYS_MUST_BE_VALID_ARRAY)
     
     for (let i = 0; i < relays.length; i++) {
-      const { fingerprint, address, hardwareVerified } = relays[i]
       this.addClaimable(state, {
         caller,
         interactionType,
         input: {
           function: 'addClaimable',
-          fingerprint,
-          address,
-          hardwareVerified
+          ...relays[i]
         }
       })
     }

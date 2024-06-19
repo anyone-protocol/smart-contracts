@@ -92,7 +92,8 @@ type RelayRegistryState = {
   addClaimable(
     fingerprint: string,
     address: string,
-    hardwareVerified?: boolean
+    hardwareVerified?: boolean,
+    nickname?: string
   ) => void
   ```
 
@@ -102,7 +103,8 @@ type RelayRegistryState = {
   addClaimableBatched({
     fingerprint: string,
     address: string,
-    hardwareVerified?: boolean
+    hardwareVerified?: boolean,
+    nickname?: string
   }[]) => void
   ```
 
