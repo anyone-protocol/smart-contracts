@@ -35,13 +35,12 @@ export {
   REGISTRATION_CREDIT_REQUIRED,
   FAMILY_REQUIRED,
   FAMILY_NOT_SET,
-  INVALID_SERIAL,
-  SERIAL_ALREADY_VERIFIED,
+  HARDWARE_ALREADY_VERIFIED,
   SERIAL_NOT_REGISTERED,
-  SERIAL_VERIFICATION_PENDING,
   DUPLICATE_FINGERPRINT,
   CREDITS_MUST_BE_ARRAY,
   REGISTRATION_CREDIT_NOT_FOUND,
+  HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED,
   RelayRegistryState,
   AddClaimable,
   RemoveClaimable,
@@ -63,7 +62,6 @@ export {
   RemoveSerials,
   GetVerifiedRelays,
   ToggleFamilyRequirement,
-  RegisterSerial,
   RelayRegistryContract,
   handle as RelayRegistryHandle
 } from './relay-registry'

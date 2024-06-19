@@ -80,12 +80,7 @@ type RelayRegistryState = {
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
   encryptionPublicKey: PublicKey
-  serials: {
-    [fingerprint in Fingerprint as string]: {
-      serial: string
-      verified?: boolean
-    }
-  }
+  verifiedHardware: Set<Fingerprint>
 }
 ```
 
@@ -94,7 +89,11 @@ type RelayRegistryState = {
 - Owner/Validator adds a fingerprint/address tuple as claimable
   ```typescript
   // @OnlyOwner
-  addClaimable(fingerprint: string, address: string) => void
+  addClaimable(
+    fingerprint: string,
+    address: string,
+    hardwareVerified?: boolean
+  ) => void
   ```
 
 - Owner/Validator removes a fingerprint/address tuple as claimable
@@ -197,7 +196,7 @@ type RelayRegistryState = {
   ```typescript
   getVerifiedRelays() => {
     verified: { [fingerprint in Fingerprint as string]: EvmAddress }
-    verifiedWithSerial: { [fingerprint in Fingerprint as string]: EvmAddress }
+    verifiedHardware: { [fingerprint in Fingerprint as string]: EvmAddress }
   }
   ```
 - Allows Owner to toggle family registration requirements to claim a relay
