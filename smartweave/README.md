@@ -89,7 +89,11 @@ type RelayRegistryState = {
 - Owner/Validator adds a fingerprint/address tuple as claimable
   ```typescript
   // @OnlyOwner
-  addClaimable(fingerprint: string, address: string) => void
+  addClaimable(
+    fingerprint: string,
+    address: string,
+    hardwareVerified?: boolean
+  ) => void
   ```
 
 - Owner/Validator removes a fingerprint/address tuple as claimable

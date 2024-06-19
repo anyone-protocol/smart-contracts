@@ -16,9 +16,10 @@ import {
   REGISTRATION_CREDIT_REQUIRED,
   FAMILY_REQUIRED,
   FAMILY_NOT_SET,
-  SERIAL_ALREADY_VERIFIED,
+  HARDWARE_ALREADY_VERIFIED,
   DUPLICATE_FINGERPRINT,
-  REGISTRATION_CREDIT_NOT_FOUND
+  REGISTRATION_CREDIT_NOT_FOUND,
+  HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
@@ -1589,18 +1590,7 @@ describe('Relay Registry Contract', () => {
   })
 
   describe('Verified Hardware', () => {
-    it('Allows Owner to verify hardware serials', () => {
-      const verifySerial = createInteraction(OWNER, {
-        function: 'verifySerials',
-        fingerprints: [fingerprintA]
-      })
-
-      const { state } = RelayRegistryHandle(initState, verifySerial)
-
-      expect(state.verifiedHardware).to.deep.equal(new Set([fingerprintA]))
-    })
-
-    it('Allows Owner to verify hardware without a serial (override)', () => {
+    it('Allows Owner to verify hardware', () => {
       const verifySerial = createInteraction(OWNER, {
         function: 'verifySerials',
         fingerprints: [fingerprintA]
@@ -1653,7 +1643,7 @@ describe('Relay Registry Contract', () => {
       ).to.throw(ERROR_ONLY_OWNER)
     })
 
-    it('Provides view method of verified relays with & w/o serials', () => {
+    it('Provides view method of verified relays (software & hardware)', () => {
       const viewVerifiedRelays = createInteraction(ALICE, {
         function: 'getVerifiedRelays'
       }, 'view')
@@ -1682,7 +1672,7 @@ describe('Relay Registry Contract', () => {
       })
     })
 
-    it('Cleans up serials on renounce of relay', () => {
+    it('Cleans up verified hardware on renounce of relay', () => {
       const renounce = createInteraction(ALICE, {
         function: 'renounce',
         fingerprint: fingerprintA
@@ -1700,22 +1690,47 @@ describe('Relay Registry Contract', () => {
       expect(state.verifiedHardware).to.not.include(fingerprintA)
     })
 
-    it('Cleans up serials on removal of verified relay', () => {
-      const removeVerified = createInteraction(OWNER, {
-        function: 'removeVerified',
-        fingerprint: fingerprintA
+    it('Prevents Owner from redundant hardware verifications', () => {
+      const verifyHardwareAgain = createInteraction(OWNER, {
+        function: 'verifySerials',
+        fingerprints: [fingerprintA]
       })
 
-      const { state } = RelayRegistryHandle(
-        {
-          ...initState,
-          verified: { [fingerprintA]: ALICE },
-          verifiedHardware: new Set([fingerprintA])
-        },
-        removeVerified
-      )
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            verifiedHardware: new Set([fingerprintA])
+          },
+          verifyHardwareAgain
+        )
+      ).to.throw(HARDWARE_ALREADY_VERIFIED)
+    })
 
-      expect(state.verifiedHardware).to.not.include(fingerprintA)
+    it('Allows Owner to verify hardware when adding relay as claimable', () => {
+      const addClaimableHardware = createInteraction(OWNER, {
+        function: 'addClaimable',
+        fingerprint: fingerprintA,
+        address: ALICE,
+        hardwareVerified: true
+      })
+
+      const { state } = RelayRegistryHandle(initState, addClaimableHardware)
+
+      expect(state.verifiedHardware).to.include(fingerprintA)
+    })
+
+    it('Validates verifying hardware when adding relay as claimable', () => {
+      const addClaimableNumberHardware = createInteraction(OWNER, {
+        function: 'addClaimable',
+        fingerprint: fingerprintA,
+        address: ALICE,
+        hardwareVerified: 1
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, addClaimableNumberHardware)
+      ).to.throw(HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED)
     })
   })
 })

@@ -40,12 +40,14 @@ export const ADDRESS_NOT_BLOCKED = 'Address not blocked'
 export const ADDRESS_IS_BLOCKED = 'Address is blocked'
 export const FAMILY_REQUIRED = 'Family required'
 export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
-export const SERIAL_ALREADY_VERIFIED = 'Serial has already been verified'
+export const HARDWARE_ALREADY_VERIFIED = 'Hardware has already been verified'
 export const SERIAL_NOT_REGISTERED = 'Serial has not been registered'
 export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
 export const CREDITS_MUST_BE_ARRAY =
   'Credits must be a valid array of address & fingerprint tuples'
 export const REGISTRATION_CREDIT_NOT_FOUND = 'Registration credit not found'
+export const HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED =
+  'Argument hardwareVerified must be boolean or undefined'
 
 export type RelayRegistryState = OwnableState & EvolvableState & {
   claimable: { [fingerprint in Fingerprint as string]: EvmAddress }
@@ -65,6 +67,7 @@ export interface AddClaimable extends ContractFunctionInput {
   function: 'addClaimable'
   fingerprint: Fingerprint
   address: EvmAddress
+  hardwareVerified?: boolean
 }
 
 export interface RemoveClaimable extends ContractFunctionInput {
@@ -221,7 +224,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     state: RelayRegistryState,
     action: ContractInteraction<PartialFunctionInput<AddClaimable>>
   ) {
-    const { input: { address, fingerprint } } = action
+    const { input: { address, fingerprint, hardwareVerified } } = action
 
     assertValidFingerprint(fingerprint)
     assertValidEvmAddress(address)
@@ -233,8 +236,21 @@ export class RelayRegistryContract extends Evolvable(Object) {
       !this.isFingerprintVerified(state, fingerprint),
       FINGERPRINT_ALREADY_CLAIMED
     )
+    ContractAssert(
+      typeof hardwareVerified === 'boolean'
+      || typeof hardwareVerified === 'undefined',
+      HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED
+    )
     
     state.claimable[fingerprint] = address
+
+    if (hardwareVerified) {
+      ContractAssert(
+        !state.verifiedHardware.has(fingerprint),
+        HARDWARE_ALREADY_VERIFIED
+      )
+      state.verifiedHardware.add(fingerprint)
+    }
 
     return { state, result: true }
   }
@@ -567,8 +583,8 @@ export class RelayRegistryContract extends Evolvable(Object) {
       const fingerprint = fingerprints[i]
       assertValidFingerprint(fingerprint)
       ContractAssert(
-        state.verifiedHardware.has(fingerprint),
-        SERIAL_ALREADY_VERIFIED
+        !state.verifiedHardware.has(fingerprint),
+        HARDWARE_ALREADY_VERIFIED
       )
   
       state.verifiedHardware.add(fingerprint)
