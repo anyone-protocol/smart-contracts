@@ -80,12 +80,7 @@ type RelayRegistryState = {
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
   encryptionPublicKey: PublicKey
-  serials: {
-    [fingerprint in Fingerprint as string]: {
-      serial: string
-      verified?: boolean
-    }
-  }
+  verifiedHardware: Set<Fingerprint>
 }
 ```
 
@@ -197,7 +192,7 @@ type RelayRegistryState = {
   ```typescript
   getVerifiedRelays() => {
     verified: { [fingerprint in Fingerprint as string]: EvmAddress }
-    verifiedWithSerial: { [fingerprint in Fingerprint as string]: EvmAddress }
+    verifiedHardware: { [fingerprint in Fingerprint as string]: EvmAddress }
   }
   ```
 - Allows Owner to toggle family registration requirements to claim a relay

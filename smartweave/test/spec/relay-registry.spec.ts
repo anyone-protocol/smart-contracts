@@ -17,8 +17,6 @@ import {
   FAMILY_REQUIRED,
   FAMILY_NOT_SET,
   SERIAL_ALREADY_VERIFIED,
-  INVALID_SERIAL,
-  SERIAL_VERIFICATION_PENDING,
   DUPLICATE_FINGERPRINT,
   REGISTRATION_CREDIT_NOT_FOUND
 } from '../../src/contracts'
@@ -56,7 +54,7 @@ function resetState() {
     families: {},
     registrationCreditsRequired: false,
     encryptionPublicKey: '',
-    serials: {},
+    verifiedHardware: new Set<string>(),
     familyRequired: false
   }
 }
@@ -97,7 +95,7 @@ describe('Relay Registry Contract', () => {
     expect(state.verified).to.exist
     expect(state.registrationCreditsRequired).to.exist
     expect(state.encryptionPublicKey).to.exist
-    expect(state.serials).to.exist
+    expect(state.verifiedHardware).to.exist
     expect(state.registrationCredits).to.exist
   })
 
@@ -535,33 +533,7 @@ describe('Relay Registry Contract', () => {
       ).to.throw(FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS)
     })
 
-    it('Prevent claiming, even with credit, if serial is pending', () => {
-      const claimFingerprint = createInteraction(ALICE, {
-        function: 'claim',
-        fingerprint: fingerprintA
-      })
-
-      expect(
-        () => RelayRegistryHandle(
-          {
-            ...initState,
-            claimable: {
-              [fingerprintA]: ALICE
-            },
-            registrationCreditsRequired: true,
-            registrationCredits: {
-              [ALICE]: [fingerprintA]
-            },
-            serials: {
-              [fingerprintA]: { serial: 'test-serial' }
-            }
-          },
-          claimFingerprint
-        )
-      ).to.throw(SERIAL_VERIFICATION_PENDING)
-    })
-
-    it('Does not require credits when serial is verified', () => {
+    it('Does not require registration credits for verified hardware', () => {
       const aliceClaimFingerprintA = createInteraction(ALICE, {
         function: 'claim',
         fingerprint: fingerprintA
@@ -571,9 +543,7 @@ describe('Relay Registry Contract', () => {
         ...initState,
         claimable: { [fingerprintA]: ALICE },
         registrationCreditsRequired: true,
-        serials: {
-          [fingerprintA]: { serial: 'test-serial', verified: true }
-        }
+        verifiedHardware: new Set([fingerprintA])
       }, aliceClaimFingerprintA)
 
       expect(state.verified[fingerprintA]).equals(ALICE)
@@ -1618,191 +1588,16 @@ describe('Relay Registry Contract', () => {
     })
   })
 
-  describe('Hardware Serials', () => {
-    it('Allows registering a hardware serial proof', () => {
-      const serial = 'test-serial'
-      const registerSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA,
-        serial
-      })
-
-      const { state } = RelayRegistryHandle(
-        {
-          ...initState,
-          claimable: { [fingerprintA]: ALICE }
-        },
-        registerSerial
-      )
-
-      expect(state.serials).to.deep.equal({
-        [fingerprintA]: { serial }
-      })
-    })
-
-    it('Prevents duplicate serial proofs from being registered', () => {
-      const serial = 'test-serial'
-      const registerSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA,
-        serial
-      })
-
-      expect(
-        () => RelayRegistryHandle(
-          {
-            ...initState,
-            claimable: {
-              [fingerprintA]: ALICE
-            },
-            verified: {
-              [fingerprintB]: BOB
-            },
-            serials: {
-              [fingerprintB]: {
-                serial,
-                verified: true
-              }
-            }
-          },
-          registerSerial
-        )
-      ).to.throw(SERIAL_ALREADY_VERIFIED)
-    })
-
-    it('Allows updating a serial that is not yet verified', () => {
-      const oldSerial = 'old-serial'
-      const newSerial = 'new-serial'
-      const registerSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA,
-        serial: newSerial
-      })
-
-      const { state } = RelayRegistryHandle(
-        {
-          ...initState,
-          claimable: { [fingerprintA]: ALICE },
-          serials: { [fingerprintA]: { serial: oldSerial } }
-        },
-        registerSerial
-      )
-
-      expect(state.serials).to.deep.equal({
-        [fingerprintA]: { serial: newSerial }
-      })
-    })
-
-    it('Prevents updating a serial that is already verified', () => {
-      const oldSerial = 'old-serial'
-      const newSerial = 'new-serial'
-      const registerSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA,
-        serial: newSerial
-      })
-
-      expect(
-        () => RelayRegistryHandle(
-          {
-            ...initState,
-            claimable: { [fingerprintA]: ALICE },
-            serials: { [fingerprintA]: { serial: oldSerial, verified: true } }
-          },
-          registerSerial
-        )
-      ).to.throw(SERIAL_ALREADY_VERIFIED)
-    })
-
-    it('Validates fingerprint when registering serial', () => {
-      const noFingerprintRegisterSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        serial: 'test-serial'
-      })
-
-      expect(
-        () => RelayRegistryHandle(initState, noFingerprintRegisterSerial)
-      ).to.throw(FINGERPRINT_REQUIRED)
-
-      const badFingerprint = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: 'bad-fingerprint',
-        serial: 'test-serial'
-      })
-
-      expect(
-        () => RelayRegistryHandle(initState, badFingerprint)
-      ).to.throw(INVALID_FINGERPRINT)
-    })
-
-    it('Validates serial when registering serial', () => {
-      const noSerialRegisterSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA
-      })
-
-      expect(
-        () => RelayRegistryHandle(
-          {
-            ...initState,
-            claimable: { [fingerprintA]: ALICE }
-          },
-          noSerialRegisterSerial
-        )
-      ).to.throw(INVALID_SERIAL)
-    })
-
-    it('Prevents registering a serial if fingerprint is not claimable', () => {
-      const registerSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA,
-        serial: 'test-serial'
-      })
-
-      expect(
-        () => RelayRegistryHandle(initState, registerSerial)
-      ).to.throw(FINGERPRINT_NOT_CLAIMABLE_BY_ADDRESS)
-    })
-
-    it('Prevents registering a serial if an address is blocked', () => {
-      const registerSerial = createInteraction(ALICE, {
-        function: 'registerSerial',
-        fingerprint: fingerprintA,
-        serial: 'test-serial'
-      })
-
-      expect(
-        () => RelayRegistryHandle(
-          {
-            ...initState,
-            claimable: { [fingerprintA]: ALICE },
-            blockedAddresses: [ ALICE ]
-          },
-          registerSerial
-        )
-      ).to.throw(ADDRESS_IS_BLOCKED)
-    })
-
+  describe('Verified Hardware', () => {
     it('Allows Owner to verify hardware serials', () => {
-      const serial = 'test-serial'
       const verifySerial = createInteraction(OWNER, {
         function: 'verifySerials',
         fingerprints: [fingerprintA]
       })
 
-      const { state } = RelayRegistryHandle(
-        {
-          ...initState,
-          serials: {
-            [fingerprintA]: { serial }
-          }
-        },
-        verifySerial
-      )
+      const { state } = RelayRegistryHandle(initState, verifySerial)
 
-      expect(state.serials).to.deep.equal({
-        [fingerprintA]: { serial, verified: true }
-      })
+      expect(state.verifiedHardware).to.deep.equal(new Set([fingerprintA]))
     })
 
     it('Allows Owner to verify hardware without a serial (override)', () => {
@@ -1813,9 +1608,7 @@ describe('Relay Registry Contract', () => {
 
       const { state } = RelayRegistryHandle(initState, verifySerial)
 
-      expect(state.serials).to.deep.equal({
-        [fingerprintA]: { verified: true }
-      })
+      expect(state.verifiedHardware).to.deep.equal(new Set([fingerprintA]))
     })
 
     it('Prevents non-owners from verifying hardware serials', () => {
@@ -1841,14 +1634,12 @@ describe('Relay Registry Contract', () => {
           verified: {
             [fingerprintA]: ALICE
           },
-          serials: {
-            [fingerprintA]: { serial: 'test-serial', verified: true }
-          }
+          verifiedHardware: new Set([fingerprintA])
         },
         removeSerial
       )
 
-      expect(state.serials[fingerprintA]).to.not.exist
+      expect(state.verifiedHardware).to.not.include(fingerprintA)
     })
 
     it('Prevents non-owners from removing serials', () => {
@@ -1875,10 +1666,7 @@ describe('Relay Registry Contract', () => {
             [fingerprintB]: BOB,
             [fingerprintC]: CHARLS
           },
-          serials: {
-            [fingerprintA]: { serial: 'serial-A' },
-            [fingerprintC]: { serial: 'serial-C', verified: true }
-          }
+          verifiedHardware: new Set([fingerprintC])
         },
         viewVerifiedRelays
       )
@@ -1888,7 +1676,7 @@ describe('Relay Registry Contract', () => {
           [fingerprintA]: ALICE,
           [fingerprintB]: BOB
         },
-        verifiedWithSerial: {
+        verifiedHardware: {
           [fingerprintC]: CHARLS
         }
       })
@@ -1904,12 +1692,12 @@ describe('Relay Registry Contract', () => {
         {
           ...initState,
           verified: { [fingerprintA]: ALICE },
-          serials: { [fingerprintA]: { serial: 'serial-A' }}
+          verifiedHardware: new Set([fingerprintA])
         },
         renounce
       )
 
-      expect(state.serials[fingerprintA]).to.not.exist
+      expect(state.verifiedHardware).to.not.include(fingerprintA)
     })
 
     it('Cleans up serials on removal of verified relay', () => {
@@ -1922,12 +1710,12 @@ describe('Relay Registry Contract', () => {
         {
           ...initState,
           verified: { [fingerprintA]: ALICE },
-          serials: { [fingerprintA]: { serial: 'serial-A' }}
+          verifiedHardware: new Set([fingerprintA])
         },
         removeVerified
       )
 
-      expect(state.serials[fingerprintA]).to.not.exist
+      expect(state.verifiedHardware).to.not.include(fingerprintA)
     })
   })
 })
