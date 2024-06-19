@@ -20,7 +20,8 @@ import {
   DUPLICATE_FINGERPRINT,
   REGISTRATION_CREDIT_NOT_FOUND,
   HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED,
-  RELAYS_MUST_BE_VALID_ARRAY
+  RELAYS_MUST_BE_VALID_ARRAY,
+  NICKNAME_MUST_BE_VALID
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
@@ -57,7 +58,8 @@ function resetState() {
     registrationCreditsRequired: false,
     encryptionPublicKey: '',
     verifiedHardware: new Set<string>(),
-    familyRequired: false
+    familyRequired: false,
+    nicknames: {}
   }
 }
 
@@ -99,6 +101,7 @@ describe('Relay Registry Contract', () => {
     expect(state.encryptionPublicKey).to.exist
     expect(state.verifiedHardware).to.exist
     expect(state.registrationCredits).to.exist
+    expect(state.nicknames).to.exist
   })
 
   describe('Claiming', () => {
@@ -606,6 +609,103 @@ describe('Relay Registry Contract', () => {
       expect(
         () => RelayRegistryHandle(initState, noRelays)
       ).to.throw(RELAYS_MUST_BE_VALID_ARRAY)
+    })
+
+    it('Allows Owner to add a nickname when adding a claimable relay', () => {
+      const nickname = 'CHARLS'
+      const addClaimableWithNickname = createInteraction(OWNER, {
+        function: 'addClaimable',
+        fingerprint: fingerprintC,
+        address: CHARLS,
+        nickname
+      })
+
+      const { state } = RelayRegistryHandle(initState, addClaimableWithNickname)
+
+      expect(state.nicknames[fingerprintC]).to.equal(nickname)
+    })
+
+    it('Validates nicknames when adding a claimable relay', () => {
+      const nonStringNickname = createInteraction(OWNER, {
+        function: 'addClaimable',
+        fingerprint: fingerprintC,
+        address: CHARLS,
+        nickname: 3
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, nonStringNickname)
+      ).to.throw(NICKNAME_MUST_BE_VALID)
+
+      const tooLongNickname = createInteraction(OWNER, {
+        function: 'addClaimable',
+        fingerprint: fingerprintC,
+        address: CHARLS,
+        nickname: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, tooLongNickname)
+      ).to.throw(NICKNAME_MUST_BE_VALID)
+    })
+
+    it('Allows Owner to add a nickname when adding a claimable batch', () => {
+      const aliceNickname = 'ALICE'
+      const charlsNickname = 'BOB'
+      const addBatchWithNicknames = createInteraction(OWNER, {
+        function: 'addClaimableBatched',
+        relays: [
+          {
+            fingerprint: fingerprintA,
+            address: ALICE,
+            nickname: aliceNickname
+          },
+          {
+            fingerprint: fingerprintB,
+            address: BOB
+          },
+          {
+            fingerprint: fingerprintC,
+            address: CHARLS,
+            nickname: charlsNickname
+          }
+        ]
+      })
+
+      const { state } = RelayRegistryHandle(initState, addBatchWithNicknames)
+
+      expect(state.nicknames).to.deep.equal({
+        [fingerprintA]: aliceNickname,
+        [fingerprintC]: charlsNickname
+      })
+    })
+
+    it('Validates nicknames when adding a relay as a claimable batch', () => {
+      const nonStringNickname = createInteraction(OWNER, {
+        function: 'addClaimableBatched',
+        relays: [{
+          fingerprint: fingerprintC,
+          address: CHARLS,
+          nickname: 3
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, nonStringNickname)
+      ).to.throw(NICKNAME_MUST_BE_VALID)
+
+      const tooLongNickname = createInteraction(OWNER, {
+        function: 'addClaimableBatched',
+        relays: [{
+          fingerprint: fingerprintC,
+          address: CHARLS,
+          nickname: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, tooLongNickname)
+      ).to.throw(NICKNAME_MUST_BE_VALID)
     })
   })
 
