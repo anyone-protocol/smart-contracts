@@ -22,7 +22,12 @@ import {
 } from '../../src/contracts/distribution'
 import TestScores from '../e2e/data/scores.json'
 import TestResults from '../e2e/data/results.json'
-import { ADDRESS_REQUIRED, ENABLED_REQUIRED, INVALID_ADDRESS, INVALID_FINGERPRINT } from '../../src/common/errors'
+import {
+  ADDRESS_REQUIRED,
+  ENABLED_REQUIRED,
+  INVALID_ADDRESS,
+  INVALID_FINGERPRINT
+} from '../../src/common/errors'
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -685,7 +690,8 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: '1000',
           totalNetworkScore: '100',
-          totalDistributedTokens: '0'
+          totalDistributedTokens: '0',
+          details: {}
         }
       })
     })
@@ -878,7 +884,8 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: '1000',
           totalNetworkScore: '100',
-          totalDistributedTokens: '0'
+          totalDistributedTokens: '0',
+          details: {}
         },
         [secondTimestamp]: {
           timeElapsed: timeBetweenDistributions.toString(),
@@ -895,7 +902,21 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
           totalNetworkScore: '500',
-          totalDistributedTokens: '1000'
+          totalDistributedTokens: '1000',
+          details: {
+            'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA': {
+              address: '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa',
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '1000',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '500'
+            }
+          }
         }
       })
       expect(state.claimable).to.deep.equal({
@@ -1023,7 +1044,8 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: '1000',
           totalNetworkScore: '300',
-          totalDistributedTokens: '0'
+          totalDistributedTokens: '0',
+          details: {}
         },
         [secondTimestamp]: {
           timeElapsed: firstTimeDifference.toString(),
@@ -1040,7 +1062,45 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
           totalNetworkScore: '2069',
-          totalDistributedTokens: '5430'          
+          totalDistributedTokens: '5430',
+          details: {
+            [fingerprintA]: {
+              address: ALICE,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '196',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '75'
+            },
+            [fingerprintB]: {
+              address: BOB,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '3510',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '1337'
+            },
+            [fingerprintC]: {
+              address: ALICE,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '1724',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '657'
+            }
+          }
         },
         [thirdTimestamp]: {
           timeElapsed: secondTimeDifference.toString(),
@@ -1057,7 +1117,45 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
           totalNetworkScore: '8162',
-          totalDistributedTokens: '86399'
+          totalDistributedTokens: '86399',
+          details: {
+            [fingerprintA]: {
+              address: ALICE,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '2688',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '254'
+            },
+            [fingerprintB]: {
+              address: BOB,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '60084',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '5676'
+            },
+            [fingerprintC]: {
+              address: ALICE,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '23627',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '2232'
+            }
+          }
         }
       })
       expect(state.pendingDistributions).to.be.empty
@@ -1126,7 +1224,8 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: '4333',
           totalNetworkScore: '300',
-          totalDistributedTokens: '0'
+          totalDistributedTokens: '0',
+          details: {}
         },
         // 4333 tps rate over 443ms ~= 1,919.519 tokens
         [secondTimestamp]: {
@@ -1144,7 +1243,45 @@ describe('Distribution Contract', () => {
           },
           totalTokensDistributedPerSecond: '4333',
           totalNetworkScore: '2069',
-          totalDistributedTokens: '1918'
+          totalDistributedTokens: '1918',
+          details: {
+            [fingerprintA]: {
+              address: ALICE,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '69',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '75'
+            },
+            [fingerprintB]: {
+              address: BOB,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '1240',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '1337'
+            },
+            [fingerprintC]: {
+              address: ALICE,
+              bonuses: {
+                hardware: '0'
+              },
+              distributedTokens: '609',
+              multipliers: {
+                family: '1',
+                region: '1'
+              },
+              score: '657'
+            }
+          }
         }
       })
       expect(state.pendingDistributions).to.be.empty
@@ -1249,7 +1386,8 @@ describe('Distribution Contract', () => {
               },
               totalTokensDistributedPerSecond: '0',
               totalNetworkScore: '0',
-              totalDistributedTokens: '0'
+              totalDistributedTokens: '0',
+              details: {}
             }
           }
         },
@@ -1311,7 +1449,8 @@ describe('Distribution Contract', () => {
               },
               totalTokensDistributedPerSecond: '0',
               totalNetworkScore: '0',
-              totalDistributedTokens: '0'
+              totalDistributedTokens: '0',
+              details: {}
             }
           }
         },
@@ -1514,7 +1653,7 @@ describe('Distribution Contract', () => {
       expect(state.previousDistributions[fourthDistributionTimestamp]).to.exist
     })
 
-    it('Tracks bonuses in previous distributions', () => {
+    it('Tracks bonuses & details in previous distributions', () => {
       const elapsed = 86400
       const timestamp = Date.now()
       const previousTimestamp = (timestamp - elapsed).toString()
@@ -1561,7 +1700,8 @@ describe('Distribution Contract', () => {
               },
               totalTokensDistributedPerSecond: '0',
               totalNetworkScore: '0',
-              totalDistributedTokens: '0'
+              totalDistributedTokens: '0',
+              details: {}
             }
           }
         },
@@ -1587,6 +1727,35 @@ describe('Distribution Contract', () => {
         .to.equal(TestResults.totalNetworkScore)
       expect(distribution.totalDistributedTokens)
         .to.equal(TestResults.totalActualDistributedTokens)
+      
+      // NB: Spot-check an address that has two relays, one being a hw relay
+      const address = '0xa2AA87bE9FaaE25F1aC6E6846eC9589b03625ce0'
+      const fingerprint1 = '60CCE755BD6B7410C70A16B4204D13A986437FDA'
+      const fingerprint2 = '25280148FEF4E800FD179082D9E23276C7199E9D'
+      expect(distribution.details[fingerprint1]).to.deep.equal({
+        address,
+        score: '53000',
+        distributedTokens: '8355',
+        bonuses: {
+          hardware: '5802'
+        },
+        multipliers: {
+          family: '1',
+          region: '1'
+        }
+      })
+      expect(distribution.details[fingerprint2]).to.deep.equal({
+        address,
+        score: '56000',
+        distributedTokens: '2697',
+        bonuses: {
+          hardware: '0'
+        },
+        multipliers: {
+          family: '1',
+          region: '1'
+        }
+      })
     })
   })
 })
