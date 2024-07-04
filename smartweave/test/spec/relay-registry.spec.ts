@@ -27,8 +27,10 @@ import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
   ADDRESS_REQUIRED,
   ENABLED_REQUIRED,
+  FAMILIES_REQUIRED,
   FINGERPRINT_REQUIRED,
   INVALID_ADDRESS,
+  INVALID_FAMILY,
   INVALID_FINGERPRINT,
   PUBLIC_KEY_REQUIRED
 } from '../../src/common/errors'
@@ -1449,89 +1451,230 @@ describe('Relay Registry Contract', () => {
   })
 
   describe('Families', () => {
-    it('Allows Owner to set the family of a relay', () => {
-      const setFamily = createInteraction(OWNER, {
-        function: 'setFamily',
-        fingerprint: fingerprintA,
-        family: [ fingerprintC ]
+    it('Allows Owner to set relay families', () => {
+      const setFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            family: [ fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintC,
+            family: [ fingerprintA ]
+          }
+        ]
       })
 
-      const { state } = RelayRegistryHandle(
-        {
-          ...initState,
-          verified: { [fingerprintA]: ALICE }
-        },
-        setFamily
-      )
+      const { state } = RelayRegistryHandle(initState, setFamilies)
 
-      expect(state.families).to.deep.equal({ [fingerprintA]: [fingerprintC] })
+      expect(state.families).to.deep.equal({
+        [fingerprintA]: [fingerprintC],
+        [fingerprintC]: [fingerprintA]
+      })
     })
 
-    it('Prevents non-owners from setting the family of a relay', () => {
-      const setFamily = createInteraction(ALICE, {
-        function: 'setFamily',
-        fingerprint: fingerprintA,
-        family: [ fingerprintC ]
+    it('Prevents non-owners from setting relay families', () => {
+      const aliceSetFamilies = createInteraction(ALICE, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            family: [ fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintC,
+            family: [ fingerprintA ]
+          }
+        ]
       })
 
       expect(
-        () => RelayRegistryHandle(initState, setFamily)
-      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+        () => RelayRegistryHandle(initState, aliceSetFamilies)
+      ).to.throw(ERROR_ONLY_OWNER)
     })
 
-    it('Requires & validates relay fingerprint when setting family', () => {
-      const noFingerprint = createInteraction(OWNER, {
-        function: 'setFamily',
-        family: []
-      })
-      const invalidFingerprint = createInteraction(OWNER, {
-        function: 'setFamily',
-        fingerprint: 'invalid',
-        family: []
-      })
-      const nonStringFingerprint = createInteraction(OWNER, {
-        function: 'setFamily',
-        fingerprint: {},
-        family: []
+    it('Validates when setting relay families', () => {
+      const missingFamilies = createInteraction(OWNER, {
+        function: 'setFamilies'      
       })
 
       expect(
-        () => RelayRegistryHandle(initState, noFingerprint)
-      ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+        () => RelayRegistryHandle(initState, missingFamilies)
+      ).to.throw(FAMILIES_REQUIRED)
+
+      const noFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: []
+      })
+
       expect(
-        () => RelayRegistryHandle(initState, invalidFingerprint)
-      ).to.throw(ContractError, INVALID_FINGERPRINT)
+        () => RelayRegistryHandle(initState, noFamilies)
+      ).to.throw(FAMILIES_REQUIRED)
+
+      const nonArrayFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: { weewoo: 'boop' }
+      })
+
       expect(
-        () => RelayRegistryHandle(initState, nonStringFingerprint)
-      ).to.throw(ContractError, INVALID_FINGERPRINT)
+        () => RelayRegistryHandle(initState, nonArrayFamilies)
+      ).to.throw(FAMILIES_REQUIRED)
+
+      const noFingerprintFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          family: []
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, noFingerprintFamily)
+      ).to.throw(FINGERPRINT_REQUIRED)
+
+      const invalidFingerprintFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: 'invalid',
+          family: []
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, invalidFingerprintFamily)
+      ).to.throw(INVALID_FINGERPRINT)
+
+      const nonStringFingerprintFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: {},
+          family: []
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, nonStringFingerprintFamily)
+      ).to.throw(INVALID_FINGERPRINT)
+
+      const noFamilyFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: fingerprintA
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, noFamilyFamily)
+      ).to.throw(INVALID_FAMILY)
+
+      const invalidFamilyFingerprintsFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: fingerprintA,
+          family: [{}, 1, undefined, null, 'invalid']
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, invalidFamilyFingerprintsFamily)
+      ).to.throw(INVALID_FINGERPRINT)
+
+      const someInvalidFamilyFingerprintsFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: fingerprintA,
+          family: [fingerprintC, 'invalid', null]
+        }]
+      })
+
+      expect(
+        () => RelayRegistryHandle(initState, someInvalidFamilyFingerprintsFamily)
+      ).to.throw(INVALID_FINGERPRINT)
     })
 
-    it('Requires & validates family fingerprints when setting family', () => {
-      const noFamily = createInteraction(OWNER, {
-        function: 'setFamily',
-        fingerprint: fingerprintA
-      })
-      const invalidFamilyFingerprints = createInteraction(OWNER, {
-        function: 'setFamily',
-        fingerprint: fingerprintA,
-        family: [{}, 1, undefined, null, 'invalid']
-      })
-      const someInvalidFamilyFingerprints = createInteraction(OWNER, {
-        function: 'setFamily',
-        fingerprint: fingerprintA,
-        family: [fingerprintC, 'invalid', null]
-      })
+    // it('Allows Owner to set relay families', () => {
+    //   const setFamily = createInteraction(OWNER, {
+    //     function: 'setFamilies',
+    //     fingerprint: fingerprintA,
+    //     family: [ fingerprintC ]
+    //   })
 
-      expect(
-        () => RelayRegistryHandle(initState, noFamily)
-      ).to.throw(ContractError, FAMILY_REQUIRED)
-      expect(
-        () => RelayRegistryHandle(initState, invalidFamilyFingerprints)
-      ).to.throw(ContractError, INVALID_FINGERPRINT)
-      expect(
-        () => RelayRegistryHandle(initState, someInvalidFamilyFingerprints)
-      ).to.throw(ContractError, INVALID_FINGERPRINT)
-    })
+    //   const { state } = RelayRegistryHandle(
+    //     {
+    //       ...initState,
+    //       verified: { [fingerprintA]: ALICE }
+    //     },
+    //     setFamily
+    //   )
+
+    //   expect(state.families).to.deep.equal({ [fingerprintA]: [fingerprintC] })
+    // })
+
+    // it('Prevents non-owners from setting relay families', () => {
+    //   const setFamily = createInteraction(ALICE, {
+    //     function: 'setFamily',
+    //     fingerprint: fingerprintA,
+    //     family: [ fingerprintC ]
+    //   })
+
+    //   expect(
+    //     () => RelayRegistryHandle(initState, setFamily)
+    //   ).to.throw(ContractError, ERROR_ONLY_OWNER)
+    // })
+
+    // it('Validates relay fingerprint when setting relay families', () => {
+    //   const noFingerprint = createInteraction(OWNER, {
+    //     function: 'setFamily',
+    //     family: []
+    //   })
+    //   const invalidFingerprint = createInteraction(OWNER, {
+    //     function: 'setFamily',
+    //     fingerprint: 'invalid',
+    //     family: []
+    //   })
+    //   const nonStringFingerprint = createInteraction(OWNER, {
+    //     function: 'setFamily',
+    //     fingerprint: {},
+    //     family: []
+    //   })
+
+    //   expect(
+    //     () => RelayRegistryHandle(initState, noFingerprint)
+    //   ).to.throw(ContractError, FINGERPRINT_REQUIRED)
+    //   expect(
+    //     () => RelayRegistryHandle(initState, invalidFingerprint)
+    //   ).to.throw(ContractError, INVALID_FINGERPRINT)
+    //   expect(
+    //     () => RelayRegistryHandle(initState, nonStringFingerprint)
+    //   ).to.throw(ContractError, INVALID_FINGERPRINT)
+    // })
+
+    // it('Validates family fingerprints when setting relay families', () => {
+    //   const noFamily = createInteraction(OWNER, {
+    //     function: 'setFamily',
+    //     fingerprint: fingerprintA
+    //   })
+    //   const invalidFamilyFingerprints = createInteraction(OWNER, {
+    //     function: 'setFamily',
+    //     fingerprint: fingerprintA,
+    //     family: [{}, 1, undefined, null, 'invalid']
+    //   })
+    //   const someInvalidFamilyFingerprints = createInteraction(OWNER, {
+    //     function: 'setFamily',
+    //     fingerprint: fingerprintA,
+    //     family: [fingerprintC, 'invalid', null]
+    //   })
+
+    //   expect(
+    //     () => RelayRegistryHandle(initState, noFamily)
+    //   ).to.throw(ContractError, FAMILY_REQUIRED)
+    //   expect(
+    //     () => RelayRegistryHandle(initState, invalidFamilyFingerprints)
+    //   ).to.throw(ContractError, INVALID_FINGERPRINT)
+    //   expect(
+    //     () => RelayRegistryHandle(initState, someInvalidFamilyFingerprints)
+    //   ).to.throw(ContractError, INVALID_FINGERPRINT)
+    // })
 
     it('Prevents claiming of more than 1 relay if family not set', () => {
       const secondRelayNoFamily = createInteraction(ALICE, {

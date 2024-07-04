@@ -24,7 +24,7 @@ import {
   Fingerprint,
   PublicKey
 } from '../common/types'
-import { ENABLED_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY } from '../common/errors'
+import { ENABLED_REQUIRED, FAMILIES_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY, INVALID_FAMILY } from '../common/errors'
 
 export const FINGERPRINT_ALREADY_CLAIMABLE = 'Fingerprint already claimable'
 export const FINGERPRINT_NOT_CLAIMABLE = 'Fingerprint not claimable'
@@ -147,10 +147,12 @@ export interface UnblockAddress extends ContractFunctionInput {
   address: EvmAddress
 }
 
-export interface SetFamily extends ContractFunctionInput {
-  function: 'setFamily'
-  fingerprint: Fingerprint
-  family: Fingerprint[]
+export interface SetFamilies extends ContractFunctionInput {
+  function: 'setFamilies'
+  families: {
+    fingerprint: Fingerprint
+    family: Fingerprint[]
+  }[]
 }
 
 export interface ToggleRegistrationCreditRequirement
@@ -579,19 +581,24 @@ export class RelayRegistryContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
-  setFamily(
+  setFamilies(
     state: RelayRegistryState,
-    action: ContractInteraction<PartialFunctionInput<SetFamily>>
+    action: ContractInteraction<PartialFunctionInput<SetFamilies>>
   ) {
-    const { input: { fingerprint, family } } = action
+    const { input: { families } } = action
 
-    assertValidFingerprint(fingerprint)
-    ContractAssert(!!family, FAMILY_REQUIRED)
-    for (let i = 0; i < family.length; i++) {
-      assertValidFingerprint(family[i])
-    }
+    ContractAssert(Array.isArray(families), FAMILIES_REQUIRED)
+    ContractAssert(families.length > 0, FAMILIES_REQUIRED)
+    
+    for (const { fingerprint, family } of families) {
+      assertValidFingerprint(fingerprint)
+      ContractAssert(Array.isArray(family), INVALID_FAMILY)
+      for (const familyFingerprint of family) {
+        assertValidFingerprint(familyFingerprint)
+      }
 
-    state.families[fingerprint] = family
+      state.families[fingerprint] = family
+    }    
 
     return { state, result: true }
   }
@@ -744,8 +751,8 @@ export function handle(
       return contract.blockAddress(state, action)
     case 'unblockAddress':
       return contract.unblockAddress(state, action)
-    case 'setFamily':
-      return contract.setFamily(state, action)
+    case 'setFamilies':
+      return contract.setFamilies(state, action)
     case 'toggleRegistrationCreditRequirement':
       return contract.toggleRegistrationCreditRequirement(state, action)
     case 'setEncryptionPublicKey':

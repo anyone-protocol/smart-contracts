@@ -10,7 +10,7 @@ import {
   RelayRegistryHandle,
   RelayRegistryState
 } from '../../src/contracts'
-import { SetFamily } from '~/src/contracts/relay-registry'
+import { SetFamilies } from '~/src/contracts/relay-registry'
 
 dotenv.config()
 
@@ -46,7 +46,7 @@ async function main() {
 
   const contract = warp.contract<RelayRegistryState>(contractTxId)
 
-  const input: SetFamily = {
+  const input: SetFamilies = {
     function: 'setFamily',
     fingerprint,
     family: family.split(',').filter(f => !!f)
@@ -63,7 +63,7 @@ async function main() {
   // NB: Send real interaction
   await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<SetFamily>(input)
+    .writeInteraction<SetFamilies>(input)
 }
 
 (async () => {
