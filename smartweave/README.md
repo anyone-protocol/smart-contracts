@@ -180,9 +180,14 @@ type RelayRegistryState = {
   unblockAddress(address: string) => void
   ```
 
-- Allows Owner to set the effective family of a relay
+- Allows Owner to set relay families
   ```typescript
-  setFamily(fingerprint: string, family: string[]) => void
+  setFamilies(
+    families: {
+      fingerprint: string,
+      family: string[]
+    }[]
+  ) => void
   ```
 
 - Allows Owner to toggle registration credits requirement to claim a relay

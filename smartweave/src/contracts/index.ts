@@ -53,7 +53,7 @@ export {
   RemoveVerified,
   Verified,
   IsVerified,
-  SetFamily,
+  SetFamilies,
   AddRegistrationCredits,
   RemoveRegistrationCredits,
   BlockAddress,

@@ -16,7 +16,7 @@ import {
   assertValidFingerprint
 } from '../util'
 import { ContractFunctionInput, EvmAddress, Fingerprint } from '../common/types'
-import { ENABLED_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY } from '../common/errors'
+import { ENABLED_REQUIRED, FAMILIES_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY, INVALID_FAMILY } from '../common/errors'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
 export const INVALID_TIMESTAMP = 'Invalid timestamp'
@@ -31,8 +31,6 @@ export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
 export const VALID_BONUS_NAME_REQUIRED = 'Valid bonus name required'
 export const FINGERPRINT_NOT_IN_BONUS = 'Fingerprint is not in bonus'
 export const INVALID_FAMILY_MULTIPLIER_RATE = 'Invalid family multiplier rate'
-export const FAMILIES_REQUIRED = 'Families must be an array of family mappings'
-export const INVALID_FAMILY = 'Invalid family'
 
 export type Score = {
   score: string
