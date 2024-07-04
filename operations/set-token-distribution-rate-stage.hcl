@@ -11,7 +11,7 @@ job "set-token-distribution-rate-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.2.9"
+      image = "ghcr.io/ator-development/smart-contracts:0.2.10"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-token-distribution-rate.ts"]
