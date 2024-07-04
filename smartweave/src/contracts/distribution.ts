@@ -30,6 +30,9 @@ export const INVALID_MULTIPLIER_VALUE = 'Invalid multiplier value'
 export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
 export const VALID_BONUS_NAME_REQUIRED = 'Valid bonus name required'
 export const FINGERPRINT_NOT_IN_BONUS = 'Fingerprint is not in bonus'
+export const INVALID_FAMILY_MULTIPLIER_RATE = 'Invalid family multiplier rate'
+export const FAMILIES_REQUIRED = 'Families must be an array of family mappings'
+export const INVALID_FAMILY = 'Invalid family'
 
 export type Score = {
   score: string
@@ -50,6 +53,13 @@ export type DistributionResult = {
       distributedTokens: string
     }
   }
+  multipliers: {
+    family: {
+      enabled: boolean
+      familyMultiplierRate: string
+    }
+  }
+  families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   totalTokensDistributedPerSecond: string
   totalNetworkScore: string
   totalDistributedTokens: string
@@ -78,9 +88,6 @@ export type DistributionState = OwnableState & EvolvableState & {
       fingerprints: Fingerprint[]
     }
   }
-  multipliers: {
-    [fingerprint: Fingerprint]: string
-  }
   pendingDistributions: {
     [timestamp: string]: { scores: Score[] }
   }
@@ -91,6 +98,13 @@ export type DistributionState = OwnableState & EvolvableState & {
     [timestamp: string]: DistributionResult
   }
   previousDistributionsTrackingLimit: number
+  families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
+  multipliers: {
+    family: {
+      enabled: boolean
+      familyMultiplierRate: string
+    }
+  }
 }
 
 export interface SetTokenDistributionRate extends ContractFunctionInput {
@@ -114,11 +128,6 @@ export interface CancelDistribution extends ContractFunctionInput {
   timestamp: string
 }
 
-export interface SetMultipliers extends ContractFunctionInput {
-  function: 'setMultipliers'
-  multipliers: { [fingerprint: string]: string }
-}
-
 export interface SetHardwareBonusRate extends ContractFunctionInput {
   function: 'setHardwareBonusRate'
   tokensDistributedPerSecond: string
@@ -139,6 +148,24 @@ export interface RemoveFingerprintsFromBonus extends ContractFunctionInput {
   function: 'removeFingerprintsFromBonus'
   bonusName: string
   fingerprints: Fingerprint[]
+}
+
+export interface SetFamilyMultiplierRate extends ContractFunctionInput {
+  function: 'setFamilyMultiplierRate'
+  familyMultiplierRate: string
+}
+
+export interface SetFamilies extends ContractFunctionInput {
+  function: 'setFamilies'
+  families: {
+    fingerprint: Fingerprint
+    family: Fingerprint[]
+  }[]
+}
+
+export interface ToggleFamilyMultipliers extends ContractFunctionInput {
+  function: 'toggleFamilyMultipliers'
+  enabled: boolean
 }
 
 export interface SetPreviousDistributionTrackingLimit
@@ -200,7 +227,12 @@ export class DistributionContract extends Evolvable(Object) {
     }
 
     if (!state.multipliers) {
-      state.multipliers = {}
+      state.multipliers = {
+        family: {
+          enabled: false,
+          familyMultiplierRate: '0'
+        }
+      }
     }
 
     if (!state.previousDistributionsTrackingLimit) {
@@ -215,6 +247,10 @@ export class DistributionContract extends Evolvable(Object) {
           fingerprints: []
         }
       }
+    }
+
+    if (!state.families) {
+      state.families = {}
     }
 
     super(state)
@@ -295,7 +331,12 @@ export class DistributionContract extends Evolvable(Object) {
       totalTokensDistributedPerSecond,
       totalNetworkScore,
       totalDistributedTokens,
-      details
+      details,
+      families: state.families,
+      multipliers: {
+        family: state.multipliers.family,
+
+      }
     }
 
     const previousDistributionTimestamps = Object
@@ -319,26 +360,41 @@ export class DistributionContract extends Evolvable(Object) {
       ({ address }) => state.bonuses.hardware.fingerprints.includes(address)
     )
     const { baseNetworkScore, hwBonusNetworkScore } = scores.reduce(
-      (totals, { fingerprint, score }) => {
-        const scoreWithMultiplier = BigNumber(score)
-          .times(state.multipliers[fingerprint] || '1')
+      (totals, { fingerprint, score, address }) => {
+        let scoreWithMultipliers = BigNumber(score)
+        if (
+          state.multipliers.family.enabled
+          && state.families[fingerprint]
+          && state.families[fingerprint].length > 0
+        ) {
+          const familySize = state
+            .families[fingerprint]
+            .filter(f => f !== fingerprint)
+            .length
+          const multiplier = BigNumber(
+              state.multipliers.family.familyMultiplierRate
+            )
+            .times(familySize)
+            .plus(1)
+          scoreWithMultipliers = BigNumber(score).times(multiplier)
+        }
 
-        let hwScoreWithMultiplier = BigNumber(0)
+        let hwScoreWithMultipliers = BigNumber(0)
         if (
           state.bonuses.hardware.enabled
           && state.bonuses.hardware.fingerprints.includes(fingerprint)
         ) {
-          hwScoreWithMultiplier = scoreWithMultiplier
+          hwScoreWithMultipliers = scoreWithMultipliers
         }
 
         return {
           ...totals,
           baseNetworkScore: totals
             .baseNetworkScore
-            .plus(scoreWithMultiplier),
+            .plus(scoreWithMultipliers),
           hwBonusNetworkScore: totals
             .hwBonusNetworkScore
-            .plus(hwScoreWithMultiplier)
+            .plus(hwScoreWithMultipliers)
         }        
       },
       { baseNetworkScore: BigNumber(0), hwBonusNetworkScore: BigNumber(0) }
@@ -369,8 +425,25 @@ export class DistributionContract extends Evolvable(Object) {
     for (let i = 0; i < scores.length; i++) {
       const { score, address, fingerprint } = scores[i]
 
+      let familyMultiplier = BigNumber('1')
+      if (
+        state.multipliers.family.enabled
+        && state.families[fingerprint]
+        && state.families[fingerprint].length > 0
+      ) {
+        const familySize = state
+          .families[fingerprint]
+          .filter(f => f !== fingerprint)
+          .length
+        familyMultiplier = BigNumber(
+          state.multipliers.family.familyMultiplierRate
+        )
+          .times(familySize)
+          .plus(1)
+      }
+
       const baseRedeemableTokens = BigNumber(score)
-        .times(state.multipliers[fingerprint] || '1')
+        .times(familyMultiplier)
         .dividedBy(baseNetworkScore)
         .times(baseTokensToDistribute)
         .integerValue(BigNumber.ROUND_FLOOR)
@@ -384,7 +457,7 @@ export class DistributionContract extends Evolvable(Object) {
         && state.bonuses.hardware.fingerprints.includes(fingerprint)
       ) {
         hwBonusRedeemableTokens = BigNumber(score)
-          .times(state.multipliers[fingerprint] || '1')
+          .times(familyMultiplier)
           .dividedBy(hwBonusNetworkScore)
           .times(hwBonusTokensToDistribute)
           .integerValue(BigNumber.ROUND_FLOOR)
@@ -395,6 +468,7 @@ export class DistributionContract extends Evolvable(Object) {
       const redeemableTokens = baseRedeemableTokens
         .plus(hwBonusRedeemableTokens)
       const previouslyRedeemableTokens = state.claimable[address] || '0'
+
       state.claimable[address] = BigNumber(previouslyRedeemableTokens)
         .plus(redeemableTokens)
         .toString()
@@ -407,7 +481,7 @@ export class DistributionContract extends Evolvable(Object) {
           hardware: hwBonusRedeemableTokens.toString()
         },
         multipliers: {
-          family: '1',
+          family: familyMultiplier.toString(),
           region: '1'
         }
       }
@@ -558,29 +632,6 @@ export class DistributionContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
-  setMultipliers(
-    state: DistributionState,
-    action: ContractInteraction<PartialFunctionInput<SetMultipliers>>
-  ) {
-    const { multipliers } = action.input
-
-    ContractAssert(typeof multipliers === 'object', INVALID_MULTIPLIERS_INPUT)
-
-    for (const fingerprint in multipliers) {
-      const multiplier = multipliers[fingerprint]
-      assertValidFingerprint(fingerprint)
-      ContractAssert(
-        !BigNumber(multiplier).isNaN(),
-        INVALID_MULTIPLIER_VALUE
-      )
-
-      state.multipliers[fingerprint] = multiplier
-    }
-
-    return { state, result: true }
-  }
-
-  @OnlyOwner
   setHardwareBonusRate(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<SetHardwareBonusRate>>
@@ -687,6 +738,69 @@ export class DistributionContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  setFamilyMultiplierRate(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<SetFamilyMultiplierRate>>
+  ) {
+    const { input: { familyMultiplierRate } } = action
+
+    ContractAssert(
+      typeof familyMultiplierRate === 'string',
+      INVALID_FAMILY_MULTIPLIER_RATE
+    )
+    const parsedFamilyMultiplierRate = Number.parseFloat(familyMultiplierRate)
+    ContractAssert(
+      parsedFamilyMultiplierRate >= 0,
+      INVALID_FAMILY_MULTIPLIER_RATE
+    )
+    ContractAssert(
+      Number.isFinite(parsedFamilyMultiplierRate),
+      INVALID_FAMILY_MULTIPLIER_RATE
+    )
+
+    state.multipliers.family.familyMultiplierRate = familyMultiplierRate
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  toggleFamilyMultipliers(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<ToggleFamilyMultipliers>>
+  ) {
+    const { input: { enabled } } = action
+
+    ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
+
+    state.multipliers.family.enabled = enabled
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  setFamilies(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<SetFamilies>>
+  ) {
+    const { input: { families } } = action
+
+    ContractAssert(Array.isArray(families), FAMILIES_REQUIRED)
+    ContractAssert(families.length > 0, FAMILIES_REQUIRED)
+    
+    for (const { fingerprint, family } of families) {
+      assertValidFingerprint(fingerprint)
+      ContractAssert(Array.isArray(family), INVALID_FAMILY)
+      for (const familyFingerprint of family) {
+        assertValidFingerprint(familyFingerprint)
+      }
+
+      state.families[fingerprint] = family
+    }    
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -706,8 +820,6 @@ export function handle(
       return contract.cancelDistribution(state, action)
     case 'claimable':
       return contract.claimable(state, action)
-    case 'setMultipliers':
-      return contract.setMultipliers(state, action)
     case 'setHardwareBonusRate':
       return contract.setHardwareBonusRate(state, action)
     case 'setPreviousDistributionTrackingLimit':
@@ -718,6 +830,12 @@ export function handle(
       return contract.addFingerprintsToBonus(state, action)
     case 'removeFingerprintsFromBonus':
       return contract.removeFingerprintsFromBonus(state, action)
+    case 'setFamilyMultiplierRate':
+      return contract.setFamilyMultiplierRate(state, action)
+    case 'toggleFamilyMultipliers':
+      return contract.toggleFamilyMultipliers(state, action)
+    case 'setFamilies':
+      return contract.setFamilies(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }

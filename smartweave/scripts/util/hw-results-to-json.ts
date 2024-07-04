@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 
-const resultsPath = `${__dirname}/../../test/e2e/data/results.csv`
+const resultsPath = `${__dirname}/../../test/e2e/data/results_hw_bonuses.csv`
 const resultsCSVBuffer = readFileSync(resultsPath)
 const resultsCSV = resultsCSVBuffer.toString()
 const results = resultsCSV.split('\r\n')
