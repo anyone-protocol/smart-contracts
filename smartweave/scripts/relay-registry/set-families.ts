@@ -47,9 +47,11 @@ async function main() {
   const contract = warp.contract<RelayRegistryState>(contractTxId)
 
   const input: SetFamilies = {
-    function: 'setFamily',
-    fingerprint,
-    family: family.split(',').filter(f => !!f)
+    function: 'setFamilies',
+    families: [{
+      fingerprint,
+      family: family.split(',').filter(f => !!f)
+    }]
   }
 
   // NB: Sanity check dry run
