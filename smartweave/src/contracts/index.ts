@@ -13,7 +13,6 @@ export {
   AddScores,
   Distribute,
   CancelDistribution,
-  SetMultipliers,
   SetHardwareBonusRate,
   ToggleHardwareBonus,
   SetPreviousDistributionTrackingLimit,

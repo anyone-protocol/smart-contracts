@@ -79,8 +79,10 @@ type RelayRegistryState = {
   blockedAddresses: EvmAddress[]
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
-  encryptionPublicKey: PublicKey
+  encryptionPublicKey: string
   verifiedHardware: Set<Fingerprint>
+  familyRequired: boolean
+  nicknames: { [fingerprint in Fingerprint as string]: string }
 }
 ```
 
@@ -241,9 +243,30 @@ type DistributionResult = {
       distributedTokens: string
     }
   }
+  multipliers: {
+    family: {
+      enabled: boolean
+      familyMultiplierRate: string
+    }
+  }
+  families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   totalTokensDistributedPerSecond: string
   totalNetworkScore: string
   totalDistributedTokens: string
+  details: {
+    [fingerprint: Fingerprint]: {
+      address: EvmAddress
+      score: string
+      distributedTokens: string
+      bonuses: {
+        hardware: string
+      }
+      multipliers: {
+        family: string
+        region: string
+      }
+    }
+  }
 }
 type DistributionState = {
   owner: string
@@ -257,9 +280,6 @@ type DistributionState = {
       fingerprints: Fingerprint[]
     }
   }
-  multipliers: {
-    [fingerprint: Fingerprint]: string
-  }
   pendingDistributions: {
     [timestamp: string]: { scores: Score[] }
   }
@@ -270,6 +290,13 @@ type DistributionState = {
     [timestamp: string]: DistributionResult
   }
   previousDistributionsTrackingLimit: number
+  families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
+  multipliers: {
+    family: {
+      enabled: boolean
+      familyMultiplierRate: string
+    }
+  }
 }
 ```
 
@@ -296,11 +323,6 @@ type DistributionState = {
 - Allows Owner to cancel a pending distribution for a `timestamp` key
   ```typescript
   cancelDistribution(timestamp: string) => void
-  ```
-
-- Allows Owner to set score multipliers for given `fingerprint`
-  ```typescript
-  setMultipliers(multipliers: { [fingerprint: string]: string }) => void
   ```
 
 - Allows Owner to set hardware bonus distribution rate **in atomic units** per
@@ -331,7 +353,32 @@ type DistributionState = {
   ) => void
   ```
 
+- Allows Owner to set the cumulative family multiplier rate
+  ```typescript
+  setFamilyMultiplierRate(familyMultiplierRate: string) => void
+  ```
+
+- Allows Owner to set relay families in distribution for family multipliers
+  ```typescript
+  setFamilies(
+    families: {
+      fingerprint: Fingerprint
+      family: Fingerprint[]
+    }[]
+  ) => void
+  ```
+
+- Allows Owner to toggle family multipliers on/off
+  ```typescript
+  toggleFamilyMultipliers(enabled: boolean) => void
+  ```
+
 - Allows Owner to limit the number of previous distributions tracked in contract state.  Defaults to `10`
   ```typescript
   setPreviousDistributionTrackingLimit(limit: number) => void
+  ```
+
+- View method for getting claimable (lifetime redeemable) tokens for an address
+  ```typescript
+  claimable(address: EvmAddress) => string
   ```

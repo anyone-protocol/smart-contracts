@@ -16,15 +16,24 @@ import {
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
+  FAMILIES_REQUIRED,
+  INVALID_FAMILY,
+  INVALID_FAMILY_MULTIPLIER_RATE,
   INVALID_LIMIT,
   INVALID_MULTIPLIERS_INPUT,
   INVALID_MULTIPLIER_VALUE
 } from '../../src/contracts/distribution'
-import TestScores from '../e2e/data/scores.json'
-import TestResults from '../e2e/data/results.json'
+import TestScoresHWBonuses from '../e2e/data/scores_hw_bonuses.json'
+import TestResultsHWBonuses from '../e2e/data/results_hw_bonuses.json'
+import TestFamilies from '../e2e/data/families.json'
+import TestScoresFamilyMultiplier
+  from '../e2e/data/scores_family_multipliers.json'
+import TestResultsFamilyMultiplier
+  from '../e2e/data/results_family_multipliers.json'
 import {
   ADDRESS_REQUIRED,
   ENABLED_REQUIRED,
+  FINGERPRINT_REQUIRED,
   INVALID_ADDRESS,
   INVALID_FINGERPRINT
 } from '../../src/common/errors'
@@ -45,13 +54,19 @@ function resetState() {
     pendingDistributions: {},
     claimable: {},
     previousDistributions: {},
-    multipliers: {},
     previousDistributionsTrackingLimit: 10,
     bonuses: {
       hardware: {
         enabled: false,
         tokensDistributedPerSecond: '0',
         fingerprints: []
+      }
+    },
+    families: {},
+    multipliers: {
+      family: {
+        enabled: false,
+        familyMultiplierRate: '0'
       }
     }
   }
@@ -89,13 +104,17 @@ describe('Distribution Contract', () => {
     expect(state.pendingDistributions).to.exist
     expect(state.claimable).to.exist
     expect(state.previousDistributions).to.exist
-    expect(state.multipliers).to.exist
     expect(state.previousDistributionsTrackingLimit).to.exist
     expect(state.bonuses).to.exist
     expect(state.bonuses.hardware).to.exist
     expect(state.bonuses.hardware.enabled).to.be.a('boolean')
     expect(state.bonuses.hardware.tokensDistributedPerSecond).to.be.a('string')
     expect(state.bonuses.hardware.fingerprints).to.be.an('array')
+    expect(state.families).to.exist
+    expect(state.multipliers).to.exist
+    expect(state.multipliers.family).to.exist
+    expect(state.multipliers.family.enabled).to.be.a('boolean')
+    expect(state.multipliers.family.familyMultiplierRate).to.be.a('string')
   })
 
   describe('Setting Distribution Amount', () => {
@@ -324,68 +343,313 @@ describe('Distribution Contract', () => {
     })
   })
 
-  describe('Distribution Multipliers', () => {
-    it('Allows owner to set multipliers for fingerprints', () => {
-      const multiplier = '2.13'
-      const setMultipliers = createInteraction(OWNER, {
-        function: 'setMultipliers',
-        multipliers: {
-          [fingerprintA]: multiplier
-        }
+  describe('Families', () => {
+    it('Allows Owner to set relay families', () => {
+      const setFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            family: [ fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintC,
+            family: [ fingerprintA ]
+          }
+        ]
       })
 
-      const { state } = DistributionHandle(initState, setMultipliers)
+      const { state } = DistributionHandle(initState, setFamilies)
 
-      expect(state.multipliers[fingerprintA]).to.equal(multiplier)
+      expect(state.families).to.deep.equal({
+        [fingerprintA]: [fingerprintC],
+        [fingerprintC]: [fingerprintA]
+      })
     })
 
-    it('Validates when setting multipliers', () => {
-      const setMissingMultipliers = createInteraction(OWNER, {
-        function: 'setMultipliers'
+    it('Prevents non-owners from setting relay families', () => {
+      const aliceSetFamilies = createInteraction(ALICE, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            family: [ fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintC,
+            family: [ fingerprintA ]
+          }
+        ]
       })
 
       expect(
-        () => DistributionHandle(initState, setMissingMultipliers)
-      ).to.throw(ContractError, INVALID_MULTIPLIERS_INPUT)
-
-      const setInvalidFingerprintMultipliers = createInteraction(OWNER, {
-        function: 'setMultipliers',
-        multipliers: {
-          ['alice']: '420'
-        }
-      })
-
-      expect(
-        () => DistributionHandle(initState, setInvalidFingerprintMultipliers)
-      ).to.throw(ContractError, INVALID_FINGERPRINT)
-
-      const setInvalidMultiplierValue = createInteraction(OWNER, {
-        function: 'setMultipliers',
-        multipliers: {
-          [fingerprintA]: 'peanutbutter'
-        }
-      })
-
-      expect(
-        () => DistributionHandle(initState, setInvalidMultiplierValue)
-      ).to.throw(ContractError, INVALID_MULTIPLIER_VALUE)
+        () => DistributionHandle(initState, aliceSetFamilies)
+      ).to.throw(ERROR_ONLY_OWNER)
     })
 
-    it('Prevents non-owners from setting multipliers', () => {
-      const aliceSetMultipliers = createInteraction(ALICE, {
-        function: 'setMultipliers',
-        multipliers: {
-          [fingerprintA]: '420'
-        }
+    it('Validates when setting relay families', () => {
+      const missingFamilies = createInteraction(OWNER, {
+        function: 'setFamilies'      
       })
 
       expect(
-        () => DistributionHandle(initState, aliceSetMultipliers)
-      ).to.throw(ContractError, ERROR_ONLY_OWNER)
+        () => DistributionHandle(initState, missingFamilies)
+      ).to.throw(FAMILIES_REQUIRED)
+
+      const noFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: []
+      })
+
+      expect(
+        () => DistributionHandle(initState, noFamilies)
+      ).to.throw(FAMILIES_REQUIRED)
+
+      const nonArrayFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: { weewoo: 'boop' }
+      })
+
+      expect(
+        () => DistributionHandle(initState, nonArrayFamilies)
+      ).to.throw(FAMILIES_REQUIRED)
+
+      const noFingerprintFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          family: []
+        }]
+      })
+
+      expect(
+        () => DistributionHandle(initState, noFingerprintFamily)
+      ).to.throw(FINGERPRINT_REQUIRED)
+
+      const invalidFingerprintFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: 'invalid',
+          family: []
+        }]
+      })
+
+      expect(
+        () => DistributionHandle(initState, invalidFingerprintFamily)
+      ).to.throw(INVALID_FINGERPRINT)
+
+      const nonStringFingerprintFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: {},
+          family: []
+        }]
+      })
+
+      expect(
+        () => DistributionHandle(initState, nonStringFingerprintFamily)
+      ).to.throw(INVALID_FINGERPRINT)
+
+      const noFamilyFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: fingerprintA
+        }]
+      })
+
+      expect(
+        () => DistributionHandle(initState, noFamilyFamily)
+      ).to.throw(INVALID_FAMILY)
+
+      const invalidFamilyFingerprintsFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: fingerprintA,
+          family: [{}, 1, undefined, null, 'invalid']
+        }]
+      })
+
+      expect(
+        () => DistributionHandle(initState, invalidFamilyFingerprintsFamily)
+      ).to.throw(INVALID_FINGERPRINT)
+
+      const someInvalidFamilyFingerprintsFamily = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [{
+          fingerprint: fingerprintA,
+          family: [fingerprintC, 'invalid', null]
+        }]
+      })
+
+      expect(
+        () => DistributionHandle(initState, someInvalidFamilyFingerprintsFamily)
+      ).to.throw(INVALID_FINGERPRINT)
     })
   })
 
-  describe('Distribution Bonuses', () => {
+  describe('Multipliers', () => {
+    it('Allows Owner to set family multiplier rate', () => {
+      const familyMultiplierRate = '0.1'
+      const setFamilyMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate
+      })
+
+      const { state } = DistributionHandle(initState, setFamilyMultiplierRate)
+
+      expect(
+        state.multipliers.family.familyMultiplierRate
+      ).to.equal(familyMultiplierRate)
+    })
+
+    it('Prevents non-owners from setting family multiplier rate', () => {
+      const aliceSetFamilyMultiplierRate = createInteraction(ALICE, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate: '1'
+      })
+
+      expect(
+        () => DistributionHandle(initState, aliceSetFamilyMultiplierRate)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Validates when setting family multiplier rate', () => {
+      const missingFamilyMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate'
+      })
+
+      expect(
+        () => DistributionHandle(initState, missingFamilyMultiplierRate)
+      ).to.throw(INVALID_FAMILY_MULTIPLIER_RATE)
+
+      const numberFamilyMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate: 1
+      })
+
+      expect(
+        () => DistributionHandle(initState, numberFamilyMultiplierRate)
+      ).to.throw(INVALID_FAMILY_MULTIPLIER_RATE)
+
+      const objectFamilyMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate: { rate: 1 }
+      })
+
+      expect(
+        () => DistributionHandle(initState, objectFamilyMultiplierRate)
+      ).to.throw(INVALID_FAMILY_MULTIPLIER_RATE)
+
+      const negativeFamilyMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate: '-2'
+      })
+
+      expect(
+        () => DistributionHandle(initState, negativeFamilyMultiplierRate)
+      ).to.throw(INVALID_FAMILY_MULTIPLIER_RATE)
+
+      const nanFamilyMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate: 'hello'
+      })
+
+      expect(
+        () => DistributionHandle(initState, nanFamilyMultiplierRate)
+      ).to.throw(INVALID_FAMILY_MULTIPLIER_RATE)
+
+      const infinityMultiplierRate = createInteraction(OWNER, {
+        function: 'setFamilyMultiplierRate',
+        familyMultiplierRate: 'Infinity'
+      })
+
+      expect(
+        () => DistributionHandle(initState, infinityMultiplierRate)
+      ).to.throw(INVALID_FAMILY_MULTIPLIER_RATE)
+    })
+
+    it('Allows Owner to toggle family multipliers', () => {
+      const enableFamilyMultipliers = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers',
+        enabled: true
+      })
+
+      const {
+        state: enabledState
+      } = DistributionHandle(initState, enableFamilyMultipliers)
+
+      expect(enabledState.multipliers.family.enabled).to.be.true
+
+      const disableFamilyMultipliers = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers',
+        enabled: false
+      })
+
+      const {
+        state: disabledState
+      } = DistributionHandle(initState, disableFamilyMultipliers)
+
+      expect(disabledState.multipliers.family.enabled).to.be.false
+    })
+
+    it('Prevents non-owners from toggling family multipliers', () => {
+      const aliceToggleFamilyMultipliers = createInteraction(ALICE, {
+        function: 'toggleFamilyMultipliers',
+        enabled: true
+      })
+
+      expect(
+        () => DistributionHandle(initState, aliceToggleFamilyMultipliers)
+      ).to.throw(ERROR_ONLY_OWNER)
+    })
+
+    it('Validates when toggling family multipliers', () => {
+      const undefinedToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers'
+      })
+
+      expect(
+        () => DistributionHandle(initState, undefinedToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const zeroToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers',
+        enabled: 0
+      })
+
+      expect(
+        () => DistributionHandle(initState, zeroToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const positiveToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers',
+        enabled: 12
+      })
+
+      expect(
+        () => DistributionHandle(initState, positiveToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const objectToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers',
+        enabled: { enabled: true }
+      })
+
+      expect(
+        () => DistributionHandle(initState, objectToggle)
+      ).to.throw(ENABLED_REQUIRED)
+
+      const stringToggle = createInteraction(OWNER, {
+        function: 'toggleFamilyMultipliers',
+        enabled: 'true'
+      })
+
+      expect(
+        () => DistributionHandle(initState, stringToggle)
+      ).to.throw(ENABLED_REQUIRED)
+    })
+  })
+
+  describe('Bonuses', () => {
     describe('Hardware', () => {
       it('Allows Owner to set hardware bonus token rate', () => {
         const tokensDistributedPerSecond = '200'
@@ -691,7 +955,14 @@ describe('Distribution Contract', () => {
           totalTokensDistributedPerSecond: '1000',
           totalNetworkScore: '100',
           totalDistributedTokens: '0',
-          details: {}
+          details: {},
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
+            }
+          }
         }
       })
     })
@@ -885,7 +1156,14 @@ describe('Distribution Contract', () => {
           totalTokensDistributedPerSecond: '1000',
           totalNetworkScore: '100',
           totalDistributedTokens: '0',
-          details: {}
+          details: {},
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
+            }
+          }
         },
         [secondTimestamp]: {
           timeElapsed: timeBetweenDistributions.toString(),
@@ -915,6 +1193,13 @@ describe('Distribution Contract', () => {
                 region: '1'
               },
               score: '500'
+            }
+          },
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
             }
           }
         }
@@ -1045,7 +1330,14 @@ describe('Distribution Contract', () => {
           totalTokensDistributedPerSecond: '1000',
           totalNetworkScore: '300',
           totalDistributedTokens: '0',
-          details: {}
+          details: {},
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
+            }
+          }
         },
         [secondTimestamp]: {
           timeElapsed: firstTimeDifference.toString(),
@@ -1099,6 +1391,13 @@ describe('Distribution Contract', () => {
                 region: '1'
               },
               score: '657'
+            }
+          },
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
             }
           }
         },
@@ -1154,6 +1453,13 @@ describe('Distribution Contract', () => {
                 region: '1'
               },
               score: '2232'
+            }
+          },
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
             }
           }
         }
@@ -1225,7 +1531,14 @@ describe('Distribution Contract', () => {
           totalTokensDistributedPerSecond: '4333',
           totalNetworkScore: '300',
           totalDistributedTokens: '0',
-          details: {}
+          details: {},
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
+            }
+          }
         },
         // 4333 tps rate over 443ms ~= 1,919.519 tokens
         [secondTimestamp]: {
@@ -1281,62 +1594,17 @@ describe('Distribution Contract', () => {
               },
               score: '657'
             }
+          },
+          families: {},
+          multipliers: {
+            family: {
+              enabled: false,
+              familyMultiplierRate: '0'
+            }
           }
         }
       })
       expect(state.pendingDistributions).to.be.empty
-    })
-
-    it('Applies multipliers on distribution', () => {
-      const setMultipliers = createInteraction(OWNER, {
-        function: 'setMultipliers',
-        multipliers: {
-          [fingerprintA]: '2.13',
-          [fingerprintB]: '1.25',
-          [fingerprintC]: '0.81'
-        }
-      })
-      const now = Date.now()
-      const firstDistributionTimestamp = now.toString()
-      const firstAddScores = createInteraction(OWNER, {
-        function: 'addScores',
-        timestamp: firstDistributionTimestamp,
-        scores: [
-          { score: '100', address: ALICE, fingerprint: fingerprintA },
-          { score: '100', address: BOB, fingerprint: fingerprintB },
-          { score: '100', address: ALICE, fingerprint: fingerprintC }
-        ]
-      })
-      const firstDistribute = createInteraction(OWNER, {
-        function: 'distribute',
-        timestamp: firstDistributionTimestamp
-      })
-      const elapsedTime = 5432
-      const secondDistributionTimestamp = (now + elapsedTime).toString()
-      const secondAddScores = createInteraction(OWNER, {
-        function: 'addScores',
-        timestamp: secondDistributionTimestamp,
-        scores: [
-          { score: '100', address: ALICE, fingerprint: fingerprintA },
-          { score: '100', address: BOB, fingerprint: fingerprintB },
-          { score: '100', address: ALICE, fingerprint: fingerprintC }
-        ]
-      })
-      const secondDistribute = createInteraction(OWNER, {
-        function: 'distribute',
-        timestamp: secondDistributionTimestamp
-      })
-
-      DistributionHandle(initState, setMultipliers)
-      DistributionHandle(initState, firstAddScores)
-      DistributionHandle(initState, firstDistribute)
-      DistributionHandle(initState, secondAddScores)
-      const { state } = DistributionHandle(initState, secondDistribute)
-
-      expect(state.claimable).to.deep.equal({
-        [ALICE]: '3811',
-        [BOB]: '1620'
-      })
     })
 
     it('Applies hardware bonus on distribution when enabled', () => {
@@ -1356,14 +1624,14 @@ describe('Distribution Contract', () => {
             hardware: {
               enabled: true,
               tokensDistributedPerSecond: '500',
-              fingerprints: TestScores
+              fingerprints: TestScoresHWBonuses
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
             }
           },
           pendingDistributions: {
             [timestamp]: {
-              scores: TestScores
+              scores: TestScoresHWBonuses
                 .map(
                   ({ score, address, fingerprint }) =>
                     ({ score, address, fingerprint })
@@ -1387,7 +1655,14 @@ describe('Distribution Contract', () => {
               totalTokensDistributedPerSecond: '0',
               totalNetworkScore: '0',
               totalDistributedTokens: '0',
-              details: {}
+              details: {},
+              families: TestFamilies,
+              multipliers: {
+                family: {
+                  enabled: false,
+                  familyMultiplierRate: '0'
+                }
+              }
             }
           }
         },
@@ -1395,7 +1670,7 @@ describe('Distribution Contract', () => {
       )
 
       const rewards = Object.fromEntries(
-        TestResults.rewards.map(
+        TestResultsHWBonuses.rewards.map(
           ({ address, totalReward }) => [ address, totalReward ]
         )
       )
@@ -1419,14 +1694,14 @@ describe('Distribution Contract', () => {
             hardware: {
               enabled: false,
               tokensDistributedPerSecond: '500',
-              fingerprints: TestScores
+              fingerprints: TestScoresHWBonuses
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
             }
           },
           pendingDistributions: {
             [timestamp]: {
-              scores: TestScores
+              scores: TestScoresHWBonuses
                 .map(
                   ({ score, address, fingerprint }) =>
                     ({ score, address, fingerprint })
@@ -1450,7 +1725,14 @@ describe('Distribution Contract', () => {
               totalTokensDistributedPerSecond: '0',
               totalNetworkScore: '0',
               totalDistributedTokens: '0',
-              details: {}
+              details: {},
+              families: TestFamilies,
+              multipliers: {
+                family: {
+                  enabled: false,
+                  familyMultiplierRate: '0'
+                }
+              }
             }
           }
         },
@@ -1458,8 +1740,86 @@ describe('Distribution Contract', () => {
       )
 
       const rewards = Object.fromEntries(
-        TestResults.rewards.map(
+        TestResultsHWBonuses.rewards.map(
           ({ address, baseReward }) => [ address, baseReward ]
+        )
+      )
+      expect(state.claimable).to.deep.equal(rewards)
+    })
+
+    it('Applies family multipliers when enabled', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
+      })
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          families: TestFamilies,
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScoresFamilyMultiplier
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            }
+          },
+          multipliers: {
+            family: {
+              enabled: true,
+              familyMultiplierRate: '0.1'
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScoresFamilyMultiplier
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0',
+              details: {},
+              families: TestFamilies,
+              multipliers: {
+                family: {
+                  enabled: false,
+                  familyMultiplierRate: '0'
+                }
+              }
+            }
+          }
+        },
+        distribute
+      )
+
+      const rewards = Object.fromEntries(
+        TestResultsFamilyMultiplier.rewards.map(
+          ({ address, totalRewardWithFamilyMultiplier }) =>
+            [ address, totalRewardWithFamilyMultiplier ]
         )
       )
       expect(state.claimable).to.deep.equal(rewards)
@@ -1670,14 +2030,14 @@ describe('Distribution Contract', () => {
             hardware: {
               enabled: true,
               tokensDistributedPerSecond: '500',
-              fingerprints: TestScores
+              fingerprints: TestScoresHWBonuses
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
             }
           },
           pendingDistributions: {
             [timestamp]: {
-              scores: TestScores
+              scores: TestScoresHWBonuses
                 .map(
                   ({ score, address, fingerprint }) =>
                     ({ score, address, fingerprint })
@@ -1701,7 +2061,14 @@ describe('Distribution Contract', () => {
               totalTokensDistributedPerSecond: '0',
               totalNetworkScore: '0',
               totalDistributedTokens: '0',
-              details: {}
+              details: {},
+              families: TestFamilies,
+              multipliers: {
+                family: {
+                  enabled: false,
+                  familyMultiplierRate: '0'
+                }
+              }
             }
           }
         },
@@ -1712,21 +2079,21 @@ describe('Distribution Contract', () => {
       expect(distribution.timeElapsed).to.equal(elapsed.toString())
       expect(distribution.tokensDistributedPerSecond).to.equal('1000')
       expect(distribution.baseNetworkScore)
-        .to.equal(TestResults.baseNetworkScore)
+        .to.equal(TestResultsHWBonuses.baseNetworkScore)
       expect(distribution.baseDistributedTokens)
-        .to.equal(TestResults.baseActualDistributedTokens)
+        .to.equal(TestResultsHWBonuses.baseActualDistributedTokens)
       expect(distribution.bonuses.hardware.enabled).to.be.true
       expect(distribution.bonuses.hardware.tokensDistributedPerSecond)
         .to.equal('500')
       expect(distribution.bonuses.hardware.networkScore)
-        .to.equal(TestResults.hwBonusNetworkScore)
+        .to.equal(TestResultsHWBonuses.hwBonusNetworkScore)
       expect(distribution.bonuses.hardware.distributedTokens)
-        .to.equal(TestResults.hwBonusActualDistributedTokens)
+        .to.equal(TestResultsHWBonuses.hwBonusActualDistributedTokens)
       expect(distribution.totalTokensDistributedPerSecond).to.equal('1500')
       expect(distribution.totalNetworkScore)
-        .to.equal(TestResults.totalNetworkScore)
+        .to.equal(TestResultsHWBonuses.totalNetworkScore)
       expect(distribution.totalDistributedTokens)
-        .to.equal(TestResults.totalActualDistributedTokens)
+        .to.equal(TestResultsHWBonuses.totalActualDistributedTokens)
       
       // NB: Spot-check an address that has two relays, one being a hw relay
       const address = '0xa2AA87bE9FaaE25F1aC6E6846eC9589b03625ce0'
