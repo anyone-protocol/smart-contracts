@@ -11,7 +11,7 @@ job "deploy-distribution-dev" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/ator-development/smart-contracts:0.2.10"
+            image = "ghcr.io/ator-development/smart-contracts:0.2.11"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
