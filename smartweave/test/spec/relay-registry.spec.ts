@@ -59,7 +59,7 @@ function resetState() {
     families: {},
     registrationCreditsRequired: false,
     encryptionPublicKey: '',
-    verifiedHardware: new Set<string>(),
+    verifiedHardware: {},
     familyRequired: false,
     nicknames: {}
   }
@@ -550,7 +550,7 @@ describe('Relay Registry Contract', () => {
         ...initState,
         claimable: { [fingerprintA]: ALICE },
         registrationCreditsRequired: true,
-        verifiedHardware: new Set([fingerprintA])
+        verifiedHardware: { [fingerprintA]: 1 }
       }, aliceClaimFingerprintA)
 
       expect(state.verified[fingerprintA]).equals(ALICE)
@@ -577,7 +577,7 @@ describe('Relay Registry Contract', () => {
         [fingerprintB]: BOB,
         [fingerprintC]: CHARLS
       })
-      expect(state.verifiedHardware).to.deep.equal(new Set([fingerprintC]))
+      expect(state.verifiedHardware).to.deep.equal({ [fingerprintC]: 1 })
     })
 
     it('Prevents non-owners from adding claimable relays in a batch', () => {
@@ -767,6 +767,42 @@ describe('Relay Registry Contract', () => {
         () => RelayRegistryHandle(initState, aliceRenounceFingerprintAInteraction)
       ).to.throw(ContractError, FINGERPRINT_NOT_CLAIMED_BY_ADDRESS)
     })
+
+    it('Gracefully handles delete verifiedHardware on renounce', () => {
+      const renounceNonHardware = createInteraction(ALICE, {
+        function: 'renounce',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: { [fingerprintA]: ALICE }
+        },
+        renounceNonHardware
+      )
+
+      expect(state.verified).to.deep.equal({})
+    })
+
+    it('Should remove nicknames of renounced relays', () => {
+      const nickname = 'alice'
+      const renounceNicknameRelay = createInteraction(ALICE, {
+        function: 'renounce',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: { [fingerprintA]: ALICE },
+          nicknames: { [fingerprintA]: nickname }
+        },
+        renounceNicknameRelay
+      )
+
+      expect(state.nicknames).to.deep.equal({})
+    })
   })
 
   describe('Removing', () => {
@@ -813,6 +849,23 @@ describe('Relay Registry Contract', () => {
       expect(
         () => RelayRegistryHandle(initState, invalidFingerprintInteraction)
       ).to.throw(ContractError, INVALID_FINGERPRINT)
+    })
+
+    it('Should remove nicknames of removed relays', () => {
+      const nickname = 'alice'
+      const removeNicknameRelay = createInteraction(OWNER, {
+        function: 'removeVerified',
+        fingerprint: fingerprintA
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          verified: { [fingerprintA]: ALICE },
+          nicknames: { [fingerprintA]: nickname }
+        },
+        removeNicknameRelay
+      )
     })
   })
 
@@ -1815,7 +1868,7 @@ describe('Relay Registry Contract', () => {
 
       const { state } = RelayRegistryHandle(initState, verifySerial)
 
-      expect(state.verifiedHardware).to.deep.equal(new Set([fingerprintA]))
+      expect(state.verifiedHardware).to.deep.equal({ [fingerprintA]: 1 })
     })
 
     it('Prevents non-owners from verifying hardware serials', () => {
@@ -1841,12 +1894,12 @@ describe('Relay Registry Contract', () => {
           verified: {
             [fingerprintA]: ALICE
           },
-          verifiedHardware: new Set([fingerprintA])
+          verifiedHardware: { [fingerprintA]: 1 }
         },
         removeSerial
       )
 
-      expect(state.verifiedHardware).to.not.include(fingerprintA)
+      expect(state.verifiedHardware).to.not.have.property(fingerprintA)
     })
 
     it('Prevents non-owners from removing serials', () => {
@@ -1873,7 +1926,7 @@ describe('Relay Registry Contract', () => {
             [fingerprintB]: BOB,
             [fingerprintC]: CHARLS
           },
-          verifiedHardware: new Set([fingerprintC])
+          verifiedHardware: { [fingerprintC]: 1 }
         },
         viewVerifiedRelays
       )
@@ -1899,12 +1952,12 @@ describe('Relay Registry Contract', () => {
         {
           ...initState,
           verified: { [fingerprintA]: ALICE },
-          verifiedHardware: new Set([fingerprintA])
+          verifiedHardware: { [fingerprintA]: 1 }
         },
         renounce
       )
 
-      expect(state.verifiedHardware).to.not.include(fingerprintA)
+      expect(state.verifiedHardware[fingerprintA]).to.not.exist
     })
 
     it('Prevents Owner from redundant hardware verifications', () => {
@@ -1917,7 +1970,7 @@ describe('Relay Registry Contract', () => {
         () => RelayRegistryHandle(
           {
             ...initState,
-            verifiedHardware: new Set([fingerprintA])
+            verifiedHardware: { [fingerprintA]: 1 }
           },
           verifyHardwareAgain
         )
@@ -1934,7 +1987,7 @@ describe('Relay Registry Contract', () => {
 
       const { state } = RelayRegistryHandle(initState, addClaimableHardware)
 
-      expect(state.verifiedHardware).to.include(fingerprintA)
+      expect(state.verifiedHardware).to.deep.equal({ [fingerprintA]: 1 })
     })
 
     it('Validates verifying hardware when adding relay as claimable', () => {

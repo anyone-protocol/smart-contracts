@@ -63,7 +63,7 @@ export type RelayRegistryState = OwnableState & EvolvableState & {
   families: { [fingerprint in Fingerprint as string]: Fingerprint[] }
   registrationCreditsRequired: boolean
   encryptionPublicKey: string
-  verifiedHardware: Set<Fingerprint>
+  verifiedHardware: { [fingerprint in Fingerprint as string]: 1 }
   familyRequired: boolean
   nicknames: { [fingerprint in Fingerprint as string]: string }
 }
@@ -217,7 +217,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     }
 
     if (!state.verifiedHardware) {
-      state.verifiedHardware = new Set<Fingerprint>()
+      state.verifiedHardware = {}
     }
 
     if (!state.nicknames) {
@@ -268,10 +268,10 @@ export class RelayRegistryContract extends Evolvable(Object) {
 
     if (hardwareVerified) {
       ContractAssert(
-        !state.verifiedHardware.has(fingerprint),
+        !state.verifiedHardware[fingerprint],
         HARDWARE_ALREADY_VERIFIED
       )
-      state.verifiedHardware.add(fingerprint)
+      state.verifiedHardware[fingerprint] = 1
     }
 
     if (nickname) {
@@ -386,7 +386,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
       !state.blockedAddresses.includes(caller),
       ADDRESS_IS_BLOCKED
     )
-    const hasVerifiedSerialProof = state.verifiedHardware.has(fingerprint)
+    const hasVerifiedSerialProof = !!state.verifiedHardware[fingerprint]
     const hasRegistrationCredit =
       !!state.registrationCredits[caller]
         && state.registrationCredits[caller].includes(fingerprint)
@@ -440,7 +440,8 @@ export class RelayRegistryContract extends Evolvable(Object) {
     )
 
     delete state.verified[fingerprint]
-    state.verifiedHardware.delete(fingerprint)
+    delete state.verifiedHardware[fingerprint]
+    delete state.nicknames[fingerprint]
 
     return { state, result: true }
   }
@@ -455,7 +456,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     assertValidFingerprint(fingerprint)
 
     delete state.verified[fingerprint]
-    state.verifiedHardware.delete(fingerprint)
+    delete state.verifiedHardware[fingerprint]
 
     return { state, result: true }
   }
@@ -646,11 +647,11 @@ export class RelayRegistryContract extends Evolvable(Object) {
       const fingerprint = fingerprints[i]
       assertValidFingerprint(fingerprint)
       ContractAssert(
-        !state.verifiedHardware.has(fingerprint),
+        !state.verifiedHardware[fingerprint],
         HARDWARE_ALREADY_VERIFIED
       )
   
-      state.verifiedHardware.add(fingerprint)
+      state.verifiedHardware[fingerprint] = 1
     }
 
     return { state, result: true }
@@ -668,9 +669,12 @@ export class RelayRegistryContract extends Evolvable(Object) {
     for (let i = 0; i < fingerprints.length; i++) {
       const fingerprint = fingerprints[i]
       assertValidFingerprint(fingerprint)
-      ContractAssert(state.verifiedHardware.has(fingerprint), SERIAL_NOT_REGISTERED)
+      ContractAssert(
+        !!state.verifiedHardware[fingerprint],
+        SERIAL_NOT_REGISTERED
+      )
 
-      state.verifiedHardware.delete(fingerprint)
+      delete state.verifiedHardware[fingerprint]
     }
 
     return { state, result: true }
@@ -691,7 +695,7 @@ export class RelayRegistryContract extends Evolvable(Object) {
     const fingerprints = Object.keys(state.verified)
     for (let i = 0; i < fingerprints.length; i++) {
       const fingerprint = fingerprints[i]
-      if (state.verifiedHardware.has(fingerprint)) {
+      if (!!state.verifiedHardware[fingerprint]) {
         result.verifiedHardware[fingerprint] = state.verified[fingerprint]
       } else {
         result.verified[fingerprint] = state.verified[fingerprint]
