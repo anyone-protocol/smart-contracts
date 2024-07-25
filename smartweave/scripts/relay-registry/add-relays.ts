@@ -9,15 +9,17 @@ import BigNumber from 'bignumber.js'
 
 import {
   AddClaimable,
+  AddClaimableBatched,
   RelayRegistryHandle,
   RelayRegistryState
 } from '../../src/contracts'
+import TestData from '../../data/test-data.json'
 
 dotenv.config()
 
 let contractTxId = process.env.RELAY_REGISTRY_CONTRACT_ID || ''
 const consulToken = process.env.CONSUL_TOKEN
-const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OWNER_KEY
+const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OPERATOR_KEY
 
 LoggerFactory.INST.logLevel('error')
 BigNumber.config({ EXPONENTIAL_AT: 50 })
@@ -47,12 +49,16 @@ async function main() {
   }
 
   if (!contractOwnerPrivateKey) {
-    throw new Error('RELAY_REGISTRY_OWNER_KEY is not set!')
+    throw new Error('RELAY_REGISTRY_OPERATOR_KEY is not set!')
   }
 
   const contract = warp.contract<RelayRegistryState>(contractTxId)
 
-  let claims: {address: string, fingerprint: string}[] = []
+  const claims: {
+    address: string,
+    fingerprint: string,
+    nickname?: string
+  }[] = []
 
   if (consul) {
     const accountsData = await consul.kv.get<{ Value: string }>({
@@ -60,43 +66,43 @@ async function main() {
       token: consulToken
     })
     
-
     if (accountsData) {
       const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
       const accounts = JSON.parse(decodedValue) as string[];
-      claims = accounts.map((acct, index, array) => ({
+      claims.push(...accounts.map((acct, index, array) => ({
         address: acct,
         fingerprint: BigNumber(1E39).plus(index).integerValue().toString()
-      }))
+      })))
 
       console.log(claims)
     }
+  } else {
+    claims.push(...TestData.relays)
   }
   
   const timestamp = Date.now().toString()
 
   try {
-    for (let i = 0; i < claims.length; i += 1) {
-      const input: AddClaimable = {
-        function: 'addClaimable',
-        fingerprint: claims[i].fingerprint,
-        address: claims[i].address,
-      }
-    
-      // NB: Sanity check by getting current state and "dry-running" thru
-      //     contract source handle directly.  If it doesn't throw, we're good.
-      const { cachedValue: { state } } = await contract.readState()
-      RelayRegistryHandle(state, {
-        input,
-        caller: new Wallet(contractOwnerPrivateKey).address,
-        interactionType: 'write'
-      })
-    
-      // NB: Send off the interaction for real
-      await contract
-        .connect(new EthereumSigner(contractOwnerPrivateKey))
-        .writeInteraction<AddClaimable>(input)
+    const input: AddClaimableBatched = {
+      function: 'addClaimableBatched',
+      relays: claims
     }
+
+    // NB: Sanity check by getting current state and "dry-running" thru
+    //     contract source handle directly.  If it doesn't throw, we're good.
+    const { cachedValue: { state } } = await contract.readState()
+    RelayRegistryHandle(state, {
+      input,
+      caller: new Wallet(contractOwnerPrivateKey).address,
+      interactionType: 'write'
+    })
+
+    // NB: Send off the interaction for real
+    const result = await contract
+      .connect(new EthereumSigner(contractOwnerPrivateKey))
+      .writeInteraction<AddClaimableBatched>(input)
+
+    console.log('Add Relays result', result?.originalTxId)
   } catch(e) {
     console.error(e)
     console.log("Continuing execution")

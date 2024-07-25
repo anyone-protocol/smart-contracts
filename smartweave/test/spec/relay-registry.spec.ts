@@ -1814,6 +1814,40 @@ describe('Relay Registry Contract', () => {
         () => RelayRegistryHandle(familyRequiredState, aliceClaimB)
       ).to.throw(FAMILY_NOT_SET)
     })
+
+    it('Allows relays with registered families to claim when enabled', () => {
+      const aliceClaimB = createInteraction(ALICE, {
+        function: 'claim',
+        fingerprint: fingerprintB
+      })
+
+      const { state } = RelayRegistryHandle(
+        {
+          ...initState,
+          claimable: {
+            [fingerprintB]: ALICE
+          },
+          verified: {
+            [fingerprintA]: ALICE,
+            [fingerprintC]: ALICE
+          },
+          families: {
+            [fingerprintA]: [fingerprintA, fingerprintB, fingerprintC],
+            [fingerprintB]: [fingerprintA, fingerprintB, fingerprintC],
+            [fingerprintC]: [fingerprintA, fingerprintB, fingerprintC]
+          },
+          registrationCreditsRequired: false,
+          familyRequired: true
+        },
+        aliceClaimB
+      )
+
+      expect(state.verified).to.deep.equal({
+        [fingerprintA]: ALICE,
+        [fingerprintB]: ALICE,
+        [fingerprintC]: ALICE
+      })
+    })
   })
 
   describe('Encryption', () => {
