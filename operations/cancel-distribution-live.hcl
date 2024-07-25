@@ -11,7 +11,7 @@ job "cancel-distribution-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.2.11"
+      image = "ghcr.io/ator-development/smart-contracts:0.2.13"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/cancel-distribution.ts"]
