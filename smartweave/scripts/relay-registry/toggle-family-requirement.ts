@@ -11,7 +11,7 @@ import {
   RelayRegistryState
 } from '../../src/contracts'
 import {
-  ToggleRegistrationCreditRequirement
+  ToggleFamilyRequirement
 } from '../../src/contracts/relay-registry'
 
 dotenv.config()
@@ -19,8 +19,8 @@ dotenv.config()
 let contractTxId = process.env.RELAY_REGISTRY_CONTRACT_ID || ''
 const consulToken = process.env.CONSUL_TOKEN
 const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OPERATOR_KEY
-const registrationCreditsEnabled =
-  process.env.REGISTRATION_CREDITS_ENABLED || ''
+const familyRequirementEnabled =
+  process.env.FAMILY_REQUIREMENT_ENABLED || ''
 
 LoggerFactory.INST.logLevel('error')
 BigNumber.config({ EXPONENTIAL_AT: 50 })
@@ -38,17 +38,17 @@ async function main() {
     throw new Error('RELAY_REGISTRY_OPERATOR_KEY is not set!')
   }
 
-  if (!['true', 'false'].includes(registrationCreditsEnabled)) {
+  if (!['true', 'false'].includes(familyRequirementEnabled)) {
     throw new Error(
-      'REGISTRATION_CREDITS_ENABLED must be "true" or "false" (string)'
+      'FAMILY_REQUIREMENT_ENABLED must be "true" or "false" (string)'
     )
   }
 
   const contract = warp.contract<RelayRegistryState>(contractTxId)
 
-  const input: ToggleRegistrationCreditRequirement = {
-    function: 'toggleRegistrationCreditRequirement',
-    enabled: registrationCreditsEnabled === 'true' ? true : false
+  const input: ToggleFamilyRequirement = {
+    function: 'toggleFamilyRequirement',
+    enabled: familyRequirementEnabled === 'true' ? true : false
   }
 
   // NB: Sanity check dry run
@@ -62,19 +62,19 @@ async function main() {
   // NB: Send real interaction
   const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<ToggleRegistrationCreditRequirement>(input)
+    .writeInteraction<ToggleFamilyRequirement>(input)
 
-    console.log(
-      `Toggle registration credits ${registrationCreditsEnabled}`,
-      result?.originalTxId
-    )
+  console.log(
+    `Toggle family requirement ${familyRequirementEnabled} result`,
+    result?.originalTxId
+  )
 }
 
 (async () => {
   try {
     await main()
   } catch (error) {
-    console.error('Toggle Registration Credits Requirement script error', error)
+    console.error('Toggle Family Requirement script error', error)
     process.exitCode = 1
   }
 })()

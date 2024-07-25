@@ -16,7 +16,7 @@ dotenv.config()
 
 let contractTxId = process.env.RELAY_REGISTRY_CONTRACT_ID || ''
 const consulToken = process.env.CONSUL_TOKEN
-const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OWNER_KEY
+const contractOwnerPrivateKey = process.env.RELAY_REGISTRY_OPERATOR_KEY
 const addressToCredit = process.env.ADDRESS_TO_CREDIT || ''
 const fingerprint = process.env.FINGERPRINT || ''
 
@@ -33,7 +33,7 @@ async function main() {
   }
 
   if (!contractOwnerPrivateKey) {
-    throw new Error('RELAY_REGISTRY_OWNER_KEY is not set!')
+    throw new Error('RELAY_REGISTRY_OPERATOR_KEY is not set!')
   }
 
   if (!addressToCredit) {
@@ -60,9 +60,11 @@ async function main() {
   })
 
   // NB: Send real interaction
-  await contract
+  const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
     .writeInteraction<AddRegistrationCredits>(input)
+
+  console.log('Add registration credits result', result?.originalTxId)
 }
 
 (async () => {

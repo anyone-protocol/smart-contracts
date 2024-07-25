@@ -398,18 +398,22 @@ export class RelayRegistryContract extends Evolvable(Object) {
     }
 
     if (state.familyRequired) {
-      const claimedFingerprints = Object
+      const verifiedFingerprintsBelongingToCaller = Object
         .keys(state.verified)
         .filter(fp => state.verified[fp] === caller)
-      const fingerprintFamily = (state.families[fingerprint] || []).slice(0)
+      const claimingRelayFamily =
+        (state.families[fingerprint] || []).slice(0)
+      const claimingFamilyIncludesAllVerifiedRelays =
+        verifiedFingerprintsBelongingToCaller
+          .every(cf => claimingRelayFamily.includes(cf))
       ContractAssert(
-        claimedFingerprints.length === fingerprintFamily.length
-        && claimedFingerprints.every(cf => fingerprintFamily.includes(cf)),
+        claimingFamilyIncludesAllVerifiedRelays,
         FAMILY_NOT_SET
       )
-      for (let i = 0; i < claimedFingerprints.length; i++) {
+      for (let i = 0; i < verifiedFingerprintsBelongingToCaller.length; i++) {
         ContractAssert(
-          state.families[claimedFingerprints[i]].includes(fingerprint),
+          state.families[verifiedFingerprintsBelongingToCaller[i]]
+            .includes(fingerprint),
           FAMILY_NOT_SET
         )
       }
