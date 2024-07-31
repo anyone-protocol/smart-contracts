@@ -15,13 +15,16 @@ import {
   Score,
   Distribute
 } from '../../src/contracts'
+import TestData from '../../data/test-data.json'
 
 dotenv.config()
 
 let contractTxId = process.env.DISTRIBUTION_CONTRACT_ID
 const consulToken = process.env.CONSUL_TOKEN
-const contractOwnerPrivateKey = process.env.DISTRIBUTION_OWNER_KEY
+const contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY
 const pathToScores = process.env.SCORES_PATH
+const distributionTimestamp = process.env.DISTRIBUTION_TIMESTAMP
+  || Date.now().toString()
 
 LoggerFactory.INST.logLevel('error')
 BigNumber.config({ EXPONENTIAL_AT: 50 })
@@ -51,39 +54,38 @@ async function main() {
   }
 
   if (!contractOwnerPrivateKey) {
-    throw new Error('DISTRIBUTION_OWNER_KEY is not set!')
+    throw new Error('DISTRIBUTION_OPERATOR_KEY is not set!')
   }
 
   const contract = warp.contract<DistributionState>(contractTxId)
   const contractOwner = new Wallet(contractOwnerPrivateKey)
-  let scores: Score[] = []
+  const scores: Score[] = []
   
-  if (pathToScores) {
-    scores = JSON.parse(
-      fs.readFileSync(path.join(__dirname, pathToScores)).toString()
-    )
-  } else {
-    if (consul) {
-      const accountsData = await consul.kv.get<{ Value: string }>({
-        key: process.env.TEST_ACCOUNTS_KEY || 'dummy-path',
-        token: consulToken
-      })
-      
+  if (consul) {
+    const accountsData = await consul.kv.get<{ Value: string }>({
+      key: process.env.TEST_ACCOUNTS_KEY || 'dummy-path',
+      token: consulToken
+    })
 
-      if (accountsData) {
-        const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
-        const accounts = JSON.parse(decodedValue) as string[];
-        scores = accounts.map((acct, index, array) => ({
-          score: (BigNumber("1e22").plus(BigNumber(Math.random() * 10_000))).toFixed(0),
-          address: acct,
-          fingerprint: BigNumber(1E39).plus(index).integerValue().toString()
-        }))
+    if (accountsData) {
+      const decodedValue = Buffer.from(accountsData.Value, 'base64').toString('utf-8');
+      const accounts = JSON.parse(decodedValue) as string[];
+      scores.push(...accounts.map((acct, index, array) => ({
+        score: (BigNumber("1e22").plus(BigNumber(Math.random() * 10_000))).toFixed(0),
+        address: acct,
+        fingerprint: BigNumber(1E39).plus(index).integerValue().toString()
+      })))
 
-        console.log(scores)
-      }
+      console.log(scores)
     }
+  } else {
+    scores.push(...TestData.scores)
+    // if (pathToScores) {
+    //   scores = JSON.parse(
+    //     fs.readFileSync(path.join(__dirname, pathToScores)).toString()
+    //   )
+    // }
   }
-  const timestamp = Date.now().toString()
 
   try {
     const BATCH_SIZE = 5
@@ -91,12 +93,12 @@ async function main() {
       const scoresBatch = scores.slice(i, i + BATCH_SIZE)
       const input: AddScores = {
         function: 'addScores',
-        timestamp,
+        timestamp: distributionTimestamp,
         scores: scoresBatch
       }
     
-      // NB: Sanity check by getting current state and "dry-running" thru contract
-      //     source handle directly.  If it doesn't throw, we're good.
+      // NB: Sanity check by getting current state and "dry-running" thru
+      //     contract source handle directly.  If it doesn't throw, we're good.
       const { cachedValue: { state } } = await contract.readState()
       DistributionHandle(state, {
         input,
@@ -105,30 +107,19 @@ async function main() {
       })
     
       // NB: Send off the interaction for real
-      await contract
+      const result = await contract
         .connect(new EthereumSigner(contractOwnerPrivateKey))
         .writeInteraction<AddScores>(input)
+
+      console.log(
+        `Add Scores @ ${distributionTimestamp} result`,
+        result?.originalTxId
+      )
     }
   } catch(e) {
     console.error(e)
     console.log("Continuing execution")
   }
-
-  const input: Distribute = { function: 'distribute', timestamp }
-
-  // NB: Sanity check by getting current state and "dry-running" thru contract
-  //     source handle directly.  If it doesn't throw, we're good.
-  const { cachedValue: { state } } = await contract.readState()
-  DistributionHandle(state, {
-    input,
-    caller: contractOwner.address,
-    interactionType: 'write'
-  })
-
-  // NB: Send off the interaction for real
-  await contract
-    .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<Distribute>(input)
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; })
