@@ -77,7 +77,12 @@ async function main() {
       console.log(claims)
     }
   } else {
-    claims.push(...TestData.relays)
+    // claims.push(...TestData.relays)
+    claims.push({
+      address: '0xB109188f495c61659804b054C7Bc9f10435D9095',
+      fingerprint: '1111111111111111111111111111111111111111',
+      nickname: 'B109-test-relay-7'
+    })
   }
   
   const timestamp = Date.now().toString()

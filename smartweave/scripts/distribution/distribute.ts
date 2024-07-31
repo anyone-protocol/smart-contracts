@@ -15,8 +15,9 @@ dotenv.config()
 
 let consulToken = process.env.CONSUL_TOKEN,
   contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
-  contractOwnerPrivateKey = process.env.DISTRIBUTION_OWNER_KEY,
+  contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY,
   distributionTimestamp = process.env.DISTRIBUTION_TIMESTAMP
+    || Date.now().toString()
 
 LoggerFactory.INST.logLevel('error')
 
@@ -25,10 +26,6 @@ const warp = WarpFactory
   .use(new EthersExtension())
 
 async function main() {
-  if (!distributionTimestamp) {
-    throw new Error('DISTRIBUTION_TIMESTAMP is not set!')
-  }
-
   if (consulToken) {
     const host = process.env.CONSUL_IP,
       port = process.env.CONSUL_PORT,
@@ -52,7 +49,7 @@ async function main() {
   }
 
   if (!contractOwnerPrivateKey) {
-    throw new Error('DISTRIBUTION_OWNER_KEY is not set!')
+    throw new Error('DISTRIBUTION_OPERATOR_KEY is not set!')
   }
 
   const contract = warp.contract<DistributionState>(contractTxId)
@@ -73,9 +70,14 @@ async function main() {
   })
 
   // NB: Send off the interaction for real
-  await contract
+  const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
     .writeInteraction<Distribute>(input)
+
+  console.log(
+    `Distribution @ ${distributionTimestamp} result`,
+    result?.originalTxId
+  )
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; })
