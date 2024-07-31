@@ -24,7 +24,13 @@ import {
   Fingerprint,
   PublicKey
 } from '../common/types'
-import { ENABLED_REQUIRED, FAMILIES_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY, INVALID_FAMILY } from '../common/errors'
+import {
+  DUPLICATE_FINGERPRINT,
+  ENABLED_REQUIRED,
+  FAMILIES_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY,
+  INVALID_FAMILY
+} from '../common/errors'
 
 export const FINGERPRINT_ALREADY_CLAIMABLE = 'Fingerprint already claimable'
 export const FINGERPRINT_NOT_CLAIMABLE = 'Fingerprint not claimable'
@@ -42,7 +48,6 @@ export const FAMILY_REQUIRED = 'Family required'
 export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
 export const HARDWARE_ALREADY_VERIFIED = 'Hardware has already been verified'
 export const SERIAL_NOT_REGISTERED = 'Serial has not been registered'
-export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
 export const CREDITS_MUST_BE_ARRAY =
   'Credits must be a valid array of address & fingerprint tuples'
 export const REGISTRATION_CREDIT_NOT_FOUND = 'Registration credit not found'
@@ -151,7 +156,8 @@ export interface SetFamilies extends ContractFunctionInput {
   function: 'setFamilies'
   families: {
     fingerprint: Fingerprint
-    family: Fingerprint[]
+    add?: Fingerprint[]
+    remove?: Fingerprint[]
   }[]
 }
 
@@ -595,15 +601,37 @@ export class RelayRegistryContract extends Evolvable(Object) {
     ContractAssert(Array.isArray(families), FAMILIES_REQUIRED)
     ContractAssert(families.length > 0, FAMILIES_REQUIRED)
     
-    for (const { fingerprint, family } of families) {
+    for (const { fingerprint, add, remove } of families) {
       assertValidFingerprint(fingerprint)
-      ContractAssert(Array.isArray(family), INVALID_FAMILY)
-      for (const familyFingerprint of family) {
-        assertValidFingerprint(familyFingerprint)
+      ContractAssert(!!add || !!remove, INVALID_FAMILY)
+
+      if (!state.families[fingerprint]) {
+        state.families[fingerprint] = []
       }
 
-      state.families[fingerprint] = family
-    }    
+      if (add) {
+        ContractAssert(Array.isArray(add), INVALID_FAMILY)
+        for (const addFingerprint of add) {
+          assertValidFingerprint(addFingerprint)
+          ContractAssert(
+            !state.families[fingerprint].includes(addFingerprint),
+            DUPLICATE_FINGERPRINT
+          )
+          state.families[fingerprint].push(addFingerprint)
+        }
+      }
+
+      if (remove) {
+        ContractAssert(Array.isArray(remove), INVALID_FAMILY)
+        for (const removeFingerprint of remove) {
+          assertValidFingerprint(removeFingerprint)
+          const indexToRemove = state
+            .families[fingerprint]
+            .indexOf(removeFingerprint)
+          state.families[fingerprint].splice(indexToRemove, 1)
+        }
+      }
+    }
 
     return { state, result: true }
   }

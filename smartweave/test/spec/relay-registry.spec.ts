@@ -14,10 +14,8 @@ import {
   ADDRESS_IS_BLOCKED,
   ADDRESS_NOT_BLOCKED,
   REGISTRATION_CREDIT_REQUIRED,
-  FAMILY_REQUIRED,
   FAMILY_NOT_SET,
   HARDWARE_ALREADY_VERIFIED,
-  DUPLICATE_FINGERPRINT,
   REGISTRATION_CREDIT_NOT_FOUND,
   HARDWARE_VERIFIED_MUST_BE_BOOLEAN_OR_UNDEFINED,
   RELAYS_MUST_BE_VALID_ARRAY,
@@ -26,6 +24,7 @@ import {
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
   ADDRESS_REQUIRED,
+  DUPLICATE_FINGERPRINT,
   ENABLED_REQUIRED,
   FAMILIES_REQUIRED,
   FINGERPRINT_REQUIRED,
@@ -42,6 +41,7 @@ const CHARLS = '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
+const fingerprintD = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD'
 const encryptionPrivateKey =
   'c72033fd8bf4e9e4d7d70e890bd73e2fa32cc420030c1b2da3e902856bb536d7'
 const encryptionPublicKeyBase64 = 'u579ySzMngWIBGxrMCCPxDExuJuxhWMrHvvt3ZFPyBE='
@@ -1510,20 +1510,61 @@ describe('Relay Registry Contract', () => {
         families: [
           {
             fingerprint: fingerprintA,
-            family: [ fingerprintC ]
+            add: [ fingerprintA, fingerprintB, fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintB,
+            add: [ fingerprintA, fingerprintB, fingerprintC ]
           },
           {
             fingerprint: fingerprintC,
-            family: [ fingerprintA ]
+            add: [ fingerprintA, fingerprintB, fingerprintC ]
           }
         ]
       })
 
-      const { state } = RelayRegistryHandle(initState, setFamilies)
+      const { state: firstState } = RelayRegistryHandle(initState, setFamilies)
 
-      expect(state.families).to.deep.equal({
-        [fingerprintA]: [fingerprintC],
-        [fingerprintC]: [fingerprintA]
+      expect(firstState.families).to.deep.equal({
+        [fingerprintA]: [ fingerprintA, fingerprintB, fingerprintC ],
+        [fingerprintB]: [ fingerprintA, fingerprintB, fingerprintC ],
+        [fingerprintC]: [ fingerprintA, fingerprintB, fingerprintC ]
+      })
+
+      const setMoreFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            add: [ fingerprintD ],
+            remove: [ fingerprintB ]
+          },
+          {
+            fingerprint: fingerprintB,
+            remove: [ fingerprintA, fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintC,
+            add: [ fingerprintD ],
+            remove: [ fingerprintB ]
+          },
+          {
+            fingerprint: fingerprintD,
+            add: [ fingerprintA, fingerprintC, fingerprintD ]
+          }
+        ]
+      })
+
+      const { state: secondState } = RelayRegistryHandle(
+        firstState,
+        setMoreFamilies
+      )
+
+      expect(secondState.families).to.deep.equal({
+        [fingerprintA]: [ fingerprintA, fingerprintC, fingerprintD ],
+        [fingerprintB]: [ fingerprintB ],
+        [fingerprintC]: [ fingerprintA, fingerprintC, fingerprintD ],
+        [fingerprintD]: [ fingerprintA, fingerprintC, fingerprintD ]
       })
     })
 
@@ -1533,11 +1574,13 @@ describe('Relay Registry Contract', () => {
         families: [
           {
             fingerprint: fingerprintA,
-            family: [ fingerprintC ]
+            add: [ fingerprintC ],
+            remove: []
           },
           {
             fingerprint: fingerprintC,
-            family: [ fingerprintA ]
+            add: [ fingerprintA ],
+            remove: []
           }
         ]
       })
@@ -1577,7 +1620,7 @@ describe('Relay Registry Contract', () => {
       const noFingerprintFamily = createInteraction(OWNER, {
         function: 'setFamilies',
         families: [{
-          family: []
+          add: []
         }]
       })
 
@@ -1589,7 +1632,7 @@ describe('Relay Registry Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: 'invalid',
-          family: []
+          add: []
         }]
       })
 
@@ -1601,7 +1644,7 @@ describe('Relay Registry Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: {},
-          family: []
+          add: []
         }]
       })
 
@@ -1624,7 +1667,7 @@ describe('Relay Registry Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: fingerprintA,
-          family: [{}, 1, undefined, null, 'invalid']
+          add: [{}, 1, undefined, null, 'invalid']
         }]
       })
 
@@ -1636,13 +1679,44 @@ describe('Relay Registry Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: fingerprintA,
-          family: [fingerprintC, 'invalid', null]
+          remove: [fingerprintC, 'invalid', null]
         }]
       })
 
       expect(
-        () => RelayRegistryHandle(initState, someInvalidFamilyFingerprintsFamily)
+        () => RelayRegistryHandle(
+          initState,
+          someInvalidFamilyFingerprintsFamily
+        )
       ).to.throw(INVALID_FINGERPRINT)
+    })
+
+    it('Throws when adding duplicate fingerprints to a relay family', () => {
+      const addDuplicateFamilyFingerprint = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            add: [ fingerprintB ]
+          },
+          {
+            fingerprint: fingerprintB,
+            add: [ fingerprintA ]
+          }
+        ]
+      })
+
+      expect(
+        () => RelayRegistryHandle(
+          {
+            ...initState,
+            families: {
+              [fingerprintB]: [ fingerprintA ]
+            }
+          },
+          addDuplicateFamilyFingerprint
+        )
+      ).to.throw(DUPLICATE_FINGERPRINT)
     })
 
     it('Prevents claiming of more than 1 relay if family not set', () => {
