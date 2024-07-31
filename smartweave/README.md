@@ -185,7 +185,8 @@ type RelayRegistryState = {
   setFamilies(
     families: {
       fingerprint: string,
-      family: string[]
+      add?: Fingerprint[],
+      remove?: Fingerprint[]
     }[]
   ) => void
   ```
@@ -367,8 +368,9 @@ type DistributionState = {
   ```typescript
   setFamilies(
     families: {
-      fingerprint: Fingerprint
-      family: Fingerprint[]
+      fingerprint: Fingerprint,
+      add?: Fingerprint[],
+      remove?: Fingerprint[]
     }[]
   ) => void
   ```

@@ -30,6 +30,7 @@ import TestResultsFamilyMultiplier
   from '../e2e/data/results_family_multipliers.json'
 import {
   ADDRESS_REQUIRED,
+  DUPLICATE_FINGERPRINT,
   ENABLED_REQUIRED,
   FINGERPRINT_REQUIRED,
   INVALID_ADDRESS,
@@ -44,6 +45,7 @@ const BOB    = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
 const fingerprintA = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
+const fingerprintD = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD'
 const DEFAULT_TOKENS_PER_SECOND = '1000'
 
 let initState: DistributionState
@@ -350,20 +352,61 @@ describe('Distribution Contract', () => {
         families: [
           {
             fingerprint: fingerprintA,
-            family: [ fingerprintC ]
+            add: [ fingerprintA, fingerprintB, fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintB,
+            add: [ fingerprintA, fingerprintB, fingerprintC ]
           },
           {
             fingerprint: fingerprintC,
-            family: [ fingerprintA ]
+            add: [ fingerprintA, fingerprintB, fingerprintC ]
           }
         ]
       })
 
-      const { state } = DistributionHandle(initState, setFamilies)
+      const { state: firstState } = DistributionHandle(initState, setFamilies)
 
-      expect(state.families).to.deep.equal({
-        [fingerprintA]: [fingerprintC],
-        [fingerprintC]: [fingerprintA]
+      expect(firstState.families).to.deep.equal({
+        [fingerprintA]: [ fingerprintA, fingerprintB, fingerprintC ],
+        [fingerprintB]: [ fingerprintA, fingerprintB, fingerprintC ],
+        [fingerprintC]: [ fingerprintA, fingerprintB, fingerprintC ]
+      })
+
+      const setMoreFamilies = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            add: [ fingerprintD ],
+            remove: [ fingerprintB ]
+          },
+          {
+            fingerprint: fingerprintB,
+            remove: [ fingerprintA, fingerprintC ]
+          },
+          {
+            fingerprint: fingerprintC,
+            add: [ fingerprintD ],
+            remove: [ fingerprintB ]
+          },
+          {
+            fingerprint: fingerprintD,
+            add: [ fingerprintA, fingerprintC, fingerprintD ]
+          }
+        ]
+      })
+
+      const { state: secondState } = DistributionHandle(
+        firstState,
+        setMoreFamilies
+      )
+
+      expect(secondState.families).to.deep.equal({
+        [fingerprintA]: [ fingerprintA, fingerprintC, fingerprintD ],
+        [fingerprintB]: [ fingerprintB ],
+        [fingerprintC]: [ fingerprintA, fingerprintC, fingerprintD ],
+        [fingerprintD]: [ fingerprintA, fingerprintC, fingerprintD ]
       })
     })
 
@@ -373,11 +416,13 @@ describe('Distribution Contract', () => {
         families: [
           {
             fingerprint: fingerprintA,
-            family: [ fingerprintC ]
+            add: [ fingerprintC ],
+            remove: []
           },
           {
             fingerprint: fingerprintC,
-            family: [ fingerprintA ]
+            add: [ fingerprintA ],
+            remove: []
           }
         ]
       })
@@ -417,7 +462,7 @@ describe('Distribution Contract', () => {
       const noFingerprintFamily = createInteraction(OWNER, {
         function: 'setFamilies',
         families: [{
-          family: []
+          add: []
         }]
       })
 
@@ -429,7 +474,7 @@ describe('Distribution Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: 'invalid',
-          family: []
+          add: []
         }]
       })
 
@@ -441,7 +486,7 @@ describe('Distribution Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: {},
-          family: []
+          add: []
         }]
       })
 
@@ -464,7 +509,7 @@ describe('Distribution Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: fingerprintA,
-          family: [{}, 1, undefined, null, 'invalid']
+          add: [{}, 1, undefined, null, 'invalid']
         }]
       })
 
@@ -476,13 +521,44 @@ describe('Distribution Contract', () => {
         function: 'setFamilies',
         families: [{
           fingerprint: fingerprintA,
-          family: [fingerprintC, 'invalid', null]
+          remove: [fingerprintC, 'invalid', null]
         }]
       })
 
       expect(
-        () => DistributionHandle(initState, someInvalidFamilyFingerprintsFamily)
+        () => DistributionHandle(
+          initState,
+          someInvalidFamilyFingerprintsFamily
+        )
       ).to.throw(INVALID_FINGERPRINT)
+    })
+
+    it('Throws when adding duplicate fingerprints to a relay family', () => {
+      const addDuplicateFamilyFingerprint = createInteraction(OWNER, {
+        function: 'setFamilies',
+        families: [
+          {
+            fingerprint: fingerprintA,
+            add: [ fingerprintB ]
+          },
+          {
+            fingerprint: fingerprintB,
+            add: [ fingerprintA ]
+          }
+        ]
+      })
+
+      expect(
+        () => DistributionHandle(
+          {
+            ...initState,
+            families: {
+              [fingerprintB]: [ fingerprintA ]
+            }
+          },
+          addDuplicateFamilyFingerprint
+        )
+      ).to.throw(DUPLICATE_FINGERPRINT)
     })
   })
 

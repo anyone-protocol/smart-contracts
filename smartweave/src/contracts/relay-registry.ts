@@ -24,7 +24,13 @@ import {
   Fingerprint,
   PublicKey
 } from '../common/types'
-import { ENABLED_REQUIRED, FAMILIES_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY, INVALID_FAMILY } from '../common/errors'
+import {
+  DUPLICATE_FINGERPRINT,
+  ENABLED_REQUIRED,
+  FAMILIES_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY,
+  INVALID_FAMILY
+} from '../common/errors'
 
 export const FINGERPRINT_ALREADY_CLAIMABLE = 'Fingerprint already claimable'
 export const FINGERPRINT_NOT_CLAIMABLE = 'Fingerprint not claimable'
@@ -42,7 +48,6 @@ export const FAMILY_REQUIRED = 'Family required'
 export const FAMILY_NOT_SET = 'Subsequent relay claims require family to be set'
 export const HARDWARE_ALREADY_VERIFIED = 'Hardware has already been verified'
 export const SERIAL_NOT_REGISTERED = 'Serial has not been registered'
-export const DUPLICATE_FINGERPRINT = 'Duplicate fingerprint'
 export const CREDITS_MUST_BE_ARRAY =
   'Credits must be a valid array of address & fingerprint tuples'
 export const REGISTRATION_CREDIT_NOT_FOUND = 'Registration credit not found'
