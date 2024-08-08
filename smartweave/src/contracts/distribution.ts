@@ -16,7 +16,13 @@ import {
   assertValidFingerprint
 } from '../util'
 import { ContractFunctionInput, EvmAddress, Fingerprint } from '../common/types'
-import { DUPLICATE_FINGERPRINT, ENABLED_REQUIRED, FAMILIES_REQUIRED, FINGERPRINTS_MUST_BE_ARRAY, INVALID_FAMILY } from '../common/errors'
+import {
+  DUPLICATE_FINGERPRINT,
+  ENABLED_REQUIRED,
+  FAMILIES_REQUIRED,
+  FINGERPRINTS_MUST_BE_ARRAY,
+  INVALID_FAMILY
+} from '../common/errors'
 
 export const INVALID_DISTRIBUTION_AMOUNT = 'Invalid distribution amount'
 export const INVALID_TIMESTAMP = 'Invalid timestamp'
@@ -31,6 +37,8 @@ export const INVALID_LIMIT = 'Invalid limit - must be a positive integer'
 export const VALID_BONUS_NAME_REQUIRED = 'Valid bonus name required'
 export const FINGERPRINT_NOT_IN_BONUS = 'Fingerprint is not in bonus'
 export const INVALID_FAMILY_MULTIPLIER_RATE = 'Invalid family multiplier rate'
+export const INVALID_QUALITY_BONUS_SETTINGS = 'Invalid quality bonus settings'
+export const INVALID_UPTIMES = 'Invalid uptimes'
 
 export type Score = {
   score: string
@@ -47,6 +55,15 @@ export type DistributionResult = {
     hardware: {
       enabled: boolean
       tokensDistributedPerSecond: string
+      networkScore: string
+      distributedTokens: string
+    }
+    quality: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+      settings: {
+        uptime: {}
+      }
       networkScore: string
       distributedTokens: string
     }
@@ -84,6 +101,18 @@ export type DistributionState = OwnableState & EvolvableState & {
       enabled: boolean
       tokensDistributedPerSecond: string
       fingerprints: Fingerprint[]
+    },
+    quality: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+      settings: {
+        uptime: {
+          [days: number]: number
+        }
+      }
+      uptime: {
+        [fingerprint: Fingerprint]: number
+      }
     }
   }
   pendingDistributions: {
@@ -131,9 +160,33 @@ export interface SetHardwareBonusRate extends ContractFunctionInput {
   tokensDistributedPerSecond: string
 }
 
+export interface SetQualityTierBonusRate extends ContractFunctionInput {
+  function: 'setQualityTierBonusRate'
+  tokensDistributedPerSecond: string
+}
+
 export interface ToggleHardwareBonus extends ContractFunctionInput {
   function: 'toggleHardwareBonus'
   enabled: boolean
+}
+
+export interface ToggleQualityTierBonus extends ContractFunctionInput {
+  function: 'toggleQualityTierBonus'
+  enabled: boolean
+}
+
+export interface SetQualityTierBonusSettings extends ContractFunctionInput {
+  function: 'setQualityTierBonusSettings'
+  settings: {
+    uptime: {
+      [days: number]: number
+    }
+  }
+}
+
+export interface SetQualityTierUptimes extends ContractFunctionInput {
+  function: 'setQualityTierUptimes',
+  uptimes: { [fingerprint: Fingerprint]: number }
 }
 
 export interface AddFingerprintsToBonus extends ContractFunctionInput {
@@ -244,6 +297,14 @@ export class DistributionContract extends Evolvable(Object) {
           enabled: false,
           tokensDistributedPerSecond: '0',
           fingerprints: []
+        },
+        quality: {
+          enabled: false,
+          tokensDistributedPerSecond: '0',
+          settings: {
+            uptime: {}
+          },
+          uptime: {}
         }
       }
     }
@@ -325,6 +386,16 @@ export class DistributionContract extends Evolvable(Object) {
             state.bonuses.hardware.tokensDistributedPerSecond,
           networkScore: hwBonusNetworkScore.toString(),
           distributedTokens: hwBonusDistributedTokens.toString()
+        },
+        quality: {
+          enabled: state.bonuses.quality.enabled,
+          tokensDistributedPerSecond:
+            state.bonuses.quality.tokensDistributedPerSecond,
+          networkScore: '0',
+          distributedTokens: '0',
+          settings: {
+            uptime: {}
+          }
         }
       },
       totalTokensDistributedPerSecond,
@@ -635,7 +706,6 @@ export class DistributionContract extends Evolvable(Object) {
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<SetHardwareBonusRate>>
   ) {
-    // const { timestamp, bonus } = action.input
     const { input: { tokensDistributedPerSecond } } = action
 
     ContractAssert(
@@ -651,6 +721,25 @@ export class DistributionContract extends Evolvable(Object) {
   }
 
   @OnlyOwner
+  setQualityTierBonusRate(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<SetQualityTierBonusRate>>
+  ) {
+    const { input: { tokensDistributedPerSecond } } = action
+
+    ContractAssert(
+      typeof tokensDistributedPerSecond === 'string'
+        && BigNumber(tokensDistributedPerSecond).gte(0),
+      INVALID_DISTRIBUTION_AMOUNT
+    )
+
+    state.bonuses.quality.tokensDistributedPerSecond =
+      tokensDistributedPerSecond
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
   toggleHardwareBonus(
     state: DistributionState,
     action: ContractInteraction<PartialFunctionInput<ToggleHardwareBonus>>
@@ -660,6 +749,20 @@ export class DistributionContract extends Evolvable(Object) {
     ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
 
     state.bonuses.hardware.enabled = enabled
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  toggleQualityTierBonus(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<ToggleQualityTierBonus>>
+  ) {
+    const { input: { enabled } } = action
+
+    ContractAssert(typeof enabled === 'boolean', ENABLED_REQUIRED)
+
+    state.bonuses.quality.enabled = enabled
 
     return { state, result: true }
   }
@@ -700,9 +803,9 @@ export class DistributionContract extends Evolvable(Object) {
       assertValidFingerprint(fingerprint)
     }
 
-    state.bonuses[
-      bonusName as keyof DistributionState['bonuses']
-    ].fingerprints.push(...fingerprints)
+    if (bonusName === 'hardware') {
+      state.bonuses.hardware.fingerprints.push(...fingerprints)
+    }
 
     return { state, result: true }
   }
@@ -722,17 +825,20 @@ export class DistributionContract extends Evolvable(Object) {
       VALID_BONUS_NAME_REQUIRED
     )
     ContractAssert(Array.isArray(fingerprints), FINGERPRINTS_MUST_BE_ARRAY)
-    for (const fingerprint of fingerprints) {
-      assertValidFingerprint(fingerprint)
-      const fingerprintBonusIndex = state
-        .bonuses[bonusName as keyof DistributionState['bonuses']]
-        .fingerprints
-        .indexOf(fingerprint)
-      ContractAssert(fingerprintBonusIndex > -1, FINGERPRINT_NOT_IN_BONUS)
-      state
-        .bonuses[bonusName as keyof DistributionState['bonuses']]
-        .fingerprints
-        .splice(fingerprintBonusIndex, 1)
+
+    if (bonusName === 'hardware') {
+      for (const fingerprint of fingerprints) {
+        assertValidFingerprint(fingerprint)
+        const fingerprintBonusIndex = state
+          .bonuses.hardware
+          .fingerprints
+          .indexOf(fingerprint)
+        ContractAssert(fingerprintBonusIndex > -1, FINGERPRINT_NOT_IN_BONUS)
+        state
+          .bonuses.hardware
+          .fingerprints
+          .splice(fingerprintBonusIndex, 1)
+      }
     }
 
     return { state, result: true }
@@ -822,6 +928,61 @@ export class DistributionContract extends Evolvable(Object) {
 
     return { state, result: true }
   }
+
+  @OnlyOwner
+  setQualityTierBonusSettings(
+    state: DistributionState,
+    action: ContractInteraction<
+      PartialFunctionInput<SetQualityTierBonusSettings>
+    >
+  ) {
+    const { input: { settings } } = action
+
+    ContractAssert(!!settings, INVALID_QUALITY_BONUS_SETTINGS)
+    ContractAssert(
+      typeof settings.uptime === 'object',
+      INVALID_QUALITY_BONUS_SETTINGS
+    )
+    ContractAssert(
+      Object
+        .keys(settings.uptime)
+        .every(k => !Number.isNaN(Number.parseInt(k))),
+      INVALID_QUALITY_BONUS_SETTINGS
+    )
+    ContractAssert(
+      Object
+        .values(settings.uptime)
+        .every((v: any) => !Number.isNaN(Number.parseInt(v)) && v > -1),
+      INVALID_QUALITY_BONUS_SETTINGS
+    )
+
+    state.bonuses.quality.settings = settings
+
+    return { state, result: true }
+  }
+
+  @OnlyOwner
+  setQualityTierUptimes(
+    state: DistributionState,
+    action: ContractInteraction<PartialFunctionInput<SetQualityTierUptimes>>
+  ) {
+    const { input: { uptimes } } = action
+
+    ContractAssert(!!uptimes, INVALID_UPTIMES)
+    ContractAssert(typeof uptimes === 'object', INVALID_UPTIMES)
+    const fingerprints = Object.keys(uptimes)
+    for (const fingerprint of fingerprints) {
+      assertValidFingerprint(fingerprint)
+      const uptime = uptimes[fingerprint]
+      ContractAssert(typeof uptime === 'number', INVALID_UPTIMES)
+      ContractAssert(Number.isInteger(uptime), INVALID_UPTIMES)
+      ContractAssert(uptime > -1, INVALID_UPTIMES)
+    }
+
+    state.bonuses.quality.uptime = uptimes
+
+    return { state, result: true }
+  }
 }
 
 export function handle(
@@ -857,6 +1018,14 @@ export function handle(
       return contract.toggleFamilyMultipliers(state, action)
     case 'setFamilies':
       return contract.setFamilies(state, action)
+    case 'setQualityTierBonusRate':
+      return contract.setQualityTierBonusRate(state, action)
+    case 'toggleQualityTierBonus':
+      return contract.toggleQualityTierBonus(state, action)
+    case 'setQualityTierBonusSettings':
+      return contract.setQualityTierBonusSettings(state, action)
+    case 'setQualityTierUptimes':
+      return contract.setQualityTierUptimes(state, action)
     default:
       throw new ContractError(INVALID_INPUT)
   }

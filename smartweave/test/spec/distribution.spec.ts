@@ -18,8 +18,8 @@ import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
   INVALID_FAMILY_MULTIPLIER_RATE,
   INVALID_LIMIT,
-  INVALID_MULTIPLIERS_INPUT,
-  INVALID_MULTIPLIER_VALUE
+  INVALID_QUALITY_BONUS_SETTINGS,
+  INVALID_UPTIMES
 } from '../../src/contracts/distribution'
 import TestScoresHWBonuses from '../e2e/data/scores_hw_bonuses.json'
 import TestResultsHWBonuses from '../e2e/data/results_hw_bonuses.json'
@@ -62,6 +62,14 @@ function resetState() {
         enabled: false,
         tokensDistributedPerSecond: '0',
         fingerprints: []
+      },
+      quality: {
+        enabled: false,
+        tokensDistributedPerSecond: '0',
+        settings: {
+          uptime: {}
+        },
+        uptime: {}
       }
     },
     families: {},
@@ -730,13 +738,13 @@ describe('Distribution Contract', () => {
       it('Allows Owner to set hardware bonus token rate', () => {
         const tokensDistributedPerSecond = '200'
         const setHardwareBonusRate = createInteraction(OWNER, {
-          function: 'setTokenDistributionRate',
+          function: 'setHardwareBonusRate',
           tokensDistributedPerSecond
         })
     
         const { state } = DistributionHandle(initState, setHardwareBonusRate)
     
-        expect(state.tokensDistributedPerSecond).to.equal(
+        expect(state.bonuses.hardware.tokensDistributedPerSecond).to.equal(
           tokensDistributedPerSecond
         )
       })
@@ -937,6 +945,14 @@ describe('Distribution Contract', () => {
                 enabled: true,
                 tokensDistributedPerSecond: '100',
                 fingerprints
+              },
+              quality: {
+                enabled: false,
+                tokensDistributedPerSecond: '0',
+                settings: {
+                  uptime: {}
+                },
+                uptime: {}
               }
             }
           },
@@ -993,6 +1009,345 @@ describe('Distribution Contract', () => {
         ).to.throw(ERROR_ONLY_OWNER)
       })
     })
+
+    describe('Quality Tiers', () => {
+      it('Allows Owner to set quality tier bonus token rate', () => {
+        const tokensDistributedPerSecond = '200'
+        const setQualityTierBonusRate = createInteraction(OWNER, {
+          function: 'setQualityTierBonusRate',
+          tokensDistributedPerSecond
+        })
+    
+        const { state } = DistributionHandle(initState, setQualityTierBonusRate)
+    
+        expect(state.bonuses.quality.tokensDistributedPerSecond).to.equal(
+          tokensDistributedPerSecond
+        )
+      })
+
+      it('Prevents non-owners from setting quality tier bonus token rate', () => {
+        const aliceSetQualityTierBonusRate = createInteraction(ALICE, {
+          function: 'setQualityTierBonusRate',
+          tokensDistributedPerSecond: '1000'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, aliceSetQualityTierBonusRate)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      })
+
+      it('Validates when setting quality tier bonus token rate', () => {
+        const setMissingRate = createInteraction(OWNER, {
+          function: 'setQualityTierBonusRate'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, setMissingRate)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+  
+        const negativeDistributionAmount = '-100'
+        const setNegativeDistributionAmount = createInteraction(OWNER, {
+          function: 'setQualityTierBonusRate',
+          tokensDistributedPerSecond: negativeDistributionAmount
+        })
+  
+        expect(
+          () => DistributionHandle(initState, setNegativeDistributionAmount)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+  
+        const numberDistributionAmount = 100
+        const setNumberDistributionAmount = createInteraction(OWNER, {
+          function: 'setQualityTierBonusRate',
+          tokensDistributedPerSecond: numberDistributionAmount
+        })
+        
+        expect(
+          () => DistributionHandle(initState, setNumberDistributionAmount)
+        ).to.throw(ContractError, INVALID_DISTRIBUTION_AMOUNT)
+      })
+
+      it('Allows Owner to toggle quality tier bonus', () => {
+        const enableQualityTierBonus = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus',
+          enabled: true
+        })
+        const { state: firstState } = DistributionHandle(
+          { ...initState },
+          enableQualityTierBonus
+        )
+        expect(firstState.bonuses.quality.enabled).to.be.true
+
+        const disableQualityTierBonus = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus',
+          enabled: false
+        })
+        const { state: secondState } = DistributionHandle(
+          firstState,
+          disableQualityTierBonus
+        )
+        expect(secondState.bonuses.quality.enabled).to.be.false
+      })
+
+      it('Prevents non-owners from toggling quality tier bonus', () => {
+        const aliceToggleQualityTierBonus = createInteraction(ALICE, {
+          function: 'toggleQualityTierBonus',
+          enabled: true
+        })
+  
+        expect(
+          () => DistributionHandle(initState, aliceToggleQualityTierBonus)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      })
+
+      it('Validates when toggling quality tier bonus', () => {
+        const undefinedToggle = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, undefinedToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const zeroToggle = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus',
+          enabled: 0
+        })
+  
+        expect(
+          () => DistributionHandle(initState, zeroToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const positiveToggle = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus',
+          enabled: 12
+        })
+  
+        expect(
+          () => DistributionHandle(initState, positiveToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const objectToggle = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus',
+          enabled: { enabled: true }
+        })
+  
+        expect(
+          () => DistributionHandle(initState, objectToggle)
+        ).to.throw(ENABLED_REQUIRED)
+  
+        const stringToggle = createInteraction(OWNER, {
+          function: 'toggleQualityTierBonus',
+          enabled: 'true'
+        })
+  
+        expect(
+          () => DistributionHandle(initState, stringToggle)
+        ).to.throw(ENABLED_REQUIRED)
+      })      
+
+      it('Allows Owner to set quality tier bonus settings', () => {
+        const settings = {
+          uptime: {
+            [3]: 1,
+            [8]: 2,
+            [22]: 4
+          }
+        }
+        const setQualityTierBonusSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings
+        })
+
+        const { state } = DistributionHandle(
+          initState,
+          setQualityTierBonusSettings
+        )
+
+        expect(state.bonuses.quality.settings).to.deep.equal(settings)
+      })
+
+      it('Prevents non-owners from setting quality tier bonus settings', () => {
+        const aliceSetQualityTierBonusSettings = createInteraction(ALICE, {
+          function: 'setQualityTierBonusSettings',
+          settings: { uptime: {} }
+        })
+
+        expect(
+          () => DistributionHandle(initState, aliceSetQualityTierBonusSettings)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      })
+
+      it('Validates when setting quality tier bonus settings', () => {
+        const undefinedSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings'
+        })
+        expect(
+          () => DistributionHandle(initState, undefinedSettings)
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+
+        const nonObjectSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings: 12
+        })
+        expect(
+          () => DistributionHandle(initState, nonObjectSettings)
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+
+        const undefinedUptimeSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings: {}
+        })
+        expect(
+          () => DistributionHandle(initState, undefinedUptimeSettings)
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+
+        const nonObjectUptimeSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings: {
+            uptime: 12
+          }
+        })
+        expect(
+          () => DistributionHandle(initState, nonObjectUptimeSettings)
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+
+        const stringKeyQualityUptimeSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings: {
+            uptime: {
+              ['one']: 'two'
+            }
+          }
+        })
+        expect(
+          () => DistributionHandle(initState, stringKeyQualityUptimeSettings)
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+
+        const nonNumericQualityPointsUptimeSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings: {
+            uptime: {
+              [1]: 'one'
+            }
+          }
+        })
+        expect(
+          () => DistributionHandle(
+            initState,
+            nonNumericQualityPointsUptimeSettings
+          )
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+
+        const negativeQualityPointsUptimeSettings = createInteraction(OWNER, {
+          function: 'setQualityTierBonusSettings',
+          settings: {
+            uptime: {
+              [1]: -2
+            }
+          }
+        })
+        expect(
+          () => DistributionHandle(
+            initState,
+            negativeQualityPointsUptimeSettings
+          )
+        ).to.throw(INVALID_QUALITY_BONUS_SETTINGS)
+      })
+
+      it('Allows Owner to set quality tier batch data', () => {
+        const uptimes = {
+          [fingerprintA]: 1,
+          [fingerprintB]: 0,
+          [fingerprintC]: 26,
+          [fingerprintD]: 4
+        }
+        const setQualityTierUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes',
+          uptimes
+        })
+
+        const { state } = DistributionHandle(initState, setQualityTierUptimes)
+
+        expect(state.bonuses.quality.uptime).to.deep.equal(uptimes)
+      })
+
+      it('Prevents non-owners from setting quality tier batch data', () => {
+        const aliceSetQualityTierUptimes = createInteraction(ALICE, {
+          function: 'setQualityTierUptimes',
+          uptimes: {
+            [fingerprintA]: 1,
+            [fingerprintB]: 0,
+            [fingerprintC]: 26,
+            [fingerprintD]: 4
+          }
+        })
+
+        expect(
+          () => DistributionHandle(initState, aliceSetQualityTierUptimes)
+        ).to.throw(ContractError, ERROR_ONLY_OWNER)
+      })
+
+      it('Validates when setting quality tier batch data', () => {
+        const undefinedUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes'
+        })
+        expect(
+          () => DistributionHandle(initState, undefinedUptimes)
+        ).to.throw(INVALID_UPTIMES)
+
+        const nonObjectUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes',
+          uptimes: 'uptimes'
+        })
+        expect(
+          () => DistributionHandle(initState, nonObjectUptimes)
+        ).to.throw(INVALID_UPTIMES)
+
+        const invalidFingerprintUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes',
+          uptimes: {
+            [fingerprintA]: 5,
+            ['invalid-fingerprint']: 2
+          }
+        })
+        expect(
+          () => DistributionHandle(initState, invalidFingerprintUptimes)
+        ).to.throw(INVALID_FINGERPRINT)
+
+        const nonNumericUptimeUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes',
+          uptimes: {
+            [fingerprintA]: 5,
+            [fingerprintB]: '4'
+          }
+        })
+        expect(
+          () => DistributionHandle(initState, nonNumericUptimeUptimes)
+        ).to.throw(INVALID_UPTIMES)
+
+        const nonIntegerUptimeUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes',
+          uptimes: {
+            [fingerprintA]: 5,
+            [fingerprintB]: 3.4
+          }
+        })
+        expect(
+          () => DistributionHandle(initState, nonIntegerUptimeUptimes)
+        ).to.throw(INVALID_UPTIMES)
+
+        const negativeUptimeUptimes = createInteraction(OWNER, {
+          function: 'setQualityTierUptimes',
+          uptimes: {
+            [fingerprintA]: 5,
+            [fingerprintB]: -3
+          }
+        })
+        expect(
+          () => DistributionHandle(initState, negativeUptimeUptimes)
+        ).to.throw(INVALID_UPTIMES)
+      })
+    })
   })
 
   describe('Distributing', () => {
@@ -1026,6 +1381,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: '1000',
@@ -1227,6 +1591,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: '1000',
@@ -1252,6 +1625,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
@@ -1401,6 +1783,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: '1000',
@@ -1426,6 +1817,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
@@ -1488,6 +1888,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
@@ -1602,6 +2011,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: '4333',
@@ -1628,6 +2046,15 @@ describe('Distribution Contract', () => {
               tokensDistributedPerSecond: '0',
               networkScore: '0',
               distributedTokens: '0'
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              networkScore: '0',
+              distributedTokens: '0',
+              settings: {
+                uptime: {}
+              }
             }
           },
           totalTokensDistributedPerSecond: '4333',
@@ -1703,6 +2130,14 @@ describe('Distribution Contract', () => {
               fingerprints: TestScoresHWBonuses
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              settings: {
+                uptime: {}
+              },
+              uptime: {}
             }
           },
           pendingDistributions: {
@@ -1726,6 +2161,15 @@ describe('Distribution Contract', () => {
                   tokensDistributedPerSecond: '0',
                   networkScore: '0',
                   distributedTokens: '0'
+                },
+                quality: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0',
+                  settings: {
+                    uptime: {}
+                  }
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -1773,6 +2217,14 @@ describe('Distribution Contract', () => {
               fingerprints: TestScoresHWBonuses
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              settings: {
+                uptime: {}
+              },
+              uptime: {}
             }
           },
           pendingDistributions: {
@@ -1796,6 +2248,15 @@ describe('Distribution Contract', () => {
                   tokensDistributedPerSecond: '0',
                   networkScore: '0',
                   distributedTokens: '0'
+                },
+                quality: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0',
+                  settings: {
+                    uptime: {}
+                  }
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -1844,6 +2305,14 @@ describe('Distribution Contract', () => {
               fingerprints: TestScoresFamilyMultiplier
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              settings: {
+                uptime: {}
+              },
+              uptime: {}
             }
           },
           multipliers: {
@@ -1873,6 +2342,15 @@ describe('Distribution Contract', () => {
                   tokensDistributedPerSecond: '0',
                   networkScore: '0',
                   distributedTokens: '0'
+                },
+                quality: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0',
+                  settings: {
+                    uptime: {}
+                  }
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -1900,6 +2378,8 @@ describe('Distribution Contract', () => {
       )
       expect(state.claimable).to.deep.equal(rewards)
     })
+
+    it('Applies quality tier bonus enabled')
   })
 
   describe('Claiming', () => {
@@ -2109,6 +2589,14 @@ describe('Distribution Contract', () => {
               fingerprints: TestScoresHWBonuses
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
+            },
+            quality: {
+              enabled: false,
+              tokensDistributedPerSecond: '0',
+              settings: {
+                uptime: {}
+              },
+              uptime: {}
             }
           },
           pendingDistributions: {
@@ -2132,6 +2620,15 @@ describe('Distribution Contract', () => {
                   tokensDistributedPerSecond: '0',
                   networkScore: '0',
                   distributedTokens: '0'
+                },
+                quality: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0',
+                  settings: {
+                    uptime: {}
+                  }
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -2200,5 +2697,7 @@ describe('Distribution Contract', () => {
         }
       })
     })
+
+    it('Tracks quality tier bonus in previous distributions')
   })
 })
