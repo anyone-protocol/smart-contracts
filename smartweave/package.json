@@ -1,12 +1,12 @@
 {
   "name": "@ator/smart-contracts-smartweave",
-  "version": "0.2.14",
+  "version": "0.3.0",
   "contributors": [
     "ATOR Labs",
     "Jim Toth <jim@artby.city>"
   ],
   "license": "AGPL-3.0-only",
-  "description": "ATOR Protocol SmartWeave Smart Contracts",
+  "description": "ANyONe Protocol SmartWeave Smart Contracts",
   "keywords": [],
   "repository": {
     "type": "git",
