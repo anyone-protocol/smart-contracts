@@ -248,6 +248,20 @@ type DistributionResult = {
       networkScore: string
       distributedTokens: string
     }
+    quality: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+      settings: {
+        uptime: {
+          [days: number]: number
+        }
+      }
+      uptime: {
+        [fingerprint: Fingerprint]: number
+      }
+      networkScore: string
+      distributedTokens: string
+    }
   }
   multipliers: {
     family: {
@@ -266,6 +280,7 @@ type DistributionResult = {
       distributedTokens: string
       bonuses: {
         hardware: string
+        quality: string
       }
       multipliers: {
         family: string
@@ -284,6 +299,18 @@ type DistributionState = {
       enabled: boolean
       tokensDistributedPerSecond: string
       fingerprints: Fingerprint[]
+    },
+    quality: {
+      enabled: boolean
+      tokensDistributedPerSecond: string
+      settings: {
+        uptime: {
+          [days: number]: number
+        }
+      }
+      uptime: {
+        [fingerprint: Fingerprint]: number
+      }
     }
   }
   pendingDistributions: {
@@ -337,9 +364,27 @@ type DistributionState = {
   setHardwareBonusRate(tokensDistributedPerSecond: string) => void
   ```
 
+- Allows Owner to set quality bonus distribution rate **in atomic units** per
+  second
+  ```typescript
+  setQualityTierBonusRate(tokensDistributedPerSecond: string) => void
+  ```
+
 - Allows Owner to toggle hardware bonus on or off
   ```typescript
   toggleHardwareBonus(enabled: boolean) => void
+  ```
+
+- Allows Owner to toggle quality bonus on or off
+  ```typescript
+  toggleQualityTierBonus(enabled: boolean) => void
+  ```
+
+- Allows Owner to set quality bonus settings
+  ```typescript
+  setQualityTierBonusSettings(
+    settings: { uptime: { [days: number]: number } }
+  ) => void
   ```
 
 - Allows Owner to add fingerprints to a bonus pool.  Currently only 'hardware'
@@ -348,6 +393,11 @@ type DistributionState = {
     bonusName: 'hardware',
     fingerprints: Fingerprint[]
   ) => void
+  ```
+
+- Allows Owner to set fingerprint uptimes for quality bonus
+  ```typescript
+  setQualityTierUptimes(uptimes: { [fingerprint: Fingerprint]: number }) => void
   ```
 
 - Allows Owner to remove fingerprints from a bonus pool.  Currently only
