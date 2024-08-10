@@ -16,6 +16,16 @@ import {
 } from '../../src/contracts'
 import { ERROR_ONLY_OWNER, INVALID_INPUT } from '../../src/util'
 import {
+  ADDRESS_REQUIRED,
+  DUPLICATE_FINGERPRINT,
+  ENABLED_REQUIRED,
+  FINGERPRINT_REQUIRED,
+  INVALID_ADDRESS,
+  INVALID_FINGERPRINT,
+  INVALID_FAMILY,
+  FAMILIES_REQUIRED
+} from '../../src/common/errors'
+import {
   INVALID_FAMILY_MULTIPLIER_RATE,
   INVALID_LIMIT,
   INVALID_QUALITY_BONUS_SETTINGS,
@@ -28,16 +38,9 @@ import TestScoresFamilyMultiplier
   from '../e2e/data/scores_family_multipliers.json'
 import TestResultsFamilyMultiplier
   from '../e2e/data/results_family_multipliers.json'
-import {
-  ADDRESS_REQUIRED,
-  DUPLICATE_FINGERPRINT,
-  ENABLED_REQUIRED,
-  FINGERPRINT_REQUIRED,
-  INVALID_ADDRESS,
-  INVALID_FINGERPRINT,
-  INVALID_FAMILY,
-  FAMILIES_REQUIRED
-} from '../../src/common/errors'
+import TestScoresQualityBonus from '../e2e/data/scores_quality_bonuses.json'
+import TestResultsQualityBonus from '../e2e/data/results_quality_bonuses.json'
+
 
 const OWNER  = '0x1111111111111111111111111111111111111111'
 const ALICE  = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa'
@@ -47,6 +50,11 @@ const fingerprintB = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 const fingerprintC = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
 const fingerprintD = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD'
 const DEFAULT_TOKENS_PER_SECOND = '1000'
+const DEFAULT_QUALITY_BONUS_SETTINGS = {
+  [ 3]: 1, // NB: At least  3 days uptime => 1 point
+  [ 8]: 2, // NB: At least  8 days uptime => 2 points
+  [22]: 4  // NB: At least 22 days uptime => 4 points
+}
 
 let initState: DistributionState
 function resetState() {
@@ -1389,7 +1397,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: '1000',
@@ -1599,7 +1608,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: '1000',
@@ -1633,7 +1643,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
@@ -1643,7 +1654,8 @@ describe('Distribution Contract', () => {
             'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA': {
               address: '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa',
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '1000',
               multipliers: {
@@ -1791,7 +1803,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: '1000',
@@ -1825,7 +1838,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
@@ -1835,7 +1849,8 @@ describe('Distribution Contract', () => {
             [fingerprintA]: {
               address: ALICE,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '196',
               multipliers: {
@@ -1847,7 +1862,8 @@ describe('Distribution Contract', () => {
             [fingerprintB]: {
               address: BOB,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '3510',
               multipliers: {
@@ -1859,7 +1875,8 @@ describe('Distribution Contract', () => {
             [fingerprintC]: {
               address: ALICE,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '1724',
               multipliers: {
@@ -1896,7 +1913,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: DEFAULT_TOKENS_PER_SECOND,
@@ -1906,7 +1924,8 @@ describe('Distribution Contract', () => {
             [fingerprintA]: {
               address: ALICE,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '2688',
               multipliers: {
@@ -1918,7 +1937,8 @@ describe('Distribution Contract', () => {
             [fingerprintB]: {
               address: BOB,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '60084',
               multipliers: {
@@ -1930,7 +1950,8 @@ describe('Distribution Contract', () => {
             [fingerprintC]: {
               address: ALICE,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '23627',
               multipliers: {
@@ -2019,7 +2040,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: '4333',
@@ -2054,7 +2076,8 @@ describe('Distribution Contract', () => {
               distributedTokens: '0',
               settings: {
                 uptime: {}
-              }
+              },
+              uptime: {}
             }
           },
           totalTokensDistributedPerSecond: '4333',
@@ -2064,7 +2087,8 @@ describe('Distribution Contract', () => {
             [fingerprintA]: {
               address: ALICE,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '69',
               multipliers: {
@@ -2076,7 +2100,8 @@ describe('Distribution Contract', () => {
             [fingerprintB]: {
               address: BOB,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '1240',
               multipliers: {
@@ -2088,7 +2113,8 @@ describe('Distribution Contract', () => {
             [fingerprintC]: {
               address: ALICE,
               bonuses: {
-                hardware: '0'
+                hardware: '0',
+                quality: '0'
               },
               distributedTokens: '609',
               multipliers: {
@@ -2169,7 +2195,8 @@ describe('Distribution Contract', () => {
                   distributedTokens: '0',
                   settings: {
                     uptime: {}
-                  }
+                  },
+                  uptime: {}
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -2256,7 +2283,8 @@ describe('Distribution Contract', () => {
                   distributedTokens: '0',
                   settings: {
                     uptime: {}
-                  }
+                  },
+                  uptime: {}
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -2350,7 +2378,8 @@ describe('Distribution Contract', () => {
                   distributedTokens: '0',
                   settings: {
                     uptime: {}
-                  }
+                  },
+                  uptime: {}
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -2379,7 +2408,104 @@ describe('Distribution Contract', () => {
       expect(state.claimable).to.deep.equal(rewards)
     })
 
-    it('Applies quality tier bonus enabled')
+    it('Applies quality tier bonus when enabled', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
+      })
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          families: TestFamilies,
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScoresQualityBonus
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            },
+            quality: {
+              enabled: true,
+              tokensDistributedPerSecond: '250',
+              settings: {
+                uptime: DEFAULT_QUALITY_BONUS_SETTINGS
+              },
+              uptime: Object.fromEntries(
+                TestScoresQualityBonus.map(({ fingerprint, uptime }) => {
+                  let parsedUptime = Number.parseInt(uptime)
+                  if (Number.isNaN(parsedUptime)) {
+                    parsedUptime = 0
+                  }
+
+                  return [ fingerprint, parsedUptime ]
+                })
+              )
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScoresQualityBonus
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                },
+                quality: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0',
+                  settings: {
+                    uptime: {}
+                  },
+                  uptime: {}
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0',
+              details: {},
+              families: TestFamilies,
+              multipliers: {
+                family: {
+                  enabled: false,
+                  familyMultiplierRate: '0'
+                }
+              }
+            }
+          }
+        },
+        distribute
+      )
+
+      const rewards = Object.fromEntries(
+        TestResultsQualityBonus.rewards.map(
+          ({ address, totalReward }) => [ address, totalReward ]
+        )
+      )
+      expect(state.claimable).to.deep.equal(rewards)
+    })
   })
 
   describe('Claiming', () => {
@@ -2582,26 +2708,36 @@ describe('Distribution Contract', () => {
         {
           ...initState,
           tokensDistributedPerSecond: '1000',
+          families: TestFamilies,
           bonuses: {
             hardware: {
               enabled: true,
               tokensDistributedPerSecond: '500',
-              fingerprints: TestScoresHWBonuses
+              fingerprints: TestScoresQualityBonus
                 .filter(({ hardware }) => !!hardware)
                 .map(({ fingerprint }) => fingerprint)
             },
             quality: {
-              enabled: false,
-              tokensDistributedPerSecond: '0',
+              enabled: true,
+              tokensDistributedPerSecond: '250',
               settings: {
-                uptime: {}
+                uptime: DEFAULT_QUALITY_BONUS_SETTINGS
               },
-              uptime: {}
+              uptime: Object.fromEntries(
+                TestScoresQualityBonus.map(({ fingerprint, uptime }) => {
+                  let parsedUptime = Number.parseInt(uptime)
+                  if (Number.isNaN(parsedUptime)) {
+                    parsedUptime = 0
+                  }
+
+                  return [ fingerprint, parsedUptime ]
+                })
+              )
             }
           },
           pendingDistributions: {
             [timestamp]: {
-              scores: TestScoresHWBonuses
+              scores: TestScoresQualityBonus
                 .map(
                   ({ score, address, fingerprint }) =>
                     ({ score, address, fingerprint })
@@ -2628,7 +2764,8 @@ describe('Distribution Contract', () => {
                   distributedTokens: '0',
                   settings: {
                     uptime: {}
-                  }
+                  },
+                  uptime: {}
                 }
               },
               totalTokensDistributedPerSecond: '0',
@@ -2649,35 +2786,48 @@ describe('Distribution Contract', () => {
       )
 
       const distribution = state.previousDistributions[timestamp]
+
       expect(distribution.timeElapsed).to.equal(elapsed.toString())
+
       expect(distribution.tokensDistributedPerSecond).to.equal('1000')
       expect(distribution.baseNetworkScore)
-        .to.equal(TestResultsHWBonuses.baseNetworkScore)
+        .to.equal(TestResultsQualityBonus.baseNetworkScore)
       expect(distribution.baseDistributedTokens)
-        .to.equal(TestResultsHWBonuses.baseActualDistributedTokens)
+        .to.equal(TestResultsQualityBonus.baseActualDistributedTokens)
+
       expect(distribution.bonuses.hardware.enabled).to.be.true
       expect(distribution.bonuses.hardware.tokensDistributedPerSecond)
         .to.equal('500')
       expect(distribution.bonuses.hardware.networkScore)
-        .to.equal(TestResultsHWBonuses.hwBonusNetworkScore)
+        .to.equal(TestResultsQualityBonus.hwBonusNetworkScore)
       expect(distribution.bonuses.hardware.distributedTokens)
-        .to.equal(TestResultsHWBonuses.hwBonusActualDistributedTokens)
-      expect(distribution.totalTokensDistributedPerSecond).to.equal('1500')
+        .to.equal(TestResultsQualityBonus.hwBonusActualDistributedTokens)
+
+      expect(distribution.bonuses.quality.enabled).to.be.true
+      expect(distribution.bonuses.quality.tokensDistributedPerSecond)
+        .to.equal('250')
+      expect(distribution.bonuses.quality.networkScore)
+        .to.equal(TestResultsQualityBonus.qualityBonusNetworkScore)
+      expect(distribution.bonuses.quality.distributedTokens)
+        .to.equal(TestResultsQualityBonus.qualityBonusActualDistributedTokens)
+
+      expect(distribution.totalTokensDistributedPerSecond).to.equal('1750')
       expect(distribution.totalNetworkScore)
-        .to.equal(TestResultsHWBonuses.totalNetworkScore)
+        .to.equal(TestResultsQualityBonus.totalNetworkScore)
       expect(distribution.totalDistributedTokens)
-        .to.equal(TestResultsHWBonuses.totalActualDistributedTokens)
+        .to.equal(TestResultsQualityBonus.totalActualDistributedTokens)
       
-      // NB: Spot-check an address that has two relays, one being a hw relay
+      // NB: Spot-check an address that has a family, hw relay, quality bonus
       const address = '0xa2AA87bE9FaaE25F1aC6E6846eC9589b03625ce0'
       const fingerprint1 = '60CCE755BD6B7410C70A16B4204D13A986437FDA'
       const fingerprint2 = '25280148FEF4E800FD179082D9E23276C7199E9D'
       expect(distribution.details[fingerprint1]).to.deep.equal({
         address,
         score: '53000',
-        distributedTokens: '8355',
+        distributedTokens: '8881',
         bonuses: {
-          hardware: '5802'
+          hardware: '5802',
+          quality: '526'
         },
         multipliers: {
           family: '1',
@@ -2689,7 +2839,8 @@ describe('Distribution Contract', () => {
         score: '56000',
         distributedTokens: '2697',
         bonuses: {
-          hardware: '0'
+          hardware: '0',
+          quality: '0'
         },
         multipliers: {
           family: '1',
@@ -2697,7 +2848,5 @@ describe('Distribution Contract', () => {
         }
       })
     })
-
-    it('Tracks quality tier bonus in previous distributions')
   })
 })

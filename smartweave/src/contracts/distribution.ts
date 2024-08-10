@@ -62,7 +62,12 @@ export type DistributionResult = {
       enabled: boolean
       tokensDistributedPerSecond: string
       settings: {
-        uptime: {}
+        uptime: {
+          [days: number]: number
+        }
+      }
+      uptime: {
+        [fingerprint: Fingerprint]: number
       }
       networkScore: string
       distributedTokens: string
@@ -85,6 +90,7 @@ export type DistributionResult = {
       distributedTokens: string
       bonuses: {
         hardware: string
+        quality: string
       }
       multipliers: {
         family: string
@@ -359,11 +365,14 @@ export class DistributionContract extends Evolvable(Object) {
     baseDistributedTokens: BigNumber,
     hwBonusNetworkScore: BigNumber,
     hwBonusDistributedTokens: BigNumber,
+    qualityBonusNetworkScore: BigNumber,
+    qualityBonusDistributedTokens: BigNumber,
     details: DistributionResult['details']
   ) {
     const totalTokensDistributedPerSecond =
       BigNumber(state.tokensDistributedPerSecond)
         .plus(BigNumber(state.bonuses.hardware.tokensDistributedPerSecond))
+        .plus(BigNumber(state.bonuses.quality.tokensDistributedPerSecond))
         .toString()
     
     const totalNetworkScore = baseNetworkScore
@@ -388,14 +397,9 @@ export class DistributionContract extends Evolvable(Object) {
           distributedTokens: hwBonusDistributedTokens.toString()
         },
         quality: {
-          enabled: state.bonuses.quality.enabled,
-          tokensDistributedPerSecond:
-            state.bonuses.quality.tokensDistributedPerSecond,
-          networkScore: '0',
-          distributedTokens: '0',
-          settings: {
-            uptime: {}
-          }
+          ...state.bonuses.quality,
+          networkScore: qualityBonusNetworkScore.toString(),
+          distributedTokens: qualityBonusDistributedTokens.toString()
         }
       },
       totalTokensDistributedPerSecond,
@@ -426,10 +430,12 @@ export class DistributionContract extends Evolvable(Object) {
     timestamp: string
   ) {
     const { scores } = state.pendingDistributions[timestamp]
-    const hwScores = scores.filter(
-      ({ address }) => state.bonuses.hardware.fingerprints.includes(address)
-    )
-    const { baseNetworkScore, hwBonusNetworkScore } = scores.reduce(
+    const {
+      baseNetworkScore,
+      hwBonusNetworkScore,
+      qualityBonusNetworkScore,
+      qualityScores
+    } = scores.reduce(
       (totals, { fingerprint, score, address }) => {
         let scoreWithMultipliers = BigNumber(score)
         if (
@@ -457,6 +463,25 @@ export class DistributionContract extends Evolvable(Object) {
           hwScoreWithMultipliers = scoreWithMultipliers
         }
 
+        let qualityScore = BigNumber(0)
+        if (state.bonuses.quality.enabled) {
+          const uptime = state.bonuses.quality.uptime[fingerprint] || 0
+          const uptimeTierDayThresholds = Object
+            .keys(state.bonuses.quality.settings.uptime)
+            .map(d => Number.parseInt(d))
+          for (const uptimeTierDayThreshold of uptimeTierDayThresholds) {
+            if (uptime >= uptimeTierDayThreshold) {
+              qualityScore = BigNumber(
+                state.bonuses.quality.settings.uptime[uptimeTierDayThreshold]
+              )
+            } else {
+              break
+            }
+          }
+
+          totals.qualityScores[fingerprint] = qualityScore
+        }
+
         return {
           ...totals,
           baseNetworkScore: totals
@@ -464,13 +489,28 @@ export class DistributionContract extends Evolvable(Object) {
             .plus(scoreWithMultipliers),
           hwBonusNetworkScore: totals
             .hwBonusNetworkScore
-            .plus(hwScoreWithMultipliers)
-        }        
+            .plus(hwScoreWithMultipliers),
+          qualityBonusNetworkScore: totals
+            .qualityBonusNetworkScore
+            .plus(qualityScore)
+        }
       },
-      { baseNetworkScore: BigNumber(0), hwBonusNetworkScore: BigNumber(0) }
+      {
+        baseNetworkScore: BigNumber(0),
+        hwBonusNetworkScore: BigNumber(0),
+        qualityBonusNetworkScore: BigNumber(0),
+        qualityScores: {} as { [fingerprint: Fingerprint]: BigNumber }
+      }
     )
 
-    return { scores, hwScores, baseNetworkScore, hwBonusNetworkScore }
+    return {
+      scores,
+      qualityScores,
+
+      baseNetworkScore,
+      hwBonusNetworkScore,
+      qualityBonusNetworkScore
+    }
   }
 
   private calculateEpochTokens(
@@ -478,7 +518,9 @@ export class DistributionContract extends Evolvable(Object) {
     epochLengthInMs: number,
     scores: Score[],
     baseNetworkScore: BigNumber,
-    hwBonusNetworkScore: BigNumber
+    hwBonusNetworkScore: BigNumber,
+    qualityScores: { [fingerprint: string]: BigNumber },
+    qualityBonusNetworkScore: BigNumber
   ) {
     const baseTokensToDistribute = BigNumber(state.tokensDistributedPerSecond)
       .times(BigNumber(epochLengthInMs))
@@ -489,8 +531,14 @@ export class DistributionContract extends Evolvable(Object) {
         .times(BigNumber(epochLengthInMs))
         .dividedBy(1000)
 
+    const qualityBonusTokensToDistribute =
+      BigNumber(state.bonuses.quality.tokensDistributedPerSecond)
+        .times(BigNumber(epochLengthInMs))
+        .dividedBy(1000)
+
     let baseActualDistributedTokens = BigNumber(0)
     let hwBonusActualDistributedTokens = BigNumber(0)
+    let qualityBonusActualDistributedTokens = BigNumber(0)
     const details: DistributionResult['details'] = {}
     for (let i = 0; i < scores.length; i++) {
       const { score, address, fingerprint } = scores[i]
@@ -534,9 +582,20 @@ export class DistributionContract extends Evolvable(Object) {
       }
       hwBonusActualDistributedTokens = hwBonusActualDistributedTokens
         .plus(hwBonusRedeemableTokens)
+
+      let qualityBonusRedeemableTokens = BigNumber(0)
+      if (state.bonuses.quality.enabled) {
+        qualityBonusRedeemableTokens = qualityScores[fingerprint]
+          .dividedBy(qualityBonusNetworkScore)
+          .times(qualityBonusTokensToDistribute)
+          .integerValue(BigNumber.ROUND_FLOOR)
+      }
+      qualityBonusActualDistributedTokens = qualityBonusActualDistributedTokens
+        .plus(qualityBonusRedeemableTokens)
       
       const redeemableTokens = baseRedeemableTokens
         .plus(hwBonusRedeemableTokens)
+        .plus(qualityBonusRedeemableTokens)
       const previouslyRedeemableTokens = state.claimable[address] || '0'
 
       state.claimable[address] = BigNumber(previouslyRedeemableTokens)
@@ -548,7 +607,8 @@ export class DistributionContract extends Evolvable(Object) {
         score,
         distributedTokens: redeemableTokens.toString(),
         bonuses: {
-          hardware: hwBonusRedeemableTokens.toString()
+          hardware: hwBonusRedeemableTokens.toString(),
+          quality: qualityBonusRedeemableTokens.toString()
         },
         multipliers: {
           family: familyMultiplier.toString(),
@@ -560,6 +620,7 @@ export class DistributionContract extends Evolvable(Object) {
     return {
       baseActualDistributedTokens,
       hwBonusActualDistributedTokens,
+      qualityBonusActualDistributedTokens,
       details
     }
   }
@@ -633,8 +694,10 @@ export class DistributionContract extends Evolvable(Object) {
     const lastDistribution = this.getLatestDistribution(state)
     const {
       scores,
+      qualityScores,
       baseNetworkScore,
-      hwBonusNetworkScore
+      hwBonusNetworkScore,
+      qualityBonusNetworkScore
     } = this.calculateEpochScores(state, timestamp)
     const epochLengthInMs = lastDistribution
       ? Number.parseInt(timestamp) - lastDistribution
@@ -643,6 +706,7 @@ export class DistributionContract extends Evolvable(Object) {
     let distributionResult = {
       baseActualDistributedTokens: BigNumber(0),
       hwBonusActualDistributedTokens: BigNumber(0),
+      qualityBonusActualDistributedTokens: BigNumber(0),
       details: {} as DistributionResult['details']
     }
     if (lastDistribution) {
@@ -651,7 +715,9 @@ export class DistributionContract extends Evolvable(Object) {
         epochLengthInMs,
         scores,
         baseNetworkScore,
-        hwBonusNetworkScore
+        hwBonusNetworkScore,
+        qualityScores,
+        qualityBonusNetworkScore
       )
     }
 
@@ -663,6 +729,8 @@ export class DistributionContract extends Evolvable(Object) {
       distributionResult.baseActualDistributedTokens,
       hwBonusNetworkScore,
       distributionResult.hwBonusActualDistributedTokens,
+      qualityBonusNetworkScore,
+      distributionResult.qualityBonusActualDistributedTokens,
       distributionResult.details
     )
 
