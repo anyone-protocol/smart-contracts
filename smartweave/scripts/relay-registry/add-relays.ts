@@ -2,13 +2,11 @@ import dotenv from 'dotenv'
 import { LoggerFactory, WarpFactory } from 'warp-contracts'
 import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
-
 import { Wallet } from 'ethers'
 import Consul from 'consul'
 import BigNumber from 'bignumber.js'
 
 import {
-  AddClaimable,
   AddClaimableBatched,
   RelayRegistryHandle,
   RelayRegistryState
@@ -36,11 +34,16 @@ async function main() {
       key = process.env.RELAY_REGISTRY_ADDRESS_CONSUL_KEY
     if (!host) { throw new Error('CONSUL_IP is not set!') }
     if (!port) { throw new Error('CONSUL_PORT is not set!') }
-    if (!key) { throw new Error('RELAY_REGISTRY_ADDRESS_CONSUL_KEY is not set!') }
+    if (!key) {
+      throw new Error('RELAY_REGISTRY_ADDRESS_CONSUL_KEY is not set!')
+    }
     
     console.log(`Connecting to Consul at ${host}:${port}`)
     consul = new Consul({ host, port })
-    const { Value } = await consul.kv.get<{Value: string}>({ token: consulToken, key })
+    const { Value } = await consul.kv.get<{Value: string}>({
+      token: consulToken,
+      key
+    })
     contractTxId = Value
   }
 

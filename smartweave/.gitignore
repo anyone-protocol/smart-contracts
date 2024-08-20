@@ -93,3 +93,5 @@ sw.*
 
 # warp cache
 cache/
+
+data/data.json
