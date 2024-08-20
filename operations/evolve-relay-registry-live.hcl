@@ -11,7 +11,7 @@ job "evolve-relay-registry-live" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/ator-development/smart-contracts:0.3.0"
+            image = "ghcr.io/ator-development/smart-contracts:0.3.1"
             entrypoint = ["npm"]
             command = "run"
             args = ["evolve"]

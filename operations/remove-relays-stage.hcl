@@ -1,4 +1,4 @@
-job "set-previous-distribution-tracking-limit-dev" {
+job "remove-relays-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "set-previous-distribution-tracking-limit-dev" {
     attempts = 0
   }
 
-  task "set-previous-distribution-tracking-limit-dev-task" {
+  task "remove-relays-stage-task" {
     driver = "docker"
 
     config {
@@ -14,17 +14,17 @@ job "set-previous-distribution-tracking-limit-dev" {
       image = "ghcr.io/ator-development/smart-contracts:0.3.1"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-token-distribution-rate.ts"]
+      args = ["scripts/relay-registry/remove-relays.ts"]
     }
 
     vault {
-      policies = ["distribution-dev"]
+      policies = ["relay-registry-stage"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/dev"}}
-        DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+      {{with secret "kv/relay-registry/stage"}}
+        RELAY_REGISTRY_OWNER_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH
@@ -32,12 +32,22 @@ job "set-previous-distribution-tracking-limit-dev" {
       env         = true
     }
 
+    template {
+      data = <<EOH
+      {
+        "fingerprints": [
+          
+        ]
+      }
+      EOH
+      destination = "data/data.json"
+    }
+
     env {
-      PHASE="dev"
+      PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/dev/distribution-address"
-      DISTRIBUTION_PREV_TRACKING_LIMIT="1"
+      RELAY_REGISTRY_ADDRESS_CONSUL_KEY="smart-contracts/stage/relay-registry-address"
     }
 
     restart {
