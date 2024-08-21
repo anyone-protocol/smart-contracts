@@ -11,10 +11,11 @@ job "remove-relays-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.3.1"
+      image = "ghcr.io/ator-development/smart-contracts:0.3.2"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/relay-registry/remove-relays.ts"]
+      volumes = [ "data/data.json:/usr/src/app/smartweave/data/data.json" ]
     }
 
     vault {
@@ -24,7 +25,7 @@ job "remove-relays-live" {
     template {
       data = <<EOH
       {{with secret "kv/relay-registry/live"}}
-        RELAY_REGISTRY_OWNER_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
+        RELAY_REGISTRY_OPERATOR_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH
