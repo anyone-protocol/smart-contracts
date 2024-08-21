@@ -74,7 +74,7 @@ async function main() {
 
     const input: RemoveClaimable = { function: 'removeClaimable', fingerprint }
 
-    console.log(`Runnning sanity check for ${input}`)
+    console.log(`Runnning sanity check for ${JSON.stringify(input)}`)
     try {
       // NB: Dry-run sanity check
       const { cachedValue: { state } } = await contract.readState()
@@ -89,7 +89,9 @@ async function main() {
         .connect(signer)
         .writeInteraction<RemoveClaimable>(input)
 
-      console.log(`Remove relay ${input} result ${result?.originalTxId}`)
+      console.log(
+        `Remove relay ${JSON.stringify(input)} result ${result?.originalTxId}`
+      )
     } catch (error) {
       console.error(error)
       console.log('Continuing execution')
