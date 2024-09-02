@@ -18,6 +18,12 @@ export {
   SetPreviousDistributionTrackingLimit,
   AddFingerprintsToBonus,
   RemoveFingerprintsFromBonus,
+  SetQualityTierBonusRate,
+  ToggleQualityTierBonus,
+  SetQualityTierBonusSettings,
+  SetQualityTierUptimes,
+  SetFamilyMultiplierRate,
+  ToggleFamilyMultipliers,
   DistributionContract,
   handle as DistributionHandle
 } from './distribution'

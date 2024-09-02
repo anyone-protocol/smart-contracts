@@ -11,7 +11,7 @@ job "deploy-distribution-stage" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/ator-development/smart-contracts:0.3.2"
+            image = "ghcr.io/ator-development/smart-contracts:0.3.3"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
@@ -43,7 +43,7 @@ job "deploy-distribution-stage" {
     "owner":"{{.Data.data.DISTRIBUTION_OWNER_ADDRESS}}",
     "pendingDistributions":{},
     "previousDistributions":{},
-    "tokensDistributedPerSecond":"62800000000000000"
+    "tokensDistributedPerSecond":"54320142060000000"
 }
 
             {{end}}

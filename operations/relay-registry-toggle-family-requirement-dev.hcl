@@ -11,7 +11,7 @@ job "relay-registry-toggle-family-requirement-dev" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.3.2"
+      image = "ghcr.io/ator-development/smart-contracts:0.3.3"
       entrypoint = ["npx"]
       command = "ts-node"
       args = [

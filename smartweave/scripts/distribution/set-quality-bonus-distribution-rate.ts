@@ -8,7 +8,7 @@ import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import {
   DistributionHandle,
   DistributionState,
-  SetTokenDistributionRate
+  SetQualityTierBonusRate
 } from '../../src/contracts'
 
 dotenv.config()
@@ -16,7 +16,8 @@ dotenv.config()
 let consulToken = process.env.CONSUL_TOKEN,
   contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
   contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY,
-  tokensDistributedPerSecond = process.env.TOKENS_DISTRIBUTED_PER_SECOND
+  tokensDistributedPerSecond =
+    process.env.QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND
 
 LoggerFactory.INST.logLevel('error')
 
@@ -26,7 +27,7 @@ const warp = WarpFactory
 
 async function main() {
   if (!tokensDistributedPerSecond) {
-    throw new Error('TOKENS_DISTRIBUTED_PER_SECOND is not set!')
+    throw new Error('QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND is not set!')
   }
 
   if (consulToken) {
@@ -58,14 +59,14 @@ async function main() {
   const contract = warp.contract<DistributionState>(contractTxId)
   const contractOwner = new Wallet(contractOwnerPrivateKey)
 
-  const input: SetTokenDistributionRate = {
-    function: 'setTokenDistributionRate',
+  const input: SetQualityTierBonusRate = {
+    function: 'setQualityTierBonusRate',
     tokensDistributedPerSecond
   }
 
   console.log(
-    `Setting base token distribution rate ${tokensDistributedPerSecond}`
-      + ` on contract ${contractTxId}`
+    `Setting quality bonus token distribution rate`
+      + ` ${tokensDistributedPerSecond} on contract ${contractTxId}`
   )
 
   // NB: Sanity check by getting current state and "dry-running" thru contract
@@ -80,10 +81,11 @@ async function main() {
   // NB: Send off the interaction for real
   const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<SetTokenDistributionRate>(input)
+    .writeInteraction<SetQualityTierBonusRate>(input)
 
   console.log(
-    `Set base token distribution rate result txid ${result?.originalTxId}`
+    `Set quality bonus token distribution rate result`
+      + ` txid ${result?.originalTxId}`
   )
 }
 
