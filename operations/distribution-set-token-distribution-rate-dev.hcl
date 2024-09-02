@@ -1,4 +1,4 @@
-job "set-token-distribution-rate-dev" {
+job "distribution-set-token-distribution-rate-dev" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "set-token-distribution-rate-dev" {
     attempts = 0
   }
 
-  task "set-token-distribution-rate-dev-task" {
+  task "distribution-set-token-distribution-rate-dev-task" {
     driver = "docker"
 
     config {
@@ -24,7 +24,7 @@ job "set-token-distribution-rate-dev" {
     template {
       data = <<EOH
       {{with secret "kv/distribution/dev"}}
-        DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+        DISTRIBUTION_OPERATOR_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH

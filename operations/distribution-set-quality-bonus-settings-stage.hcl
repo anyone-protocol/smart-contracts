@@ -1,4 +1,4 @@
-job "set-distribution-bonus-stage" {
+job "distribution-set-quality-bonus-settings-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "set-distribution-bonus-stage" {
     attempts = 0
   }
 
-  task "set-distribution-bonus-stage-task" {
+  task "distribution-set-quality-bonus-settings-stage-task" {
     driver = "docker"
 
     config {
@@ -14,7 +14,7 @@ job "set-distribution-bonus-stage" {
       image = "ghcr.io/ator-development/smart-contracts:0.3.3"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-distribution-bonus.ts"]
+      args = ["scripts/distribution/set-quality-bonus-settings.ts"]
     }
 
     vault {
@@ -24,7 +24,7 @@ job "set-distribution-bonus-stage" {
     template {
       data = <<EOH
       {{with secret "kv/distribution/stage"}}
-        DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+        DISTRIBUTION_OPERATOR_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH
@@ -37,8 +37,9 @@ job "set-distribution-bonus-stage" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
-      DISTRIBUTION_BONUS="0"
-      DISTRIBUTION_TIMESTAMP=""
+      QUALITY_BONUS_SETTINGS=<<EOH
+        {"uptime":{"3":1,"14":3}}
+      EOH
     }
 
     restart {
