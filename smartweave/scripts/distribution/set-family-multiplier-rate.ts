@@ -8,7 +8,7 @@ import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import {
   DistributionHandle,
   DistributionState,
-  SetTokenDistributionRate
+  SetFamilyMultiplierRate
 } from '../../src/contracts'
 
 dotenv.config()
@@ -16,7 +16,7 @@ dotenv.config()
 let consulToken = process.env.CONSUL_TOKEN,
   contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
   contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY,
-  tokensDistributedPerSecond = process.env.TOKENS_DISTRIBUTED_PER_SECOND
+  familyMultiplierRate = process.env.FAMILY_MULTIPLIER_RATE
 
 LoggerFactory.INST.logLevel('error')
 
@@ -25,8 +25,8 @@ const warp = WarpFactory
   .use(new EthersExtension())
 
 async function main() {
-  if (!tokensDistributedPerSecond) {
-    throw new Error('TOKENS_DISTRIBUTED_PER_SECOND is not set!')
+  if (!familyMultiplierRate) {
+    throw new Error('FAMILY_MULTIPLIER_RATE is not set!')
   }
 
   if (consulToken) {
@@ -58,13 +58,13 @@ async function main() {
   const contract = warp.contract<DistributionState>(contractTxId)
   const contractOwner = new Wallet(contractOwnerPrivateKey)
 
-  const input: SetTokenDistributionRate = {
-    function: 'setTokenDistributionRate',
-    tokensDistributedPerSecond
+  const input: SetFamilyMultiplierRate = {
+    function: 'setFamilyMultiplierRate',
+    familyMultiplierRate
   }
 
   console.log(
-    `Setting base token distribution rate ${tokensDistributedPerSecond}`
+    `Setting family multiplier rate ${familyMultiplierRate}`
       + ` on contract ${contractTxId}`
   )
 
@@ -80,11 +80,12 @@ async function main() {
   // NB: Send off the interaction for real
   const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<SetTokenDistributionRate>(input)
+    .writeInteraction<SetFamilyMultiplierRate>(input)
 
   console.log(
-    `Set base token distribution rate result txid ${result?.originalTxId}`
+    `Set family multiplier rate result txid ${result?.originalTxId}`
   )
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; })
+

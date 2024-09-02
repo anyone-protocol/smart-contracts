@@ -8,15 +8,15 @@ import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import {
   DistributionHandle,
   DistributionState,
-  SetTokenDistributionRate
+  ToggleHardwareBonus
 } from '../../src/contracts'
 
 dotenv.config()
 
-let consulToken = process.env.CONSUL_TOKEN,
-  contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
-  contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY,
-  tokensDistributedPerSecond = process.env.TOKENS_DISTRIBUTED_PER_SECOND
+const consulToken = process.env.CONSUL_TOKEN
+const contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY
+const hwBonusEnabled = process.env.HW_BONUS_ENABLED || ''
+let contractTxId = process.env.DISTRIBUTION_CONTRACT_ID
 
 LoggerFactory.INST.logLevel('error')
 
@@ -25,8 +25,10 @@ const warp = WarpFactory
   .use(new EthersExtension())
 
 async function main() {
-  if (!tokensDistributedPerSecond) {
-    throw new Error('TOKENS_DISTRIBUTED_PER_SECOND is not set!')
+  if (!['true', 'false'].includes(hwBonusEnabled)) {
+    throw new Error(
+      'HW_BONUS_ENABLED must be "true" or "false" (string)'
+    )
   }
 
   if (consulToken) {
@@ -57,15 +59,14 @@ async function main() {
 
   const contract = warp.contract<DistributionState>(contractTxId)
   const contractOwner = new Wallet(contractOwnerPrivateKey)
-
-  const input: SetTokenDistributionRate = {
-    function: 'setTokenDistributionRate',
-    tokensDistributedPerSecond
+  const enabled = hwBonusEnabled === 'true' ? true : false
+  const input: ToggleHardwareBonus = {
+    function: 'toggleHardwareBonus',
+    enabled
   }
 
   console.log(
-    `Setting base token distribution rate ${tokensDistributedPerSecond}`
-      + ` on contract ${contractTxId}`
+    `Toggling hw bonus enabled ${enabled} on contract ${contractTxId}`
   )
 
   // NB: Sanity check by getting current state and "dry-running" thru contract
@@ -80,10 +81,10 @@ async function main() {
   // NB: Send off the interaction for real
   const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<SetTokenDistributionRate>(input)
+    .writeInteraction<ToggleHardwareBonus>(input)
 
   console.log(
-    `Set base token distribution rate result txid ${result?.originalTxId}`
+    `Toggling hw bonus enabled ${enabled} result txid ${result?.originalTxId}`
   )
 }
 

@@ -1,4 +1,4 @@
-job "set-token-distribution-rate-live" {
+job "set-token-distribution-rate-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,24 +6,24 @@ job "set-token-distribution-rate-live" {
     attempts = 0
   }
 
-  task "set-token-distribution-rate-live-task" {
+  task "set-token-distribution-rate-stage-task" {
     driver = "docker"
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.3.2"
+      image = "ghcr.io/ator-development/smart-contracts:0.3.3"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-token-distribution-rate.ts"]
     }
 
     vault {
-      policies = ["distribution-live"]
+      policies = ["distribution-stage"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/live"}}
+      {{with secret "kv/distribution/stage"}}
         DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
@@ -33,11 +33,11 @@ job "set-token-distribution-rate-live" {
     }
 
     env {
-      PHASE="live"
+      PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TOKENS_DISTRIBUTED_PER_SECOND="95116000000000000"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
+      TOKENS_DISTRIBUTED_PER_SECOND="54320142060000000"
+      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
     }
 
     restart {

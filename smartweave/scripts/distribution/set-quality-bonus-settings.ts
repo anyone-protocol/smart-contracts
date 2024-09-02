@@ -8,15 +8,15 @@ import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import {
   DistributionHandle,
   DistributionState,
-  SetTokenDistributionRate
+  SetQualityTierBonusSettings
 } from '../../src/contracts'
 
 dotenv.config()
 
 let consulToken = process.env.CONSUL_TOKEN,
   contractTxId = process.env.DISTRIBUTION_CONTRACT_ID,
-  contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY,
-  tokensDistributedPerSecond = process.env.TOKENS_DISTRIBUTED_PER_SECOND
+  contractOwnerPrivateKey = process.env.DISTRIBUTION_OPERATOR_KEY
+const qualityBonusSettingsJsonString = process.env.QUALITY_BONUS_SETTINGS || ''
 
 LoggerFactory.INST.logLevel('error')
 
@@ -25,8 +25,8 @@ const warp = WarpFactory
   .use(new EthersExtension())
 
 async function main() {
-  if (!tokensDistributedPerSecond) {
-    throw new Error('TOKENS_DISTRIBUTED_PER_SECOND is not set!')
+  if (!qualityBonusSettingsJsonString) {
+    throw new Error('QUALITY_BONUS_SETTINGS is not set!')
   }
 
   if (consulToken) {
@@ -57,15 +57,15 @@ async function main() {
 
   const contract = warp.contract<DistributionState>(contractTxId)
   const contractOwner = new Wallet(contractOwnerPrivateKey)
-
-  const input: SetTokenDistributionRate = {
-    function: 'setTokenDistributionRate',
-    tokensDistributedPerSecond
+  const settings = JSON.parse(qualityBonusSettingsJsonString)
+  const input: SetQualityTierBonusSettings = {
+    function: 'setQualityTierBonusSettings',
+    settings
   }
 
   console.log(
-    `Setting base token distribution rate ${tokensDistributedPerSecond}`
-      + ` on contract ${contractTxId}`
+    `Setting quality bonus settings on contract ${contractTxId}`,
+    JSON.stringify(input, undefined, 2)
   )
 
   // NB: Sanity check by getting current state and "dry-running" thru contract
@@ -80,11 +80,9 @@ async function main() {
   // NB: Send off the interaction for real
   const result = await contract
     .connect(new EthereumSigner(contractOwnerPrivateKey))
-    .writeInteraction<SetTokenDistributionRate>(input)
+    .writeInteraction<SetQualityTierBonusSettings>(input)
 
-  console.log(
-    `Set base token distribution rate result txid ${result?.originalTxId}`
-  )
+  console.log(`Set quality bonus settings result txid ${result?.originalTxId}`)
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; })
