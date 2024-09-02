@@ -1,4 +1,4 @@
-job "distribution-set-token-distribution-rate-stage" {
+job "distribution-toggle-quality-bonus-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "distribution-set-token-distribution-rate-stage" {
     attempts = 0
   }
 
-  task "distribution-set-token-distribution-rate-stage-task" {
+  task "distribution-toggle-quality-bonus-stage-task" {
     driver = "docker"
 
     config {
@@ -14,7 +14,9 @@ job "distribution-set-token-distribution-rate-stage" {
       image = "ghcr.io/ator-development/smart-contracts:0.3.3"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-token-distribution-rate.ts"]
+      args = [
+        "scripts/distribution/toggle-quality-bonus.ts"
+      ]
     }
 
     vault {
@@ -36,8 +38,8 @@ job "distribution-set-token-distribution-rate-stage" {
       PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TOKENS_DISTRIBUTED_PER_SECOND="54320142060000000"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
+      QUALITY_BONUS_ENABLED="true"
     }
 
     restart {

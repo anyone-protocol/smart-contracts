@@ -1,4 +1,4 @@
-job "set-distribution-bonus-dev" {
+job "distribution-set-quality-bonus-distribution-rate-dev" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "set-distribution-bonus-dev" {
     attempts = 0
   }
 
-  task "set-distribution-bonus-dev-task" {
+  task "distribution-set-quality-bonus-distribution-rate-dev-task" {
     driver = "docker"
 
     config {
@@ -14,7 +14,7 @@ job "set-distribution-bonus-dev" {
       image = "ghcr.io/ator-development/smart-contracts:0.3.3"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-distribution-bonus.ts"]
+      args = ["scripts/distribution/set-quality-bonus-distribution-rate.ts"]
     }
 
     vault {
@@ -24,7 +24,7 @@ job "set-distribution-bonus-dev" {
     template {
       data = <<EOH
       {{with secret "kv/distribution/dev"}}
-        DISTRIBUTION_OWNER_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+        DISTRIBUTION_OPERATOR_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH
@@ -37,8 +37,7 @@ job "set-distribution-bonus-dev" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/dev/distribution-address"
-      DISTRIBUTION_BONUS="0"
-      DISTRIBUTION_TIMESTAMP=""
+      QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="13580035510000000"
     }
 
     restart {
