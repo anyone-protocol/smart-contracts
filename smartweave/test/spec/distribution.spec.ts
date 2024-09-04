@@ -2506,6 +2506,96 @@ describe('Distribution Contract', () => {
       )
       expect(state.claimable).to.deep.equal(rewards)
     })
+
+    it('Applies quality tier bonus gracefully if info is missing', () => {
+      const elapsed = 86400
+      const timestamp = Date.now()
+      const previousTimestamp = (timestamp - elapsed).toString()
+
+      const distribute = createInteraction(OWNER, {
+        function: 'distribute',
+        timestamp: timestamp.toString()
+      })
+
+      const { state } = DistributionHandle(
+        {
+          ...initState,
+          tokensDistributedPerSecond: '1000',
+          families: TestFamilies,
+          bonuses: {
+            hardware: {
+              enabled: true,
+              tokensDistributedPerSecond: '500',
+              fingerprints: TestScoresQualityBonus
+                .filter(({ hardware }) => !!hardware)
+                .map(({ fingerprint }) => fingerprint)
+            },
+            quality: {
+              enabled: true,
+              tokensDistributedPerSecond: '250',
+              settings: {
+                uptime: DEFAULT_QUALITY_BONUS_SETTINGS
+              },
+              uptime: {}
+            }
+          },
+          pendingDistributions: {
+            [timestamp]: {
+              scores: TestScoresQualityBonus
+                .map(
+                  ({ score, address, fingerprint }) =>
+                    ({ score, address, fingerprint })
+                )
+            }
+          },
+          previousDistributions: {
+            [previousTimestamp]: {
+              timeElapsed: '0',
+              tokensDistributedPerSecond: '0',
+              baseNetworkScore: '0',
+              baseDistributedTokens: '0',
+              bonuses: {
+                hardware: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0'
+                },
+                quality: {
+                  enabled: false,
+                  tokensDistributedPerSecond: '0',
+                  networkScore: '0',
+                  distributedTokens: '0',
+                  settings: {
+                    uptime: {}
+                  },
+                  uptime: {}
+                }
+              },
+              totalTokensDistributedPerSecond: '0',
+              totalNetworkScore: '0',
+              totalDistributedTokens: '0',
+              details: {},
+              families: TestFamilies,
+              multipliers: {
+                family: {
+                  enabled: false,
+                  familyMultiplierRate: '0'
+                }
+              }
+            }
+          }
+        },
+        distribute
+      )
+
+      const rewards = Object.fromEntries(
+        TestResultsQualityBonus.rewards.map(
+          ({ address, totalReward }) => [ address, totalReward ]
+        )
+      )
+      expect(Object.values(state.claimable)).to.not.include('NaN')
+    })
   })
 
   describe('Claiming', () => {

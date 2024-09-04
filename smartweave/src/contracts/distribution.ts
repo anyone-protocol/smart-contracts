@@ -560,11 +560,13 @@ export class DistributionContract extends Evolvable(Object) {
           .plus(1)
       }
 
-      const baseRedeemableTokens = BigNumber(score)
-        .times(familyMultiplier)
-        .dividedBy(baseNetworkScore)
-        .times(baseTokensToDistribute)
-        .integerValue(BigNumber.ROUND_FLOOR)
+      const baseRedeemableTokens = baseNetworkScore.gt(0)
+        ? BigNumber(score)
+            .times(familyMultiplier)
+            .dividedBy(baseNetworkScore)
+            .times(baseTokensToDistribute)
+            .integerValue(BigNumber.ROUND_FLOOR)
+        : BigNumber(0)
 
       baseActualDistributedTokens = baseActualDistributedTokens
         .plus(baseRedeemableTokens)
@@ -573,6 +575,7 @@ export class DistributionContract extends Evolvable(Object) {
       if (
         state.bonuses.hardware.enabled
         && state.bonuses.hardware.fingerprints.includes(fingerprint)
+        && hwBonusNetworkScore.gt(0)
       ) {
         hwBonusRedeemableTokens = BigNumber(score)
           .times(familyMultiplier)
@@ -584,7 +587,7 @@ export class DistributionContract extends Evolvable(Object) {
         .plus(hwBonusRedeemableTokens)
 
       let qualityBonusRedeemableTokens = BigNumber(0)
-      if (state.bonuses.quality.enabled) {
+      if (state.bonuses.quality.enabled && qualityBonusNetworkScore.gt(0)) {
         qualityBonusRedeemableTokens = qualityScores[fingerprint]
           .dividedBy(qualityBonusNetworkScore)
           .times(qualityBonusTokensToDistribute)
