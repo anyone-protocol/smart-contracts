@@ -11,7 +11,7 @@ job "distribution-toggle-quality-bonus-dev" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.3.3"
+      image = "ghcr.io/ator-development/smart-contracts:0.3.4"
       entrypoint = ["npx"]
       command = "ts-node"
       args = [
