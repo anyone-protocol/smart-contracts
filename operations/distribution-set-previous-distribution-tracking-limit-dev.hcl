@@ -11,7 +11,7 @@ job "distribution-set-previous-distribution-tracking-limit-dev" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/ator-development/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
       entrypoint = ["npx"]
       command = "ts-node"
       args = [

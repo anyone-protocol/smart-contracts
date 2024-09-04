@@ -10,7 +10,7 @@
   "keywords": [],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ATOR-Development/smart-contracts"
+    "url": "git+https://github.com/anyone-protocol/smart-contracts"
   },
   "scripts": {
     "process:build": "npm run process:clean && tsx scripts/bundle.ts",

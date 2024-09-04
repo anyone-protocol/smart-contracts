@@ -5,8 +5,8 @@ This monorepo contains smart contracts for the Protocol as well as hashicorp lan
 ## EVM
 
 The [/evm](./evm/README.md) directory is mostly used for test and development purposes.  For EVM contracts used as part of the Protocol, see their individual repositories:
-- [Facilitator](https://github.com/ATOR-Development/facilitator)
-- [Registrator](https://github.com/ATOR-Development/registrator)
+- [Facilitator](https://github.com/anyone-protocol/facilitator)
+- [Registrator](https://github.com/anyone-protocol/registrator)
 
 ## SmartWeave
 
