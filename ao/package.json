@@ -26,6 +26,8 @@
     "mocha": "^10.7.3",
     "rimraf": "^5.0.10",
     "tsx": "^4.19.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
     "typescript": "^5.5.4"
   }
 }

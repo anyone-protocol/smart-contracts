@@ -3,13 +3,27 @@ import path from 'path'
 import AoLoader from '@permaweb/ao-loader'
 
 export const MODULE_NAME = 'Encrypted-Messages'
-export const OWNER_ADDRESS = ''.padEnd(43, '1')
-export const ALICE_ADDRESS = ''.padEnd(42, 'a')
+export const OWNER_ADDRESS = '0x'.padEnd(42, '1')
+export const ALICE_ADDRESS = '0x'.padEnd(42, 'a')
+export const ALICE_PUBKEY = ''.padEnd(64, 'a')
+export const BOB_ADDRESS = '0x'.padEnd(42, 'b')
+export const BOB_PUBKEY = ''.padEnd(64, 'b')
 export const PROCESS_ID = ''.padEnd(43, '2')
 export const MODULE_ID = ''.padEnd(43, '3')
 export const DEFAULT_MODULE_ID = ''.padEnd(43, '4')
 export const DEFAULT_TARGET = ''.padEnd(43, '5')
 export const DEFAULT_MESSAGE_ID = ''.padEnd(43, 'f')
+export const FINGERPRINT_A = ''.padEnd(40, 'A')
+export const FINGERPRINT_B = ''.padEnd(40, 'B')
+export const FINGERPRINT_C = ''.padEnd(40, 'C')
+export const FINGERPRINT_D = ''.padEnd(40, 'D')
+export const FINGERPRINT_E = ''.padEnd(40, 'E')
+export const FINGERPRINT_F = ''.padEnd(40, 'F')
+
+// const hash = crypto.createHash('sha1')
+// hash.update(ALICE_PUBKEY)
+// const hex = hash.digest('hex')
+// console.log('alice fingerprint', hex)
 
 export const AO_ENV = {
   Process: {
@@ -54,6 +68,12 @@ const BUNDLED_SOURCE = fs.readFileSync(
   'utf-8',
 )
 
+export type FullAOHandleFunction = (
+  buffer: ArrayBuffer | null,
+  msg: AoLoader.Message,
+  env: AoLoader.Environment
+) => Promise<AoLoader.HandleResponse & { Error?: string }>
+
 export async function createLoader() {
   const handle = await AoLoader(AOS_WASM, {
     format: 'wasm64-unknown-emscripten-draft_2024_02_15',
@@ -86,5 +106,8 @@ export async function createLoader() {
     )
   }
 
-  return { handle, memory: memory as unknown as ArrayBuffer }
+  return {
+    handle: handle as unknown as FullAOHandleFunction,
+    memory: memory as unknown as ArrayBuffer
+  }
 }
