@@ -20,10 +20,47 @@ export const FINGERPRINT_D = ''.padEnd(40, 'D')
 export const FINGERPRINT_E = ''.padEnd(40, 'E')
 export const FINGERPRINT_F = ''.padEnd(40, 'F')
 
-// const hash = crypto.createHash('sha1')
-// hash.update(ALICE_PUBKEY)
-// const hex = hash.digest('hex')
-// console.log('alice fingerprint', hex)
+export const EXAMPLE_MASTER_ID_PUBLIC_KEY = fs.readFileSync(
+  path.join(
+    path.resolve(),
+    './test/util/test-keys/ed25519_master_id_public_key'
+  )
+)
+
+export const EXAMPLE_MASTER_ID_SECRET_KEY = fs.readFileSync(
+  path.join(
+    path.resolve(),
+    './test/util/test-keys/ed25519_master_id_secret_key'
+  )
+)
+
+export const EXAMPLE_SIGNING_CERT = fs.readFileSync(
+  path.join(path.resolve(), './test/util/test-keys/ed25519_signing_cert')
+)
+
+export const EXAMPLE_SIGNING_SECRET_KEY = fs.readFileSync(
+  path.join(path.resolve(), './test/util/test-keys/ed25519_signing_secret_key')
+)
+
+// const pubkey = crypto.createPublicKey({
+//   key: `
+// -----BEGIN RSA PRIVATE KEY-----
+// MIICXAIBAAKBgQDcvhABzy0a1mKCXKUdl415T2h0VEFOqx6rpWuiwQll+i3wS9hB
+// U3x/X+61j1g3uMtYGKltT51HkldNDuzxIznsKXEWpHJQE9HYW+t9GjUaYUhYqi5k
+// K4fHcvA5ixDoGd1NWfOxBTiWIkf6o2Ib2O30ieVkgney2gS8Gm59WGBI6wIDAQAB
+// AoGBAIf89vOGZG0iIbHZzUa7tMZFKz5vIYSLWuu3juXHMjkGtQJSVzl3az01JmPn
+// mRtK1srA9q+G2ofbGbk5NrMfVnCHQ43HAQ/DObTl5Nc3NOzRI/IKpdZ+2ceKBqNt
+// XM7Nj4U1zQypNpRL+hhiql6NV7SrROnUqFZpGtkyyFGUPBQxAkEA/t///UpF5+Wu
+// cZhIEkdfHOs+l4ir5GF+HUC8DzOn9sPXjWe4Dp3h3jxoiCJS7xLepz1ze+P1y8BA
+// 09Gh1vLC7QJBAN23fnJotczaa+/4TLT3QU8wVDNkPQXTZe68jjXsuIhB1TsnDP+P
+// 7ZUTuPud7IzV/MualLukN7OMnJEhwauFCDcCQCiU/AqVf+n7nToDGD6o1JEjN9Ui
+// 8tOrXkxEGW2GORFGf5TJVfol02fyUGaUqIXeiEsysqegVWu60deoQk+aWcUCQDfN
+// yl6jajagNxCUD0JxBRgYUukIbq97sKkw/h4mcZ+h6jhUMNpV8HdYGnQCIJql9VWN
+// l6fOwlJHrtR8iZFRD2sCQBFAozWaIpfn4X8//IgsT+MKWQtO/48rXSYHU41V7ZY9
+// NWtVGaZI2AWpyjRgHhBTMSLyme5rtFtETkfKHyKok7k=
+// -----END RSA PRIVATE KEY-----
+// `
+// })
 
 export const AO_ENV = {
   Process: {
@@ -74,8 +111,13 @@ export type FullAOHandleFunction = (
   env: AoLoader.Environment
 ) => Promise<AoLoader.HandleResponse & { Error?: string }>
 
+export type AOTestHandle = (
+  options?: Partial<AoLoader.Message>,
+  mem?: ArrayBuffer | null
+) => Promise<AoLoader.HandleResponse & { Error?: string }>
+
 export async function createLoader() {
-  const handle = await AoLoader(AOS_WASM, {
+  const originalHandle = await AoLoader(AOS_WASM, {
     format: 'wasm64-unknown-emscripten-draft_2024_02_15',
     memoryLimit: '524288000', // in bytes
     computeLimit: 9e12,
@@ -91,7 +133,7 @@ export async function createLoader() {
   ]
   let memory: ArrayBuffer | null = null
   for (const { action, args, Data } of programs) {
-    await handle(
+    await originalHandle(
       memory,
       {
         ...DEFAULT_HANDLE_OPTIONS,
@@ -106,8 +148,23 @@ export async function createLoader() {
     )
   }
 
+  async function handle(
+    options: Partial<AoLoader.Message> = {},
+    mem = memory
+  ) {
+    return originalHandle(
+      mem,
+      {
+        ...DEFAULT_HANDLE_OPTIONS,
+        ...options,
+      },
+      AO_ENV
+    )
+  }
+
   return {
-    handle: handle as unknown as FullAOHandleFunction,
+    handle,
+    originalHandle,
     memory: memory as unknown as ArrayBuffer
   }
 }

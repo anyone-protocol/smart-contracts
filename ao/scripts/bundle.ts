@@ -7,7 +7,7 @@ async function main() {
   console.log('Bundling Lua...')
   const luaEntryPath = path.join(
     path.resolve(),
-    './src/contracts/relay-registry/relay-registry.lua'
+    './src/contracts/relay-registry.lua'
   )
 
   if (!fs.existsSync(luaEntryPath)) {
