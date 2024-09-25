@@ -1,5 +1,7 @@
 return {
+  OnlyOwner = 'This method is only available to the Owner',
   InvalidCertificate = 'Invalid certificate',
-  InvalidAddress = 'Invalid address',
-  FingerprintAlreadyClaimable = 'Fingerprint is already claimable by address'
+  FingerprintRequired = 'Fingerprint required',
+  UnknownFingerprint = 'Unknown Fingerprint',
+  OnlyRelayOperatorCanRenounce = 'Only the Relay Operator can renounce'
 }
