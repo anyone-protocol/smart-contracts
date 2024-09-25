@@ -7,5 +7,9 @@ return {
   AddressIsBlocked = 'Address is blocked',
   AddressRequired = 'Address is required',
   InvalidAddress = 'Invalid Address',
-  AddressIsNotBlocked = 'Address is not blocked'
+  AddressIsNotBlocked = 'Address is not blocked',
+  InvalidFingerprint = 'Invalid Fingerprint',
+  RegistrationCreditAlreadyAdded = 'Registration Credit already added',
+  RegistrationCreditRequired = 'Registration Credit required',
+  RegistrationCreditDoesNotExist = 'Registration Credit does not exist'
 }
