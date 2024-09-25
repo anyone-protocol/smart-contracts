@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import crypto from 'crypto'
 import AoLoader from '@permaweb/ao-loader'
 
 export const MODULE_NAME = 'Encrypted-Messages'
@@ -42,25 +43,33 @@ export const EXAMPLE_SIGNING_SECRET_KEY = fs.readFileSync(
   path.join(path.resolve(), './test/util/test-keys/ed25519_signing_secret_key')
 )
 
-// const pubkey = crypto.createPublicKey({
-//   key: `
-// -----BEGIN RSA PRIVATE KEY-----
-// MIICXAIBAAKBgQDcvhABzy0a1mKCXKUdl415T2h0VEFOqx6rpWuiwQll+i3wS9hB
-// U3x/X+61j1g3uMtYGKltT51HkldNDuzxIznsKXEWpHJQE9HYW+t9GjUaYUhYqi5k
-// K4fHcvA5ixDoGd1NWfOxBTiWIkf6o2Ib2O30ieVkgney2gS8Gm59WGBI6wIDAQAB
-// AoGBAIf89vOGZG0iIbHZzUa7tMZFKz5vIYSLWuu3juXHMjkGtQJSVzl3az01JmPn
-// mRtK1srA9q+G2ofbGbk5NrMfVnCHQ43HAQ/DObTl5Nc3NOzRI/IKpdZ+2ceKBqNt
-// XM7Nj4U1zQypNpRL+hhiql6NV7SrROnUqFZpGtkyyFGUPBQxAkEA/t///UpF5+Wu
-// cZhIEkdfHOs+l4ir5GF+HUC8DzOn9sPXjWe4Dp3h3jxoiCJS7xLepz1ze+P1y8BA
-// 09Gh1vLC7QJBAN23fnJotczaa+/4TLT3QU8wVDNkPQXTZe68jjXsuIhB1TsnDP+P
-// 7ZUTuPud7IzV/MualLukN7OMnJEhwauFCDcCQCiU/AqVf+n7nToDGD6o1JEjN9Ui
-// 8tOrXkxEGW2GORFGf5TJVfol02fyUGaUqIXeiEsysqegVWu60deoQk+aWcUCQDfN
-// yl6jajagNxCUD0JxBRgYUukIbq97sKkw/h4mcZ+h6jhUMNpV8HdYGnQCIJql9VWN
-// l6fOwlJHrtR8iZFRD2sCQBFAozWaIpfn4X8//IgsT+MKWQtO/48rXSYHU41V7ZY9
-// NWtVGaZI2AWpyjRgHhBTMSLyme5rtFtETkfKHyKok7k=
-// -----END RSA PRIVATE KEY-----
-// `
-// })
+export const EXAMPLE_SIGNING_PUBLIC_KEY = EXAMPLE_SIGNING_CERT.subarray(39, 71)
+
+export const EXAMPLE_SECRET_ID_KEY = fs.readFileSync(
+  path.join(path.resolve(), './test/util/test-keys/secret_id_key')
+)
+
+export const EXAMPLE_RSA_IDENTITY_PUBLIC_KEY = crypto
+  .createPublicKey(EXAMPLE_SECRET_ID_KEY)
+  .export({ type: 'pkcs1', format: 'der' })
+
+export const EXAMPLE_FINGERPRINT = crypto
+  .createHash('sha1')
+  .update(EXAMPLE_RSA_IDENTITY_PUBLIC_KEY)
+  .digest()
+
+// const okcc = Buffer.concat([
+//   Buffer.from(EXAMPLE_FINGERPRINT),
+//   EXAMPLE_MASTER_ID_PUBLIC_KEY.subarray(32)
+// ])
+// const okccSignature = crypto.sign(null, okcc, EXAMPLE_SECRET_ID_KEY)
+// const verified = crypto.verify(
+//   null,
+//   okcc,
+//   EXAMPLE_SECRET_ID_KEY,
+//   okccSignature
+// )
+// console.log('verified', verified)
 
 export const AO_ENV = {
   Process: {

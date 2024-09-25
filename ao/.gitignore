@@ -38,3 +38,5 @@ tests/contracts
 src/contract/process.wasm
 key.json
 secret-key-base64.txt
+
+test/util/test-keys/other

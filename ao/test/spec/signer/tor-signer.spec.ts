@@ -14,7 +14,7 @@ import {
 } from '~/src/signer/tor-signer'
 
 describe('TorSigner', () => {
-  it('signs stuff', async () => {
+  it('signs & verifies stuff', async () => {
     const certified_key = EXAMPLE_SIGNING_CERT.subarray(39, 71)
     const extData = EXAMPLE_SIGNING_CERT.subarray(76, 108)
     const signature = EXAMPLE_SIGNING_CERT.subarray(108, 172)

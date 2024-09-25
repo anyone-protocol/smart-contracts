@@ -1,4 +1,5 @@
 return {
-  InvalidAddress = "Invalid address",
-  FingerprintAlreadyClaimable = "Fingerprint is already claimable by address"
+  InvalidCertificate = 'Invalid certificate',
+  InvalidAddress = 'Invalid address',
+  FingerprintAlreadyClaimable = 'Fingerprint is already claimable by address'
 }

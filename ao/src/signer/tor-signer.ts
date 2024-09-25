@@ -42,7 +42,9 @@ export class TorSigner implements Signer {
   ) {}
 
   /**
-   * From @stablelib/ed25519 from tweetnacl-js
+   * Signs a message using the Signer's "extended" ed25519 key
+   * 
+   * Modified from @stablelib/ed25519 from tweetnacl-js
    */
   async sign(message: Uint8Array): Promise<Uint8Array> {
     // NB: changed variable from "x" to "S"
@@ -119,7 +121,35 @@ export class TorSigner implements Signer {
     message: Uint8Array,
     signature: Uint8Array
   ): Promise<boolean> {
-    return verify(Buffer.from(pk), message, signature)
+    const publicKey = Buffer.from(pk)
+    const t = new Uint8Array(32)
+    const p = [gf(), gf(), gf(), gf()]
+    const q = [gf(), gf(), gf(), gf()]
+  
+    if (signature.length !== SIGNATURE_LENGTH) {
+      throw new Error(`ed25519: signature must be ${SIGNATURE_LENGTH} bytes`)
+    }
+  
+    if (unpackneg(q, publicKey)) {
+      return false
+    }
+  
+    const hs = createHash('sha512')
+    hs.update(signature.subarray(0, 32))
+    hs.update(publicKey)
+    hs.update(message)
+    const h = hs.digest()
+    reduce(h)
+    scalarmult(p, q, h)
+  
+    scalarbase(q, signature.subarray(32))
+    edadd(p, q)
+    pack(t, p)
+  
+    if (verify32(signature, t)) {
+      return false
+    }
+    return true
   }
 }
 
@@ -178,35 +208,28 @@ const L = new Float64Array([
   0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2,
   0xde, 0xf9, 0xde, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10
 ])
-
 const D = gf([
   0x78a3, 0x1359, 0x4dca, 0x75eb, 0xd8ab, 0x4141, 0x0a4d, 0x0070,
   0xe898, 0x7779, 0x4079, 0x8cc7, 0xfe73, 0x2b6f, 0x6cee, 0x5203
 ])
-
 const D2 = gf([
   0xf159, 0x26b2, 0x9b94, 0xebd6, 0xb156, 0x8283, 0x149a, 0x00e0,
   0xd130, 0xeef3, 0x80f2, 0x198e, 0xfce7, 0x56df, 0xd9dc, 0x2406
-]);
-
+])
 const X = gf([
   0xd51a, 0x8f25, 0x2d60, 0xc956, 0xa7b2, 0x9525, 0xc760, 0x692c,
   0xdc5c, 0xfdd6, 0xe231, 0xc0a4, 0x53fe, 0xcd6e, 0x36d3, 0x2169
-]);
-
+])
 const Y = gf([
   0x6658, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666,
   0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666
-]);
-
+])
 const I = gf([
   0xa0b0, 0x4a0e, 0x1b27, 0xc4ee, 0xe478, 0xad2f, 0x1806, 0x2f43,
   0xd7a7, 0x3dfb, 0x0099, 0x2b4d, 0xdf0b, 0x4fc1, 0x2480, 0x2b83
 ])
-
-const gf0 = gf();
-
-const gf1 = gf([1]);
+const gf0 = gf()
+const gf1 = gf([1])
 
 function modL(r: Uint8Array, x: Float64Array) {
   let carry: number;
@@ -856,41 +879,4 @@ function unpack25519(o: GF, n: Uint8Array) {
       o[i] = n[2 * i] + (n[2 * i + 1] << 8);
   }
   o[15] &= 0x7fff;
-}
-
-function verify(
-  publicKey: Uint8Array,
-  message: Uint8Array,
-  signature: Uint8Array
-): boolean {
-  const t = new Uint8Array(32);
-  const p = [gf(), gf(), gf(), gf()];
-  const q = [gf(), gf(), gf(), gf()];
-
-  if (signature.length !== SIGNATURE_LENGTH) {
-      throw new Error(`ed25519: signature must be ${SIGNATURE_LENGTH} bytes`);
-  }
-
-  if (unpackneg(q, publicKey)) {
-      console.error('TORVERIFY ERROR', 'unpackneg is false')
-      return false;
-  }
-
-  const hs = createHash('sha512')
-  hs.update(signature.subarray(0, 32));
-  hs.update(publicKey);
-  hs.update(message);
-  const h = hs.digest();
-  reduce(h);
-  scalarmult(p, q, h);
-
-  scalarbase(q, signature.subarray(32));
-  edadd(p, q);
-  pack(t, p);
-
-  if (verify32(signature, t)) {
-      console.error('TORVERIFY ERROR', 'verify32 is false')
-      return false;
-  }
-  return true;
 }
