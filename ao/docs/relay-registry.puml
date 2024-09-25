@@ -1,0 +1,22 @@
+@startuml Relay Registry
+class RelayRegistry {
+  {method} write submitSigningCertificate(input: SubmitSigingCertificateInput)
+  {method} read isSigningCertificateValid(input: IsSigningCertificateValidInput)
+}
+
+json "<b>SubmitSigingCertificateInput" as SubmitSigingCertificateInput {
+  "<b>Action": "Submit-Signing-Certificate",
+  "<b>Signing-Certificate": "<i>Signing Certificate Hex Data"
+}
+
+json "<b>IsSigningCertificateValidInput" as IsSigningCertificateValidInput {
+  "<b>Action": "Is-Signing-Certificate-Valid",
+  "<b>Fingerprint": "<i>Relay Fingerprint"
+}
+
+RelayRegistry::submitSigningCertificate -right- SubmitSigingCertificateInput
+RelayRegistry::isSigningCertificateValid -right- IsSigningCertificateValidInput
+
+SubmitSigingCertificateInput -[hidden]- IsSigningCertificateValidInput
+
+@enduml

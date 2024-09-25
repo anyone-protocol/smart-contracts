@@ -1,15 +1,75 @@
 import fs from 'fs'
 import path from 'path'
+import crypto from 'crypto'
 import AoLoader from '@permaweb/ao-loader'
 
 export const MODULE_NAME = 'Encrypted-Messages'
-export const OWNER_ADDRESS = ''.padEnd(43, '1')
-export const ALICE_ADDRESS = ''.padEnd(42, 'a')
+export const OWNER_ADDRESS = '0x'.padEnd(42, '1')
+export const ALICE_ADDRESS = '0x'.padEnd(42, 'a')
+export const ALICE_PUBKEY = ''.padEnd(64, 'a')
+export const BOB_ADDRESS = '0x'.padEnd(42, 'b')
+export const BOB_PUBKEY = ''.padEnd(64, 'b')
 export const PROCESS_ID = ''.padEnd(43, '2')
 export const MODULE_ID = ''.padEnd(43, '3')
 export const DEFAULT_MODULE_ID = ''.padEnd(43, '4')
 export const DEFAULT_TARGET = ''.padEnd(43, '5')
 export const DEFAULT_MESSAGE_ID = ''.padEnd(43, 'f')
+export const FINGERPRINT_A = ''.padEnd(40, 'A')
+export const FINGERPRINT_B = ''.padEnd(40, 'B')
+export const FINGERPRINT_C = ''.padEnd(40, 'C')
+export const FINGERPRINT_D = ''.padEnd(40, 'D')
+export const FINGERPRINT_E = ''.padEnd(40, 'E')
+export const FINGERPRINT_F = ''.padEnd(40, 'F')
+
+export const EXAMPLE_MASTER_ID_PUBLIC_KEY = fs.readFileSync(
+  path.join(
+    path.resolve(),
+    './test/util/test-keys/ed25519_master_id_public_key'
+  )
+)
+
+export const EXAMPLE_MASTER_ID_SECRET_KEY = fs.readFileSync(
+  path.join(
+    path.resolve(),
+    './test/util/test-keys/ed25519_master_id_secret_key'
+  )
+)
+
+export const EXAMPLE_SIGNING_CERT = fs.readFileSync(
+  path.join(path.resolve(), './test/util/test-keys/ed25519_signing_cert')
+)
+
+export const EXAMPLE_SIGNING_SECRET_KEY = fs.readFileSync(
+  path.join(path.resolve(), './test/util/test-keys/ed25519_signing_secret_key')
+)
+
+export const EXAMPLE_SIGNING_PUBLIC_KEY = EXAMPLE_SIGNING_CERT.subarray(39, 71)
+
+export const EXAMPLE_SECRET_ID_KEY = fs.readFileSync(
+  path.join(path.resolve(), './test/util/test-keys/secret_id_key')
+)
+
+export const EXAMPLE_RSA_IDENTITY_PUBLIC_KEY = crypto
+  .createPublicKey(EXAMPLE_SECRET_ID_KEY)
+  .export({ type: 'pkcs1', format: 'der' })
+
+export const EXAMPLE_FINGERPRINT = crypto
+  .createHash('sha1')
+  .update(EXAMPLE_RSA_IDENTITY_PUBLIC_KEY)
+  .digest()
+
+// const okcc = Buffer.concat([
+//   Buffer.from(EXAMPLE_FINGERPRINT),
+//   EXAMPLE_MASTER_ID_PUBLIC_KEY.subarray(32)
+// ])
+// const okccSignature = crypto.sign(null, okcc, EXAMPLE_SECRET_ID_KEY)
+// const verified = crypto.verify(
+//   null,
+//   okcc,
+//   EXAMPLE_SECRET_ID_KEY,
+//   okccSignature
+// )
+// console.log('verified', verified)
 
 export const AO_ENV = {
   Process: {
@@ -54,8 +114,19 @@ const BUNDLED_SOURCE = fs.readFileSync(
   'utf-8',
 )
 
+export type FullAOHandleFunction = (
+  buffer: ArrayBuffer | null,
+  msg: AoLoader.Message,
+  env: AoLoader.Environment
+) => Promise<AoLoader.HandleResponse & { Error?: string }>
+
+export type AOTestHandle = (
+  options?: Partial<AoLoader.Message>,
+  mem?: ArrayBuffer | null
+) => Promise<AoLoader.HandleResponse & { Error?: string }>
+
 export async function createLoader() {
-  const handle = await AoLoader(AOS_WASM, {
+  const originalHandle = await AoLoader(AOS_WASM, {
     format: 'wasm64-unknown-emscripten-draft_2024_02_15',
     memoryLimit: '524288000', // in bytes
     computeLimit: 9e12,
@@ -71,7 +142,7 @@ export async function createLoader() {
   ]
   let memory: ArrayBuffer | null = null
   for (const { action, args, Data } of programs) {
-    await handle(
+    await originalHandle(
       memory,
       {
         ...DEFAULT_HANDLE_OPTIONS,
@@ -86,5 +157,23 @@ export async function createLoader() {
     )
   }
 
-  return { handle, memory: memory as unknown as ArrayBuffer }
+  async function handle(
+    options: Partial<AoLoader.Message> = {},
+    mem = memory
+  ) {
+    return originalHandle(
+      mem,
+      {
+        ...DEFAULT_HANDLE_OPTIONS,
+        ...options,
+      },
+      AO_ENV
+    )
+  }
+
+  return {
+    handle,
+    originalHandle,
+    memory: memory as unknown as ArrayBuffer
+  }
 }

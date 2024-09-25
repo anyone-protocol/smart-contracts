@@ -22,6 +22,7 @@
     "@types/chai": "^4.3.19",
     "@types/mocha": "^10.0.7",
     "@types/node": "^22.5.3",
+    "arbundles": "^0.11.2",
     "chai": "^5.1.1",
     "mocha": "^10.7.3",
     "rimraf": "^5.0.10",
