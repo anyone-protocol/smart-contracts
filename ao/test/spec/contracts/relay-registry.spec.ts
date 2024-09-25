@@ -2,17 +2,68 @@ import { expect } from 'chai'
 
 import {
   ALICE_ADDRESS,
-  ALICE_PUBKEY,
   AOTestHandle,
+  BOB_ADDRESS,
   createLoader,
   EXAMPLE_FINGERPRINT,
   EXAMPLE_MASTER_ID_PUBLIC_KEY,
   EXAMPLE_RSA_IDENTITY_PUBLIC_KEY,
-  EXAMPLE_SECRET_ID_KEY,
   EXAMPLE_SIGNING_CERT,
   EXAMPLE_SIGNING_PUBLIC_KEY,
-  FINGERPRINT_A
+  FINGERPRINT_A,
+  OWNER_ADDRESS
 } from '~/test/util/setup'
+
+async function setupFingerprintCertificates(handle: AOTestHandle) {
+  const okcc = Buffer.concat([
+    EXAMPLE_FINGERPRINT,
+    EXAMPLE_MASTER_ID_PUBLIC_KEY.subarray(32)
+  ])
+  await handle({
+    From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+    Tags: [
+      { name: 'Action', value: 'Submit-Onion-Key-Cross-Certificate' },
+      {
+        name: 'Onion-Key-Cross-Certificate',
+        value: okcc.toString('base64')
+      }
+    ]
+  })
+  await handle({
+    From: EXAMPLE_MASTER_ID_PUBLIC_KEY.subarray(32).toString('base64'),
+    Tags: [
+      { name: 'Action', value: 'Submit-Signing-Certificate' },
+      {
+        name: 'Signing-Certificate',
+        value: EXAMPLE_SIGNING_CERT.toString('base64')
+      }
+    ]
+  })
+  const operatorCert = Buffer.concat([
+    EXAMPLE_FINGERPRINT,
+    Buffer.from(ALICE_ADDRESS.substring(2), 'hex')
+  ])
+  await handle({
+    From: EXAMPLE_SIGNING_PUBLIC_KEY.toString('base64'),
+    Tags: [
+      { name: 'Action', value: 'Submit-Operator-Certificate' },
+      {
+        name: 'Operator-Certificate',
+        value: operatorCert.toString('base64')
+      }
+    ]
+  })
+  await handle({
+    From: ALICE_ADDRESS,
+    Tags: [
+      { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+      {
+        name: 'Fingerprint-Certificate',
+        value: EXAMPLE_FINGERPRINT.toString('hex')
+      }
+    ]
+  })
+}
 
 describe('Relay Registry', () => {
   let handle: AOTestHandle
@@ -407,92 +458,192 @@ describe('Relay Registry', () => {
         .to.be.a('string')
         .that.includes('Invalid certificate')
     })
+
+    it('Lists Fingerprint & Operator Address Mappings', async () => {
+      await setupFingerprintCertificates(handle)
+
+      const result = await handle({
+        From: BOB_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'List-Fingerprint-Certificates' }
+        ]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(JSON.parse(result.Messages[0].Data)).to.deep.equal({
+        [EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()]:
+          '0x' + ALICE_ADDRESS.substring(2).toUpperCase()
+      })
+    })
   })
 
-  describe('Operator Renouncing Fingerprints', () => { it('TODO') })
+  describe('Operator Renouncing Fingerprints', () => {
+    it('Allows Operators to renounce Fingerprint Certificates', async () => {
+      await setupFingerprintCertificates(handle)
 
-  describe('Admin Removing Fingerprints', () => { it('TODO') })
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Renounce-Fingerprint-Certificate' },
+          {
+            name: 'Fingerprint',
+            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+          }
+        ]
+      })
 
-  describe('Blocking Operator Address', () => { it('TODO') })
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
 
-  describe('Registration Credits', () => { it('TODO') })
+      const listResult = await handle({
+        From: BOB_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'List-Fingerprint-Certificates' }
+        ]
+      })
 
-  describe('Families', () => { it('TODO') })
+      expect(listResult.Messages).to.have.lengthOf(1)
+      expect(JSON.parse(listResult.Messages[0].Data)).to.deep.equal([])
+    })
 
-  describe('TODO -> various view methods', () => { it('TODO') })
+    it('Rejects renounces missing a Fingerprint', async () => {
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Renounce-Fingerprint-Certificate' }
+        ]
+      })
 
-  // describe('Claiming', () => {
-  //   it('Allows anyone to submit fingerprint/address proofs', async () => {
-  //     const result = await handle({
-  //       From: ALICE_PUBKEY,
-  //       Tags: [
-  //         { name: 'Action', value: 'Submit-Fingerprint-Proof' },
-  //         { name: 'Address', value: ALICE_ADDRESS }
-  //       ]
-  //     })
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('Fingerprint required')
+    })
 
-  //     expect(result.Messages).to.have.lengthOf(1)
-  //     expect(result.Messages[0].Data).to.equal('OK')
-  //   })
+    it('Rejects renounces from non-Operators', async () => {
+      await setupFingerprintCertificates(handle)
 
-  //   it('Validates fingerprint/address proofs', async () => {
-  //     const noAddressResult = await handle({
-  //       From: ALICE_PUBKEY,
-  //       Tags: [
-  //         { name: 'Action', value: 'Submit-Fingerprint-Proof' }
-  //       ]
-  //     })
-      
-  //     expect(noAddressResult.Error).to.be.a('string')
-  //     expect(noAddressResult.Error).to.include('Invalid address')
+      const result = await handle({
+        From: BOB_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Renounce-Fingerprint-Certificate' },
+          { name: 'Fingerprint', value: EXAMPLE_FINGERPRINT.toString('hex') }
+        ]
+      })
 
-  //     const smallAddressResult = await handle({
-  //       From: ALICE_PUBKEY,
-  //       Tags: [
-  //         { name: 'Action', value: 'Submit-Fingerprint-Proof' },
-  //         { name: 'Address', value: '0xabcdef1234567890' }
-  //       ]
-  //     })
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('Only the Relay Operator can renounce')
+    })
 
-  //     expect(smallAddressResult.Error).to.be.a('string')
-  //     expect(smallAddressResult.Error).to.include('Invalid address')
+    it('Rejects renounces of unknown Fingerprints', async () => {
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Renounce-Fingerprint-Certificate' },
+          { name: 'Fingerprint', value: EXAMPLE_FINGERPRINT.toString('hex') }
+        ]
+      })
 
-  //     const badAddressResult = await handle({
-  //       From: ALICE_PUBKEY,
-  //       Tags: [
-  //         { name: 'Action', value: 'Submit-Fingerprint-Proof' },
-  //         {
-  //           name: 'Address',
-  //           value: '0xinvalid-address-invalid-address-invalidd'
-  //         }
-  //       ]
-  //     })
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('Only the Relay Operator can renounce')
+    })
+  })
 
-  //     expect(badAddressResult.Error).to.be.a('string')
-  //     expect(badAddressResult.Error).to.include('Invalid address')
-  //   })
+  describe('Admin Removing Fingerprints', () => {
+    it('Allows Admin to remove Fingerprint Certificates', async () => {
+      await setupFingerprintCertificates(handle)
 
-  //   it('Errors when proof already exists for fingerprint', async () => {
-  //     await handle({
-  //       From: ALICE_PUBKEY,
-  //       Tags: [
-  //         { name: 'Action', value: 'Submit-Fingerprint-Proof' },
-  //         { name: 'Address', value: ALICE_ADDRESS }
-  //       ]
-  //     })
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Remove-Fingerprint-Certificate' },
+          {
+            name: 'Fingerprint',
+            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+          }
+        ]
+      })
 
-  //     const result = await handle({
-  //       From: ALICE_PUBKEY,
-  //       Tags: [
-  //         { name: 'Action', value: 'Submit-Fingerprint-Proof' },
-  //         { name: 'Address', value: ALICE_ADDRESS }
-  //       ]
-  //     })
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
 
-  //     expect(result.Error).to.be.a('string')
-  //     expect(result.Error).to.include(
-  //       'Fingerprint is already claimable by address'
-  //     )
-  //   })
-  // })
+      const listResult = await handle({
+        From: BOB_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'List-Fingerprint-Certificates' }
+        ]
+      })
+
+      expect(listResult.Messages).to.have.lengthOf(1)
+      expect(JSON.parse(listResult.Messages[0].Data)).to.deep.equal([])
+    })
+
+    it('Rejects removing when missing a Fingerprint', async () => {
+      await setupFingerprintCertificates(handle)
+
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Remove-Fingerprint-Certificate' }
+        ]
+      })
+
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('Fingerprint required')
+    })
+
+    it('Rejects removing from non-Admin', async () => {
+      await setupFingerprintCertificates(handle)
+
+      const result = await handle({
+        From: BOB_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Remove-Fingerprint-Certificate' },
+          {
+            name: 'Fingerprint',
+            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+          }
+        ]
+      })
+
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('This method is only available to the Owner')
+    })
+
+    it('Rejects removing of unknown Fingerprints', async () => {
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Remove-Fingerprint-Certificate' },
+          {
+            name: 'Fingerprint',
+            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+          }
+        ]
+      })
+
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('Unknown Fingerprint')
+    })
+  })
+
+  describe('Blocking Operator Address', () => {
+    it('TODO')
+  })
+
+  describe('Registration Credits', () => {
+    it('TODO')
+  })
+
+  describe('Families', () => {
+    it('TODO')
+  })
+
+  describe('TODO -> various view methods', () => {
+    it('TODO')
+  })
 })

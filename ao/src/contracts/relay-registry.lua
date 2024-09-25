@@ -2,12 +2,13 @@ local RelayRegistry = {
   MasterIdsToFingerprints = {},
   SigningKeysToMasterIds = {},
   FingerprintsToOperatorAddresses = {},
-  AddressesToFingerprints = {}
+  OperatorAddressesToFingerprints = {}
 }
 
 function RelayRegistry.init()
   local crypto = require(".crypto")
   local base64 = require(".base64")
+  local json = require("json")
 
   local ErrorMessages = require('.common.errors')
   local Utils = require('.common.utils')
@@ -139,11 +140,68 @@ function RelayRegistry.init()
         ErrorMessages.InvalidCertificate
       )
 
-      RelayRegistry.AddressesToFingerprints[msg.From] = fingerprint
+      RelayRegistry.OperatorAddressesToFingerprints[msg.From] = fingerprint
 
       ao.send({
         Target = msg.From,
         Action = 'Submit-Fingerprint-Certificate-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'List-Fingerprint-Certificates',
+    Handlers.utils.hasMatchingTag('Action', 'List-Fingerprint-Certificates'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'List-Fingerprint-Certificates-Response',
+        Data = json.encode(RelayRegistry.FingerprintsToOperatorAddresses)
+      })
+    end
+  )
+
+  Handlers.add(
+    'Renounce-Fingerprint-Certificate',
+    Handlers.utils.hasMatchingTag('Action', 'Renounce-Fingerprint-Certificate'),
+    function (msg)
+      local fingerprint = msg.Tags['Fingerprint']
+      assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
+      assert(
+        RelayRegistry.OperatorAddressesToFingerprints[msg.From] == fingerprint,
+        ErrorMessages.OnlyRelayOperatorCanRenounce
+      )
+
+      RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Renounce-Fingerprint-Certificate-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Remove-Fingerprint-Certificate',
+    Handlers.utils.hasMatchingTag('Action', 'Remove-Fingerprint-Certificate'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local fingerprint = msg.Tags['Fingerprint']
+      assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
+      assert(string.len(fingerprint) == 40, ErrorMessages.InvalidCertificate)
+      assert(
+        RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] ~= nil,
+        ErrorMessages.UnknownFingerprint
+      )
+
+      RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Remove-Fingerprint-Certificate-Response',
         Data = 'OK'
       })
     end
