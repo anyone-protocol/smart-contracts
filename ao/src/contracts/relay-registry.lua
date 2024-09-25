@@ -4,7 +4,8 @@ local RelayRegistry = {
   FingerprintsToOperatorAddresses = {},
   OperatorAddressesToFingerprints = {},
   BlockedOperatorAddresses = {},
-  RegistrationCreditsFingerprintsToOperatorAddresses = {}
+  RegistrationCreditsFingerprintsToOperatorAddresses = {},
+  VerifiedHardwareFingerprints = {}
 }
 
 function RelayRegistry.init()
@@ -13,7 +14,7 @@ function RelayRegistry.init()
   local json = require("json")
 
   local ErrorMessages = require('.common.errors')
-  local Utils = require('.common.utils')
+  local AnyoneUtils = require('.common.utils')
 
   Handlers.add(
     'Submit-Onion-Key-Cross-Certificate',
@@ -112,6 +113,7 @@ function RelayRegistry.init()
       local address = string.upper(
         crypto.utils.hex.stringToHex(string.sub(decodedCert, 21))
       )
+
       assert(
         RelayRegistry.FingerprintsToOperatorAddresses[fingerprint]
           == 'Needs-Operator-Certificate',
@@ -135,10 +137,14 @@ function RelayRegistry.init()
         RelayRegistry.BlockedOperatorAddresses[msg.From] == nil,
         ErrorMessages.AddressIsBlocked
       )
+
       local fingerprint = msg.Tags['Fingerprint-Certificate']
-      assert(type(fingerprint) == 'string', ErrorMessages.InvalidCertificate)
-      assert(string.len(fingerprint) == 40, ErrorMessages.InvalidCertificate)
-      fingerprint = string.upper(fingerprint)
+      AnyoneUtils.assertValidFingerprint(
+        fingerprint,
+        ErrorMessages.InvalidCertificate
+      )
+
+      -- NB: Storing Operator Addresses as 0x<ALLCAPS>
       local address = '0x'..string.upper(string.sub(msg.From, 3))
 
       assert(
@@ -146,12 +152,14 @@ function RelayRegistry.init()
         ErrorMessages.InvalidCertificate
       )
 
-      assert(
-        RelayRegistry
-          .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
-            == msg.From,
-        ErrorMessages.RegistrationCreditRequired
-      )
+      if (RelayRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true ) then
+        assert(
+          RelayRegistry
+            .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
+              == msg.From,
+          ErrorMessages.RegistrationCreditRequired
+        )
+      end
 
       RelayRegistry.OperatorAddressesToFingerprints[msg.From] = fingerprint
       RelayRegistry
@@ -183,9 +191,10 @@ function RelayRegistry.init()
     function (msg)
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
+      AnyoneUtils.assertValidFingerprint(fingerprint)
       assert(
         RelayRegistry.OperatorAddressesToFingerprints[msg.From] == fingerprint,
-        ErrorMessages.OnlyRelayOperatorCanRenounce
+        ErrorMessages.OnlyRelayOperatorCanRenounce..' - '..msg.From..' - '..fingerprint..' - '..json.encode(RelayRegistry.OperatorAddressesToFingerprints)
       )
 
       RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
@@ -230,11 +239,7 @@ function RelayRegistry.init()
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
-      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
-      assert(
-        string.find(address, Utils.EvmAddressPattern),
-        ErrorMessages.InvalidAddress
-      )
+      AnyoneUtils.assertValidEvmAddress(address)
 
       RelayRegistry.BlockedOperatorAddresses[address] = true
 
@@ -247,6 +252,18 @@ function RelayRegistry.init()
   )
 
   Handlers.add(
+    'List-Blocked-Operator-Addresses',
+    Handlers.utils.hasMatchingTag('Action', 'List-Blocked-Operator-Addresses'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'List-Blocked-Operator-Addresses-Response',
+        Data = json.encode(RelayRegistry.BlockedOperatorAddresses)
+      })
+    end
+  )
+
+  Handlers.add(
     'Unblock-Operator-Address',
     Handlers.utils.hasMatchingTag('Action', 'Unblock-Operator-Address'),
     function (msg)
@@ -254,11 +271,8 @@ function RelayRegistry.init()
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
-      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
-      assert(
-        string.find(address, Utils.EvmAddressPattern),
-        ErrorMessages.InvalidAddress
-      )
+      AnyoneUtils.assertValidEvmAddress(address)
+
       assert(
         RelayRegistry.BlockedOperatorAddresses[address] ~= nil,
         ErrorMessages.AddressIsNotBlocked
@@ -282,15 +296,11 @@ function RelayRegistry.init()
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
-      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
-      assert(
-        string.find(address, Utils.EvmAddressPattern),
-        ErrorMessages.InvalidAddress
-      )
+      AnyoneUtils.assertValidEvmAddress(address)
 
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
-      assert(string.len(fingerprint) == 40, ErrorMessages.InvalidFingerprint)
+      AnyoneUtils.assertValidFingerprint(fingerprint)
 
       assert(
         RelayRegistry
@@ -333,15 +343,11 @@ function RelayRegistry.init()
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
-      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
-      assert(
-        string.find(address, Utils.EvmAddressPattern),
-        ErrorMessages.InvalidAddress
-      )
+      AnyoneUtils.assertValidEvmAddress(address)
 
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
-      assert(string.len(fingerprint) == 40, ErrorMessages.InvalidFingerprint)
+      AnyoneUtils.assertValidFingerprint(fingerprint)
 
       assert(
         RelayRegistry
@@ -356,6 +362,72 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'Remove-Registration-Credit-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Add-Verified-Hardware',
+    Handlers.utils.hasMatchingTag('Action', 'Add-Verified-Hardware'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local fingerprints = msg.Tags['Fingerprints']
+      assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
+
+      for fingerprint in string.gmatch(fingerprints, '[^,]+') do
+        AnyoneUtils.assertValidFingerprint(fingerprint)
+        assert(
+          RelayRegistry.VerifiedHardwareFingerprints[fingerprint] == nil,
+          ErrorMessages.DuplicateFingerprint
+        )
+
+        RelayRegistry.VerifiedHardwareFingerprints[fingerprint] = true
+      end
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Add-Verified-Hardware-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'List-Verified-Hardware',
+    Handlers.utils.hasMatchingTag('Action', 'List-Verified-Hardware'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'List-Verified-Hardware-Response',
+        Data = json.encode(RelayRegistry.VerifiedHardwareFingerprints)
+      })
+    end
+  )
+
+  Handlers.add(
+    'Remove-Verified-Hardware',
+    Handlers.utils.hasMatchingTag('Action', 'Remove-Verified-Hardware'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local fingerprints = msg.Tags['Fingerprints']
+      assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
+
+      for fingerprint in string.gmatch(fingerprints, '[^,]+') do
+        AnyoneUtils.assertValidFingerprint(fingerprint)
+        assert(
+          RelayRegistry.VerifiedHardwareFingerprints[fingerprint] ~= nil,
+          ErrorMessages.UnknownFingerprint
+        )
+
+        RelayRegistry.VerifiedHardwareFingerprints[fingerprint] = nil
+      end
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Remove-Verified-Hardware-Response',
         Data = 'OK'
       })
     end

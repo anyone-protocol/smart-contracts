@@ -27,12 +27,15 @@ import {
  *  3) Signing Identity (ED25519) submits Operator Certificate
  *  4) Operator Address (SECP256K1 aka EVM) submits Fingerprint Certificate
  */
-async function setupOnionKeyCrossCertificate(handle: AOTestHandle) {
+async function setupOnionKeyCrossCertificate(
+  handle: AOTestHandle,
+  debug = false
+) {
   const okcc = Buffer.concat([
     EXAMPLE_FINGERPRINT,
     EXAMPLE_MASTER_ID_PUBLIC_KEY.subarray(32)
   ])
-  await handle({
+  const setupOnionKeyCrossCertificateResult = await handle({
     From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
     Tags: [
       { name: 'Action', value: 'Submit-Onion-Key-Cross-Certificate' },
@@ -42,12 +45,19 @@ async function setupOnionKeyCrossCertificate(handle: AOTestHandle) {
       }
     ]
   })
+
+  if (debug) {
+    console.log(
+      'setupOnionKeyCrossCertificateResult',
+      setupOnionKeyCrossCertificateResult
+    )
+  }
 }
 
-async function setupSigningCertificate(handle: AOTestHandle) {
+async function setupSigningCertificate(handle: AOTestHandle, debug = false) {
   await setupOnionKeyCrossCertificate(handle)
 
-  await handle({
+  const setupSigningCertificateResult = await handle({
     From: EXAMPLE_MASTER_ID_PUBLIC_KEY.subarray(32).toString('base64'),
     Tags: [
       { name: 'Action', value: 'Submit-Signing-Certificate' },
@@ -57,16 +67,20 @@ async function setupSigningCertificate(handle: AOTestHandle) {
       }
     ]
   })
+
+  if (debug) {
+    console.log('setupSigningCertificateResult', setupSigningCertificateResult)
+  }
 }
 
-async function setupOperatorCertificate(handle: AOTestHandle) {
+async function setupOperatorCertificate(handle: AOTestHandle, debug = false) {
   await setupSigningCertificate(handle)
 
   const operatorCert = Buffer.concat([
     EXAMPLE_FINGERPRINT,
     Buffer.from(ALICE_ADDRESS.substring(2), 'hex')
   ])
-  await handle({
+  const setupOperatorCertificateResult = await handle({
     From: EXAMPLE_SIGNING_PUBLIC_KEY.toString('base64'),
     Tags: [
       { name: 'Action', value: 'Submit-Operator-Certificate' },
@@ -76,29 +90,47 @@ async function setupOperatorCertificate(handle: AOTestHandle) {
       }
     ]
   })
+
+  if (debug) {
+    console.log(
+      'setupOperatorCertificateResult',
+      setupOperatorCertificateResult
+    )
+  }
 }
 
-async function setupFingerprintCertificates(handle: AOTestHandle) {
+async function setupFingerprintCertificates(
+  handle: AOTestHandle,
+  debug = false
+) {
   await setupOperatorCertificate(handle)
 
-  await handle({
+  const setupFingerprintCertificatesResult = await handle({
     From: ALICE_ADDRESS,
     Tags: [
       { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
       {
         name: 'Fingerprint-Certificate',
-        value: EXAMPLE_FINGERPRINT.toString('hex')
+        value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
       }
     ]
   })
+
+  if (debug) {
+    console.log(
+      'setupFingerprintCertificatesResult',
+      setupFingerprintCertificatesResult
+    )
+  }
 }
 
 async function addRegistrationCredit(
   handle: AOTestHandle,
   address: string, 
-  fingerprint: string
+  fingerprint: string,
+  debug = false
 ) {
-  await handle({
+  const addRegistrationCreditResult = await handle({
     From: OWNER_ADDRESS,
     Tags: [
       { name: 'Action', value: 'Add-Registration-Credit' },
@@ -106,6 +138,10 @@ async function addRegistrationCredit(
       { name: 'Fingerprint', value: fingerprint }
     ]
   })
+
+  if (debug) {
+    console.log('addRegistrationCreditResult', addRegistrationCreditResult)
+  }
 }
 
 describe('Relay Registry', () => {
@@ -486,7 +522,7 @@ describe('Relay Registry', () => {
     })
   })
 
-  describe('Operator Renouncing Fingerprints', () => {
+  describe('Operator Renouncing Fingerprint Certificates', () => {
     it('Allows Operators to renounce Fingerprint Certificates', async () => {
       const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
       await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
@@ -537,7 +573,10 @@ describe('Relay Registry', () => {
         From: BOB_ADDRESS,
         Tags: [
           { name: 'Action', value: 'Renounce-Fingerprint-Certificate' },
-          { name: 'Fingerprint', value: EXAMPLE_FINGERPRINT.toString('hex') }
+          {
+            name: 'Fingerprint',
+            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+          }
         ]
       })
 
@@ -551,7 +590,10 @@ describe('Relay Registry', () => {
         From: ALICE_ADDRESS,
         Tags: [
           { name: 'Action', value: 'Renounce-Fingerprint-Certificate' },
-          { name: 'Fingerprint', value: EXAMPLE_FINGERPRINT.toString('hex') }
+          {
+            name: 'Fingerprint',
+            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+          }
         ]
       })
 
@@ -561,7 +603,7 @@ describe('Relay Registry', () => {
     })
   })
 
-  describe('Admin Removing Fingerprints', () => {
+  describe('Admin Removing Fingerprint Certificates', () => {
     it('Allows Admin to remove Fingerprint Certificates', async () => {
       await setupFingerprintCertificates(handle)
 
@@ -727,7 +769,31 @@ describe('Relay Registry', () => {
         }
       )
     })
-    
+
+    describe('Listing', () => {
+      it('Lists Blocked Addresses', async () => {
+        const addresses = [ ALICE_ADDRESS, BOB_ADDRESS, CHARLS_ADDRESS ]
+        for (const address of addresses) {
+          await handle({
+            From: OWNER_ADDRESS,
+            Tags: [
+              { name: 'Action', value: 'Block-Operator-Address' },
+              { name: 'Address', value: address }
+            ]
+          })
+        }
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [{ name: 'Action', value: 'List-Blocked-Operator-Addresses' }]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(JSON.parse(result.Messages[0].Data))
+          .to.deep.equal(Object.fromEntries(addresses.map(a => [a, true])))
+      })
+    })
+
     describe('Unblocking', () => {
       it('Allows Admin to unblock addresses', async () => {
         await handle({
@@ -1270,19 +1336,283 @@ describe('Relay Registry', () => {
 
   describe('Verified Hardware', () => {
     describe('Adding', () => {
-      it('Allows Admin to add Verified Hardware Fingerprints')
-      it('Rejects adding Verified Hardware when missing fingerprints')
-      it('Rejects adding Verified Hardware when invalid fingerprints')
-      it('Rejects adding duplicate Verified Hardware fingerprints')
-      it('Rejects adding Verified Hardware from non-admin')
-      it('Does not require Registration Credits for Verified Hardware')
+      it('Allows Admin to add VH Fingerprints', async () => {
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C,
+          FINGERPRINT_D
+        ]
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprints.join(',') }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Rejects adding VH when missing fingerprints', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('A comma-separated list of Fingerprints is required')
+      })
+
+      it('Rejects adding VH when invalid fingerprints', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            {
+              name: 'Fingerprints',
+              value: `${FINGERPRINT_A},invalid-fingerprint`
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Invalid Fingerprint')
+      })
+
+      it('Rejects adding duplicate VH fingerprints', async () => {
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C
+        ]
+
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprints.join(',') }
+          ]
+        })
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            {
+              name: 'Fingerprints',
+              value: `${FINGERPRINT_D},${FINGERPRINT_C}`
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Duplicate Fingerprint')
+      })
+
+      it('Rejects adding VH from non-admin', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            {
+              name: 'Fingerprints',
+              value: FINGERPRINT_A
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('This method is only available to the Owner')
+      })
+
+      it('Does not require Registration Credits for VH', async () => {
+        const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+        await setupOperatorCertificate(handle)
+
+        const resultNotVerifiedYet = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+        
+        expect(resultNotVerifiedYet.Error)
+          .to.be.a('string')
+          .that.includes('Registration Credit required')
+
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprint }
+          ]
+        })
+
+        const resultAfterVerified = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        expect(resultAfterVerified.Messages).to.have.lengthOf(1)
+        expect(resultAfterVerified.Messages[0].Data).to.equal('OK')
+      })
+    })
+
+    describe('Listing', () => {
+      it('Lists VH', async () => {
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C,
+          FINGERPRINT_D
+        ]
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprints.join(',') }
+          ]
+        })
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [{ name: 'Action', value: 'List-Verified-Hardware' }]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(JSON.parse(result.Messages[0].Data))
+          .to.deep.equal(Object.fromEntries(fingerprints.map(f => [f, true])))
+      })
     })
 
     describe('Removing', () => {
-      it('Allows Admin to remove Verified Hardware Fingerprints')
-      it('Rejects removing Verified Hardware when missing Fingerprints')
-      it('Rejects removing Verified Hardware when not added')
-      it('Rejects removing Verified Hardware from non-admin')
+      it('Allows Admin to remove VH Fingerprints', async () => {
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C,
+          FINGERPRINT_D
+        ]
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprints.join(',') }
+          ]
+        })
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Verified-Hardware' },
+            { name: 'Fingerprints', value: `${FINGERPRINT_B},${FINGERPRINT_C}` }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Rejects removing VH when missing Fingerprints', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Verified-Hardware' }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('A comma-separated list of Fingerprints is required')
+      })
+
+      it('Rejects removing VH when not added', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Verified-Hardware' },
+            { name: 'Fingerprints', value: `${FINGERPRINT_B},${FINGERPRINT_C}` }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Unknown Fingerprint')
+      })
+
+      it('Rejects non-Admin removing VH', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Verified-Hardware' },
+            { name: 'Fingerprints', value: `${FINGERPRINT_B},${FINGERPRINT_C}` }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('This method is only available to the Owner')
+      })
+
+      it('Requires Registration Credits if removed VH', async () => {
+        const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C,
+          FINGERPRINT_D,
+          fingerprint
+        ]
+        await setupOperatorCertificate(handle)
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprints.join(',') }
+          ]
+        })
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Verified-Hardware' },
+            { name: 'Fingerprints', value: fingerprint }
+          ]
+        })
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Registration Credit required')
+      })
     })
   })
 
@@ -1290,7 +1620,7 @@ describe('Relay Registry', () => {
     it('TODO')
   })
 
-  describe('TODO -> various view methods', () => {
+  describe('View Full State', () => {
     it('TODO')
   })
 })
