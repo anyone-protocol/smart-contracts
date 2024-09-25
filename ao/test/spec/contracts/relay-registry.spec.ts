@@ -4,6 +4,7 @@ import {
   ALICE_ADDRESS,
   AOTestHandle,
   BOB_ADDRESS,
+  CHARLS_ADDRESS,
   createLoader,
   EXAMPLE_FINGERPRINT,
   EXAMPLE_MASTER_ID_PUBLIC_KEY,
@@ -11,6 +12,9 @@ import {
   EXAMPLE_SIGNING_CERT,
   EXAMPLE_SIGNING_PUBLIC_KEY,
   FINGERPRINT_A,
+  FINGERPRINT_B,
+  FINGERPRINT_C,
+  FINGERPRINT_D,
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
@@ -85,6 +89,21 @@ async function setupFingerprintCertificates(handle: AOTestHandle) {
         name: 'Fingerprint-Certificate',
         value: EXAMPLE_FINGERPRINT.toString('hex')
       }
+    ]
+  })
+}
+
+async function addRegistrationCredit(
+  handle: AOTestHandle,
+  address: string, 
+  fingerprint: string
+) {
+  await handle({
+    From: OWNER_ADDRESS,
+    Tags: [
+      { name: 'Action', value: 'Add-Registration-Credit' },
+      { name: 'Address', value: address },
+      { name: 'Fingerprint', value: fingerprint }
     ]
   })
 }
@@ -412,7 +431,10 @@ describe('Relay Registry', () => {
 
   describe('Fingerprint Certificates', () => {
     it('Accepts Fingerprint Certs', async () => {
+      const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+
       await setupOperatorCertificate(handle)
+      await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
 
       const result = await handle({
         From: ALICE_ADDRESS,
@@ -420,7 +442,7 @@ describe('Relay Registry', () => {
           { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
           {
             name: 'Fingerprint-Certificate',
-            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            value: fingerprint
           }
         ]
       })
@@ -466,6 +488,8 @@ describe('Relay Registry', () => {
 
   describe('Operator Renouncing Fingerprints', () => {
     it('Allows Operators to renounce Fingerprint Certificates', async () => {
+      const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+      await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
       await setupFingerprintCertificates(handle)
 
       const result = await handle({
@@ -474,7 +498,7 @@ describe('Relay Registry', () => {
           { name: 'Action', value: 'Renounce-Fingerprint-Certificate' },
           {
             name: 'Fingerprint',
-            value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            value: fingerprint
           }
         ]
       })
@@ -784,7 +808,10 @@ describe('Relay Registry', () => {
       it(
         'Allows unblocked Addresses to submit Fingerprint Certificates again',
         async () => {
+          const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+
           await setupOperatorCertificate(handle)
+          await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
 
           await handle({
             From: OWNER_ADDRESS,
@@ -807,7 +834,7 @@ describe('Relay Registry', () => {
               { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
               {
                 name: 'Fingerprint-Certificate',
-                value: EXAMPLE_FINGERPRINT.toString('hex')
+                value: fingerprint
               }
             ]
           })
@@ -820,14 +847,425 @@ describe('Relay Registry', () => {
   })
 
   describe('Registration Credits', () => {
-    it('Allows Admin to add Registration Credits')
-    it('Rejects adding Registration Credits when missing Addresses')
-    it('Rejects adding Registration Credits when invalid Addresses')
-    it('Rejects adding Registration Credits when missing Fingerprints')
-    it('Rejects adding Registration Credits when invalid Fingerprints')
-    it('Rejects adding duplicate Registration Credits')
-    it('Rejects adding Registration Credits from non-admin')
-    it('Requires Registration Credits when submitting Fingerprint Certificates')
+    describe('Adding', () => {
+      it('Allows Admin to add RC', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Rejects adding RC when missing Address', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Address is required')
+      })
+
+      it('Rejects adding RC when invalid Address', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: 'invalid-address' },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Invalid Address')
+      })
+
+      it('Rejects adding RC when missing Fingerprint', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Fingerprint required')
+      })
+
+      it('Rejects adding RC when invalid Fingerprint', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: 'invalid-fingerprint'
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Invalid Fingerprint')
+      })
+
+      it('Rejects adding duplicate RC', async () => {
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Registration Credit already added')
+      })
+
+      it('Rejects adding RC from non-admin', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('This method is only available to the Owner')
+      })
+
+      it('Requires RC when submitting Fingerprint Certificates', async () => {
+        await setupOperatorCertificate(handle)
+
+        const resultNoCredit = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(resultNoCredit.Error)
+          .to.be.a('string')
+          .that.includes('Registration Credit required')
+
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        const resultWithCredit = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(resultWithCredit.Messages).to.have.lengthOf(1)
+        expect(resultWithCredit.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Consumes RC when submitting Fingerprint Certificates', async () => {
+        const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+        await setupOperatorCertificate(handle)
+        const credits = {
+          [FINGERPRINT_A]: ALICE_ADDRESS,
+          [FINGERPRINT_B]: BOB_ADDRESS,
+          [FINGERPRINT_C]: CHARLS_ADDRESS
+        }
+        for (const fingerprint of Object.keys(credits)) {
+          await addRegistrationCredit(handle, credits[fingerprint], fingerprint)
+        }
+        await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
+
+        await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        const listResult = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'List-Registration-Credits' }
+          ]
+        })
+
+        expect(listResult.Messages).to.have.lengthOf(1)
+        expect(JSON.parse(listResult.Messages[0].Data)).to.deep.equal(credits)
+      })
+    })
+
+    describe('Listing', () => {
+      it('Lists Registration Credits', async () => {
+        const credits = {
+          [FINGERPRINT_A]: ALICE_ADDRESS,
+          [FINGERPRINT_B]: BOB_ADDRESS,
+          [FINGERPRINT_C]: CHARLS_ADDRESS,
+          [FINGERPRINT_D]: ALICE_ADDRESS
+        }
+
+        for (const fingerprint of Object.keys(credits)) {
+          await addRegistrationCredit(handle, credits[fingerprint], fingerprint)
+        }
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'List-Registration-Credits' }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(JSON.parse(result.Messages[0].Data)).to.deep.equal(credits)
+      })
+    })
+
+    describe('Removing', () => {
+      it('Allows Admin to remove RC', async () => {
+        const credits = {
+          [FINGERPRINT_A]: ALICE_ADDRESS,
+          [FINGERPRINT_B]: BOB_ADDRESS,
+          [FINGERPRINT_C]: CHARLS_ADDRESS,
+          [FINGERPRINT_D]: ALICE_ADDRESS
+        }
+
+        for (const fingerprint of Object.keys(credits)) {
+          await addRegistrationCredit(handle, credits[fingerprint], fingerprint)
+        }
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            { name: 'Fingerprint', value: FINGERPRINT_D }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+
+        const listResult = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'List-Registration-Credits' }
+          ]
+        })
+
+        expect(listResult.Messages).to.have.lengthOf(1)
+        expect(JSON.parse(listResult.Messages[0].Data)).to.deep.equal({
+          [FINGERPRINT_A]: ALICE_ADDRESS,
+          [FINGERPRINT_B]: BOB_ADDRESS,
+          [FINGERPRINT_C]: CHARLS_ADDRESS
+        })
+      })
+
+      it('Rejects removing RC when missing Address', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Fingerprint', value: FINGERPRINT_D }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Address is required')
+      })
+
+      it('Rejects removing RC when invalid Address', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: 'invalid-address' },
+            { name: 'Fingerprint', value: FINGERPRINT_D }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Invalid Address')
+      })
+
+      it('Rejects removing RC when missing Fingerprint', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Fingerprint required')
+      })
+
+      it('Rejects removing RC when invalid Fingerprint', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            { name: 'Fingerprint', value: 'invalid-fingerprint' }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Invalid Fingerprint')
+      })
+
+      it('Rejects removing non-existant RC', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            { name: 'Fingerprint', value: FINGERPRINT_D }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Registration Credit does not exist')
+      })
+
+      it('Rejects removing RC from non-admin', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            { name: 'Fingerprint', value: FINGERPRINT_D }
+          ]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('This method is only available to the Owner')
+      })
+
+      it('Requires RC when submitting Fingerprint Certificates', async () => {
+        const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+        await setupOperatorCertificate(handle)
+
+        // 1) Add a registration credit for alice for fingerprint
+        await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
+
+        // 2) Remove it
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Registration-Credit' },
+            { name: 'Address', value: ALICE_ADDRESS },
+            { name: 'Fingerprint', value: fingerprint }
+          ]
+        })
+
+        // 3) Alice tries to register
+        const resultNoCredit = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        // 4) Should be rejected as the registration credit was removed
+        expect(resultNoCredit.Error)
+          .to.be.a('string')
+          .that.includes('Registration Credit required')
+
+        // 5) Add the registration credit back again
+        await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
+
+        // 6) Now Alice can register
+        const resultWithCredit = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        expect(resultWithCredit.Messages).to.have.lengthOf(1)
+        expect(resultWithCredit.Messages[0].Data).to.equal('OK')
+      })
+    })
   })
 
   describe('Verified Hardware', () => {

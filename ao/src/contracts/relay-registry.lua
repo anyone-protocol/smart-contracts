@@ -3,7 +3,8 @@ local RelayRegistry = {
   SigningKeysToMasterIds = {},
   FingerprintsToOperatorAddresses = {},
   OperatorAddressesToFingerprints = {},
-  BlockedOperatorAddresses = {}
+  BlockedOperatorAddresses = {},
+  RegistrationCreditsFingerprintsToOperatorAddresses = {}
 }
 
 function RelayRegistry.init()
@@ -145,7 +146,16 @@ function RelayRegistry.init()
         ErrorMessages.InvalidCertificate
       )
 
+      assert(
+        RelayRegistry
+          .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
+            == msg.From,
+        ErrorMessages.RegistrationCreditRequired
+      )
+
       RelayRegistry.OperatorAddressesToFingerprints[msg.From] = fingerprint
+      RelayRegistry
+          .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -259,6 +269,93 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'Unblock-Operator-Address-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Add-Registration-Credit',
+    Handlers.utils.hasMatchingTag('Action', 'Add-Registration-Credit'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local address = msg.Tags['Address']
+      assert(type(address) == 'string', ErrorMessages.AddressRequired)
+      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
+      assert(
+        string.find(address, Utils.EvmAddressPattern),
+        ErrorMessages.InvalidAddress
+      )
+
+      local fingerprint = msg.Tags['Fingerprint']
+      assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
+      assert(string.len(fingerprint) == 40, ErrorMessages.InvalidFingerprint)
+
+      assert(
+        RelayRegistry
+          .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
+            == nil,
+        ErrorMessages.RegistrationCreditAlreadyAdded
+      )
+
+      RelayRegistry
+        .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
+          = address
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Add-Registration-Credit-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'List-Registration-Credits',
+    Handlers.utils.hasMatchingTag('Action', 'List-Registration-Credits'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'List-Registration-Credits-Response',
+        Data = json.encode(
+          RelayRegistry.RegistrationCreditsFingerprintsToOperatorAddresses
+        )
+      })
+    end
+  )
+
+  Handlers.add(
+    'Remove-Registration-Credit',
+    Handlers.utils.hasMatchingTag('Action', 'Remove-Registration-Credit'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local address = msg.Tags['Address']
+      assert(type(address) == 'string', ErrorMessages.AddressRequired)
+      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
+      assert(
+        string.find(address, Utils.EvmAddressPattern),
+        ErrorMessages.InvalidAddress
+      )
+
+      local fingerprint = msg.Tags['Fingerprint']
+      assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
+      assert(string.len(fingerprint) == 40, ErrorMessages.InvalidFingerprint)
+
+      assert(
+        RelayRegistry
+          .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
+            ~= nil,
+        ErrorMessages.RegistrationCreditDoesNotExist
+      )
+
+      RelayRegistry
+        .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Remove-Registration-Credit-Response',
         Data = 'OK'
       })
     end
