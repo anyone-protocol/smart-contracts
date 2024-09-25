@@ -3,5 +3,9 @@ return {
   InvalidCertificate = 'Invalid certificate',
   FingerprintRequired = 'Fingerprint required',
   UnknownFingerprint = 'Unknown Fingerprint',
-  OnlyRelayOperatorCanRenounce = 'Only the Relay Operator can renounce'
+  OnlyRelayOperatorCanRenounce = 'Only the Relay Operator can renounce',
+  AddressIsBlocked = 'Address is blocked',
+  AddressRequired = 'Address is required',
+  InvalidAddress = 'Invalid Address',
+  AddressIsNotBlocked = 'Address is not blocked'
 }
