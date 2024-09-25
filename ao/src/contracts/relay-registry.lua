@@ -2,7 +2,8 @@ local RelayRegistry = {
   MasterIdsToFingerprints = {},
   SigningKeysToMasterIds = {},
   FingerprintsToOperatorAddresses = {},
-  OperatorAddressesToFingerprints = {}
+  OperatorAddressesToFingerprints = {},
+  BlockedOperatorAddresses = {}
 }
 
 function RelayRegistry.init()
@@ -129,6 +130,10 @@ function RelayRegistry.init()
     'Submit-Fingerprint-Certificate',
     Handlers.utils.hasMatchingTag('Action', 'Submit-Fingerprint-Certificate'),
     function (msg)
+      assert(
+        RelayRegistry.BlockedOperatorAddresses[msg.From] == nil,
+        ErrorMessages.AddressIsBlocked
+      )
       local fingerprint = msg.Tags['Fingerprint-Certificate']
       assert(type(fingerprint) == 'string', ErrorMessages.InvalidCertificate)
       assert(string.len(fingerprint) == 40, ErrorMessages.InvalidCertificate)
@@ -202,6 +207,58 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'Remove-Fingerprint-Certificate-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Block-Operator-Address',
+    Handlers.utils.hasMatchingTag('Action', 'Block-Operator-Address'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local address = msg.Tags['Address']
+      assert(type(address) == 'string', ErrorMessages.AddressRequired)
+      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
+      assert(
+        string.find(address, Utils.EvmAddressPattern),
+        ErrorMessages.InvalidAddress
+      )
+
+      RelayRegistry.BlockedOperatorAddresses[address] = true
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Block-Operator-Address-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Unblock-Operator-Address',
+    Handlers.utils.hasMatchingTag('Action', 'Unblock-Operator-Address'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      local address = msg.Tags['Address']
+      assert(type(address) == 'string', ErrorMessages.AddressRequired)
+      assert(string.len(address) == 42, ErrorMessages.InvalidAddress)
+      assert(
+        string.find(address, Utils.EvmAddressPattern),
+        ErrorMessages.InvalidAddress
+      )
+      assert(
+        RelayRegistry.BlockedOperatorAddresses[address] ~= nil,
+        ErrorMessages.AddressIsNotBlocked
+      )
+
+      RelayRegistry.BlockedOperatorAddresses[address] = nil
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Unblock-Operator-Address-Response',
         Data = 'OK'
       })
     end
