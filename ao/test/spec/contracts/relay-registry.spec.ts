@@ -15,6 +15,7 @@ import {
   FINGERPRINT_B,
   FINGERPRINT_C,
   FINGERPRINT_D,
+  FINGERPRINT_E,
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
@@ -1617,7 +1618,142 @@ describe('Relay Registry', () => {
   })
 
   describe('Families', () => {
-    it('TODO')
+    describe('Admin setting Families', () => {
+      it('Allows Admin to set Families via Data', async () => {
+        const families = {
+          [FINGERPRINT_A]: [ FINGERPRINT_A, FINGERPRINT_D ],
+          [FINGERPRINT_B]: [ FINGERPRINT_B, FINGERPRINT_C ],
+          [FINGERPRINT_C]: [ FINGERPRINT_C, FINGERPRINT_B ],
+          [FINGERPRINT_D]: [ FINGERPRINT_D, FINGERPRINT_A ],
+          [FINGERPRINT_E]: [ FINGERPRINT_E ]
+        }
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }],
+          Data: JSON.stringify(families)
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Rejects when missing Families', async () => {
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }]
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Families required as Message Data')
+      })
+
+      it('Rejects non-Admin setting Families', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }],
+          Data: JSON.stringify({})
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('This method is only available to the Owner')
+      })
+
+      it('Rejects invalid Families Data', async () => {
+        const families = 9999999999
+
+        const result = await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }],
+          Data: JSON.stringify(families)
+        })
+
+        expect(result.Error)
+          .to.be.a('string')
+          .that.includes('Invalid Families')
+      })
+
+      it('Enforces Family when submitting Fingerprint Certs', async () => {
+        const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+        const familiesBefore = {
+          [FINGERPRINT_A]: [ FINGERPRINT_A, fingerprint ]
+        }
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }],
+          Data: JSON.stringify(familiesBefore)
+        })
+        await setupOperatorCertificate(handle)
+        await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
+
+        const resultBeforeFamilySet = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        expect(resultBeforeFamilySet.Error)
+          .to.be.a('string')
+          .that.includes('Family not set')
+
+        const familiesAfter = {
+          [FINGERPRINT_A]: [ FINGERPRINT_A, fingerprint ],
+          [fingerprint]: [ fingerprint, FINGERPRINT_A ]
+        }
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }],
+          Data: JSON.stringify(familiesAfter)
+        })
+
+        const resultAfterFamilySet = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+
+        expect(resultAfterFamilySet.Messages).to.have.lengthOf(1)
+        expect(resultAfterFamilySet.Messages[0].Data).to.equal('OK')
+      })
+    })
+
+    describe('Listing Families', () => {
+      it('Allows anyone to list Families', async () => {
+        const families = {
+          [FINGERPRINT_A]: [ FINGERPRINT_A, FINGERPRINT_D ],
+          [FINGERPRINT_B]: [ FINGERPRINT_B, FINGERPRINT_C ],
+          [FINGERPRINT_C]: [ FINGERPRINT_C, FINGERPRINT_B ],
+          [FINGERPRINT_D]: [ FINGERPRINT_D, FINGERPRINT_A ],
+          [FINGERPRINT_E]: [ FINGERPRINT_E ]
+        }
+
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Set-Families' }],
+          Data: JSON.stringify(families)
+        })
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [{ name: 'Action', value: 'List-Families' }]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(JSON.parse(result.Messages[0].Data)).to.deep.equal(families)
+      })
+    })
   })
 
   describe('View Full State', () => {

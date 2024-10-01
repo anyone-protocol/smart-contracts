@@ -2,10 +2,10 @@ local RelayRegistry = {
   MasterIdsToFingerprints = {},
   SigningKeysToMasterIds = {},
   FingerprintsToOperatorAddresses = {},
-  OperatorAddressesToFingerprints = {},
   BlockedOperatorAddresses = {},
   RegistrationCreditsFingerprintsToOperatorAddresses = {},
-  VerifiedHardwareFingerprints = {}
+  VerifiedHardwareFingerprints = {},
+  FingerprintsToFamilies = {}
 }
 
 function RelayRegistry.init()
@@ -152,7 +152,7 @@ function RelayRegistry.init()
         ErrorMessages.InvalidCertificate
       )
 
-      if (RelayRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true ) then
+      if (RelayRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true) then
         assert(
           RelayRegistry
             .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
@@ -161,7 +161,10 @@ function RelayRegistry.init()
         )
       end
 
-      RelayRegistry.OperatorAddressesToFingerprints[msg.From] = fingerprint
+      -- TODO -> enforce families here
+      
+
+      RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = msg.From
       RelayRegistry
           .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
 
@@ -193,8 +196,8 @@ function RelayRegistry.init()
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
       AnyoneUtils.assertValidFingerprint(fingerprint)
       assert(
-        RelayRegistry.OperatorAddressesToFingerprints[msg.From] == fingerprint,
-        ErrorMessages.OnlyRelayOperatorCanRenounce..' - '..msg.From..' - '..fingerprint..' - '..json.encode(RelayRegistry.OperatorAddressesToFingerprints)
+        RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] == msg.From,
+        ErrorMessages.OnlyRelayOperatorCanRenounce
       )
 
       RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
@@ -429,6 +432,38 @@ function RelayRegistry.init()
         Target = msg.From,
         Action = 'Remove-Verified-Hardware-Response',
         Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Set-Families',
+    Handlers.utils.hasMatchingTag('Action', 'Set-Families'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+
+      assert(msg.Data, ErrorMessages.FamiliesRequiredAsMessageData)
+      local families = json.decode(msg.Data)
+      assert(type(families) == 'table', ErrorMessages.InvalidFamilies)
+
+      RelayRegistry.FingerprintsToFamilies = families
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Set-Families-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'List-Families',
+    Handlers.utils.hasMatchingTag('Action', 'List-Families'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'Set-Families-Response',
+        Data = json.encode(RelayRegistry.FingerprintsToFamilies)
       })
     end
   )
