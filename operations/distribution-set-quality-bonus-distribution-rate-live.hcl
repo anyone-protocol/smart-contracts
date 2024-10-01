@@ -37,7 +37,7 @@ job "distribution-set-quality-bonus-distribution-rate-live" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
-      QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="13580035510000000"
+      QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="4050925000000000"
     }
 
     restart {
