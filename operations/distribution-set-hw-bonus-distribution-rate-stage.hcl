@@ -11,7 +11,7 @@ job "distribution-set-hw-bonus-distribution-rate-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.7"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-hw-bonus-distribution-rate.ts"]
