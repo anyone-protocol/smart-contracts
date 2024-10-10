@@ -13,5 +13,8 @@ return {
   InvalidFingerprint = 'Invalid Fingerprint',
   RegistrationCreditAlreadyAdded = 'Registration Credit already added',
   RegistrationCreditRequired = 'Registration Credit required',
-  RegistrationCreditDoesNotExist = 'Registration Credit does not exist'
+  RegistrationCreditDoesNotExist = 'Registration Credit does not exist',
+  FamiliesRequiredAsMessageData = 'Families required as Message Data',
+  InvalidFamilies = 'Invalid Families',
+  FamilyNotSet = 'Family not set'
 }

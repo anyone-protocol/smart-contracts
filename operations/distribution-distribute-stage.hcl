@@ -1,4 +1,4 @@
-job "distribution-set-family-multiplier-rate-dev" {
+job "distribution-distribute-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "distribution-set-family-multiplier-rate-dev" {
     attempts = 0
   }
 
-  task "distribution-set-family-multiplier-rate-dev-task" {
+  task "distribution-distribute-stage-task" {
     driver = "docker"
 
     config {
@@ -14,16 +14,16 @@ job "distribution-set-family-multiplier-rate-dev" {
       image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-family-multiplier-rate.ts"]
+      args = ["scripts/distribution/distribute.ts"]
     }
 
     vault {
-      policies = ["distribution-dev"]
+      policies = ["distribution-stage"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/dev"}}
+      {{with secret "kv/distribution/stage"}}
         DISTRIBUTION_OPERATOR_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
@@ -33,11 +33,11 @@ job "distribution-set-family-multiplier-rate-dev" {
     }
 
     env {
-      PHASE="dev"
+      PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/dev/distribution-address"
-      FAMILY_MULTIPLIER_RATE="0.1"
+      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
+      DISTRIBUTION_TIMESTAMP="<timestamp>"
     }
 
     restart {

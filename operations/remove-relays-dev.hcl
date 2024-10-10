@@ -11,7 +11,7 @@ job "remove-relays-dev" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/relay-registry/remove-relays.ts"]

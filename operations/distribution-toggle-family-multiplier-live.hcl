@@ -11,7 +11,7 @@ job "distribution-toggle-family-multiplier-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
       entrypoint = ["npx"]
       command = "ts-node"
       args = [
@@ -39,7 +39,7 @@ job "distribution-toggle-family-multiplier-live" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
-      FAMILY_MULTIPLIER_ENABLED="true"
+      FAMILY_MULTIPLIER_ENABLED="false"
     }
 
     restart {
