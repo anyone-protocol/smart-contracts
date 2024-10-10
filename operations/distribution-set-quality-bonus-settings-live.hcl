@@ -11,7 +11,7 @@ job "distribution-set-quality-bonus-settings-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.7"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.8"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-quality-bonus-settings.ts"]

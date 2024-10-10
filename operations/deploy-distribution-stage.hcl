@@ -11,7 +11,7 @@ job "deploy-distribution-stage" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/anyone-protocol/smart-contracts:0.3.7"
+            image = "ghcr.io/anyone-protocol/smart-contracts:0.3.8"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]

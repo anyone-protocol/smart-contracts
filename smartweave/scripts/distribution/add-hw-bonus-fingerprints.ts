@@ -94,14 +94,12 @@ async function main() {
   const relayRegistryContract = warp
     .contract<RelayRegistryState>(relayRegistryContractId)
     .setEvaluationOptions({
-      remoteStateSyncEnabled: true,
-      remoteStateSyncSource: dreHostname ?? 'dre-1.warp.cc'
+      remoteStateSyncEnabled: true
     })
   const distributionContract = warp
     .contract<DistributionState>(distributionContractId)
     .setEvaluationOptions({
-      remoteStateSyncEnabled: true,
-      remoteStateSyncSource: dreHostname ?? 'dre-1.warp.cc'
+      remoteStateSyncEnabled: true
     })
   const contractOwner = new Wallet(contractOwnerPrivateKey)
 
