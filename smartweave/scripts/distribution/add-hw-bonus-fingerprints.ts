@@ -93,14 +93,16 @@ async function main() {
 
   const relayRegistryContract = warp
     .contract<RelayRegistryState>(relayRegistryContractId)
-    .setEvaluationOptions({
-      remoteStateSyncEnabled: true
-    })
+    // .setEvaluationOptions({
+    //   remoteStateSyncEnabled: true,
+    //   remoteStateSyncSource: dreHostname ?? 'dre-1.warp.cc'
+    // })
   const distributionContract = warp
     .contract<DistributionState>(distributionContractId)
-    .setEvaluationOptions({
-      remoteStateSyncEnabled: true
-    })
+    // .setEvaluationOptions({
+    //   remoteStateSyncEnabled: true,
+    //   remoteStateSyncSource: dreHostname ?? 'dre-1.warp.cc'
+    // })
   const contractOwner = new Wallet(contractOwnerPrivateKey)
 
   const fingerprints: string[] = []
