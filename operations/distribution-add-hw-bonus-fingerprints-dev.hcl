@@ -1,12 +1,10 @@
-job "distribution-set-family-multiplier-rate-dev" {
-  datacenters = ["ator-fin"]
+job "distribution-add-hw-bonus-fingerprints-dev" {
+  datacenters = [ "ator-fin" ]
   type = "batch"
 
-  reschedule {
-    attempts = 0
-  }
+  reschedule { attempts = 0 }
 
-  task "distribution-set-family-multiplier-rate-dev-task" {
+  task "distribution-add-hw-bonus-fingerprints-dev-task" {
     driver = "docker"
 
     config {
@@ -14,7 +12,7 @@ job "distribution-set-family-multiplier-rate-dev" {
       image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = ["scripts/distribution/set-family-multiplier-rate.ts"]
+      args = ["scripts/distribution/add-hw-bonus-fingerprints.ts"]
     }
 
     vault {
@@ -36,8 +34,9 @@ job "distribution-set-family-multiplier-rate-dev" {
       PHASE="dev"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
+      DRE_HOSTNAME="https://dre-dev.ec.anyone.tech"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/dev/distribution-address"
-      FAMILY_MULTIPLIER_RATE="0.1"
+      RELAY_REGISTRY_ADDRESS_CONSUL_KEY="smart-contracts/dev/relay-registry-address"
     }
 
     restart {

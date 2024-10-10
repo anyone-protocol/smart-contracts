@@ -11,7 +11,7 @@ job "set-previous-distribution-tracking-limit-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-token-distribution-rate.ts"]
