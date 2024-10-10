@@ -11,7 +11,7 @@ job "distribution-set-family-multiplier-rate-dev" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.5"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.6"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-family-multiplier-rate.ts"]

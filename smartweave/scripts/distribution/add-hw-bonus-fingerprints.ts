@@ -1,6 +1,4 @@
 import dotenv from 'dotenv'
-import fs from 'fs'
-import path from 'path'
 import { LoggerFactory, WarpFactory } from 'warp-contracts'
 import EthereumSigner from 'arbundles/src/signing/chains/ethereumSigner'
 import { EthersExtension } from 'warp-contracts-plugin-ethers'
@@ -15,7 +13,6 @@ import {
   DistributionState,
   RelayRegistryState,
 } from '../../src/contracts'
-// import TestData from '../../data/test-data.json'
 
 dotenv.config()
 
@@ -94,14 +91,12 @@ async function main() {
   const relayRegistryContract = warp
     .contract<RelayRegistryState>(relayRegistryContractId)
     .setEvaluationOptions({
-      remoteStateSyncEnabled: true,
-      remoteStateSyncSource: dreHostname ?? 'dre-1.warp.cc'
+      remoteStateSyncEnabled: true
     })
   const distributionContract = warp
     .contract<DistributionState>(distributionContractId)
     .setEvaluationOptions({
-      remoteStateSyncEnabled: true,
-      remoteStateSyncSource: dreHostname ?? 'dre-1.warp.cc'
+      remoteStateSyncEnabled: true
     })
   const contractOwner = new Wallet(contractOwnerPrivateKey)
 
