@@ -11,7 +11,7 @@ job "deploy-distribution-live" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+            image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]
@@ -43,18 +43,18 @@ job "deploy-distribution-live" {
     "owner":"{{.Data.data.DISTRIBUTION_OWNER_ADDRESS}}",
     "pendingDistributions":{},
     "previousDistributions":{},
-    "tokensDistributedPerSecond":"54320142060000000",
+    "tokensDistributedPerSecond":"16203703700000000",
     "previousDistributionsTrackingLimit":2,
     "bonuses": {
         "hardware": {
             "enabled": true,
             "fingerprints": [],
-            "tokensDistributedPerSecond": "19400050740000000"
+            "tokensDistributedPerSecond": "8680555500000000"
         },
         "quality": {
             "enabled": true,
             "uptime": {},
-            "tokensDistributedPerSecond": "13580035510000000",
+            "tokensDistributedPerSecond": "4050925000000000",
             "settings": {
                 "uptime": {
                     "3": 1,

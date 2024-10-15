@@ -1,12 +1,10 @@
-job "distribution-toggle-hw-bonus-stage" {
-  datacenters = ["ator-fin"]
+job "distribution-add-hw-bonus-fingerprints-stage" {
+  datacenters = [ "ator-fin" ]
   type = "batch"
 
-  reschedule {
-    attempts = 0
-  }
+  reschedule { attempts = 0 }
 
-  task "distribution-toggle-hw-bonus-stage-task" {
+  task "distribution-add-hw-bonus-fingerprints-stage-task" {
     driver = "docker"
 
     config {
@@ -14,9 +12,7 @@ job "distribution-toggle-hw-bonus-stage" {
       image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = [
-        "scripts/distribution/toggle-hw-bonus.ts"
-      ]
+      args = ["scripts/distribution/add-hw-bonus-fingerprints.ts"]
     }
 
     vault {
@@ -38,8 +34,9 @@ job "distribution-toggle-hw-bonus-stage" {
       PHASE="stage"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
+      DRE_HOSTNAME="https://dre-stage.ec.anyone.tech"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
-      HW_BONUS_ENABLED="true"
+      RELAY_REGISTRY_ADDRESS_CONSUL_KEY="smart-contracts/stage/relay-registry-address"
     }
 
     restart {

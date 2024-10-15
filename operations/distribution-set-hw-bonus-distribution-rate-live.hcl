@@ -11,7 +11,7 @@ job "distribution-set-hw-bonus-distribution-rate-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-hw-bonus-distribution-rate.ts"]
@@ -37,7 +37,7 @@ job "distribution-set-hw-bonus-distribution-rate-live" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
-      HW_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="19400050740000000"
+      HW_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="8680555500000000"
     }
 
     restart {

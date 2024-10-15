@@ -11,7 +11,7 @@ job "distribution-set-token-distribution-rate-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-token-distribution-rate.ts"]
@@ -36,7 +36,7 @@ job "distribution-set-token-distribution-rate-live" {
       PHASE="live"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      TOKENS_DISTRIBUTED_PER_SECOND="54320142060000000"
+      TOKENS_DISTRIBUTED_PER_SECOND="16203703700000000"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
     }
 

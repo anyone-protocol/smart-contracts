@@ -1,12 +1,10 @@
-job "distribution-toggle-hw-bonus-stage" {
-  datacenters = ["ator-fin"]
+job "distribution-add-hw-bonus-fingerprints-live" {
+  datacenters = [ "ator-fin" ]
   type = "batch"
 
-  reschedule {
-    attempts = 0
-  }
+  reschedule { attempts = 0 }
 
-  task "distribution-toggle-hw-bonus-stage-task" {
+  task "distribution-add-hw-bonus-fingerprints-live-task" {
     driver = "docker"
 
     config {
@@ -14,18 +12,16 @@ job "distribution-toggle-hw-bonus-stage" {
       image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = [
-        "scripts/distribution/toggle-hw-bonus.ts"
-      ]
+      args = ["scripts/distribution/add-hw-bonus-fingerprints.ts"]
     }
 
     vault {
-      policies = ["distribution-stage"]
+      policies = ["distribution-live"]
     }
 
     template {
       data = <<EOH
-      {{with secret "kv/distribution/stage"}}
+      {{with secret "kv/distribution/live"}}
         DISTRIBUTION_OPERATOR_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
@@ -35,11 +31,12 @@ job "distribution-toggle-hw-bonus-stage" {
     }
 
     env {
-      PHASE="stage"
+      PHASE="live"
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
-      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
-      HW_BONUS_ENABLED="true"
+      DRE_HOSTNAME="https://dre.ec.anyone.tech"
+      DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/live/distribution-address"
+      RELAY_REGISTRY_ADDRESS_CONSUL_KEY="smart-contracts/live/relay-registry-address"
     }
 
     restart {

@@ -11,7 +11,7 @@ job "deploy-relay-registry-live" {
 
         config {
             network_mode = "host"
-            image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+            image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
             entrypoint = ["npm"]
             command = "run"
             args = ["deploy"]

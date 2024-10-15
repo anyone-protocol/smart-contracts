@@ -11,7 +11,7 @@ job "distribution-set-quality-bonus-distribution-rate-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.4"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/set-quality-bonus-distribution-rate.ts"]
@@ -37,7 +37,7 @@ job "distribution-set-quality-bonus-distribution-rate-stage" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
-      QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="13580035510000000"
+      QUALITY_BONUS_TOKENS_DISTRIBUTED_PER_SECOND="4050925000000000"
     }
 
     restart {

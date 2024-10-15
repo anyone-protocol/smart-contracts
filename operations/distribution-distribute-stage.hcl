@@ -1,4 +1,4 @@
-job "distribution-toggle-hw-bonus-stage" {
+job "distribution-distribute-stage" {
   datacenters = ["ator-fin"]
   type = "batch"
 
@@ -6,7 +6,7 @@ job "distribution-toggle-hw-bonus-stage" {
     attempts = 0
   }
 
-  task "distribution-toggle-hw-bonus-stage-task" {
+  task "distribution-distribute-stage-task" {
     driver = "docker"
 
     config {
@@ -14,9 +14,7 @@ job "distribution-toggle-hw-bonus-stage" {
       image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
       entrypoint = ["npx"]
       command = "ts-node"
-      args = [
-        "scripts/distribution/toggle-hw-bonus.ts"
-      ]
+      args = ["scripts/distribution/distribute.ts"]
     }
 
     vault {
@@ -39,7 +37,7 @@ job "distribution-toggle-hw-bonus-stage" {
       CONSUL_IP="127.0.0.1"
       CONSUL_PORT="8500"
       DISTRIBUTION_ADDRESS_CONSUL_KEY="smart-contracts/stage/distribution-address"
-      HW_BONUS_ENABLED="true"
+      DISTRIBUTION_TIMESTAMP="<timestamp>"
     }
 
     restart {
