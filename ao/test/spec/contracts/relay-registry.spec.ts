@@ -1098,9 +1098,9 @@ describe('Relay Registry', () => {
         const result = await handle({
           From: OWNER_ADDRESS,
           Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            { name: 'Fingerprints', value: fingerprints.join(',') }
-          ]
+            { name: 'Action', value: 'Add-Verified-Hardware' }
+          ],
+          Data: fingerprints.join(',')
         })
 
         expect(result.Messages).to.have.lengthOf(1)
@@ -1123,13 +1123,8 @@ describe('Relay Registry', () => {
       it('Rejects adding VH when invalid fingerprints', async () => {
         const result = await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            {
-              name: 'Fingerprints',
-              value: `${FINGERPRINT_A},invalid-fingerprint`
-            }
-          ]
+          Tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
+          Data: `${FINGERPRINT_A},invalid-fingerprint`
         })
 
         expect(result.Error)
@@ -1146,21 +1141,14 @@ describe('Relay Registry', () => {
 
         await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            { name: 'Fingerprints', value: fingerprints.join(',') }
-          ]
+          Tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
+          Data: fingerprints.join(',')
         })
 
         const result = await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            {
-              name: 'Fingerprints',
-              value: `${FINGERPRINT_D},${FINGERPRINT_C}`
-            }
-          ]
+          Tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
+          Data: `${FINGERPRINT_D},${FINGERPRINT_C}`
         })
 
         expect(result.Error)
@@ -1210,10 +1198,8 @@ describe('Relay Registry', () => {
 
         await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            { name: 'Fingerprints', value: fingerprint }
-          ]
+          Tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
+          Data: fingerprint
         })
 
         const resultAfterVerified = await handle({
@@ -1242,10 +1228,8 @@ describe('Relay Registry', () => {
         ]
         await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            { name: 'Fingerprints', value: fingerprints.join(',') }
-          ]
+          Tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
+          Data: fingerprints.join(',')
         })
 
         const result = await handle({
@@ -1269,18 +1253,14 @@ describe('Relay Registry', () => {
         ]
         await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Add-Verified-Hardware' },
-            { name: 'Fingerprints', value: fingerprints.join(',') }
-          ]
+          Tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
+          Data: fingerprints.join(',')
         })
 
         const result = await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Remove-Verified-Hardware' },
-            { name: 'Fingerprints', value: `${FINGERPRINT_B},${FINGERPRINT_C}` }
-          ]
+          Tags: [{ name: 'Action', value: 'Remove-Verified-Hardware' }],
+          Data: `${FINGERPRINT_B},${FINGERPRINT_C}`
         })
 
         expect(result.Messages).to.have.lengthOf(1)
@@ -1303,10 +1283,8 @@ describe('Relay Registry', () => {
       it('Rejects removing VH when not added', async () => {
         const result = await handle({
           From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Remove-Verified-Hardware' },
-            { name: 'Fingerprints', value: `${FINGERPRINT_B},${FINGERPRINT_C}` }
-          ]
+          Tags: [{ name: 'Action', value: 'Remove-Verified-Hardware' }],
+          Data: `${FINGERPRINT_B},${FINGERPRINT_C}`
         })
 
         expect(result.Error)

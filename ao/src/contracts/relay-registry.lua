@@ -300,7 +300,7 @@ function RelayRegistry.init()
     function (msg)
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
 
-      local fingerprints = msg.Tags['Fingerprints']
+      local fingerprints = msg.Data
       assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
 
       for fingerprint in string.gmatch(fingerprints, '[^,]+') do
@@ -339,7 +339,7 @@ function RelayRegistry.init()
     function (msg)
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
 
-      local fingerprints = msg.Tags['Fingerprints']
+      local fingerprints = msg.Data
       assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
 
       for fingerprint in string.gmatch(fingerprints, '[^,]+') do
