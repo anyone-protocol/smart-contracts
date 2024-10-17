@@ -13,6 +13,7 @@
     "url": "git+https://github.com/anyone-protocol/smart-contracts"
   },
   "scripts": {
+    "build": "npm run process:build",
     "process:build": "npm run process:clean && tsx scripts/bundle.ts",
     "process:clean": "rimraf [ dist ]",
     "test": "npm run process:build && mocha test/spec/**/*.ts"
