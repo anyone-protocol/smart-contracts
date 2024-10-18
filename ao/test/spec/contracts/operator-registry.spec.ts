@@ -87,7 +87,7 @@ async function addRegistrationCredit(
   }
 }
 
-describe('Relay Registry', () => {
+describe('Operator Registry', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
