@@ -1,11 +1,11 @@
-local RelayRegistry = {
+local OperatorRegistry = {
   FingerprintsToOperatorAddresses = {},
   BlockedOperatorAddresses = {},
   RegistrationCreditsFingerprintsToOperatorAddresses = {},
   VerifiedHardwareFingerprints = {}
 }
 
-function RelayRegistry.init()
+function OperatorRegistry.init()
   local json = require('json')
 
   local ErrorMessages = require('.common.errors')
@@ -29,7 +29,7 @@ function RelayRegistry.init()
         AnyoneUtils.assertValidFingerprint(fingerprint)
         AnyoneUtils.assertValidEvmAddress(address)
 
-        RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] =
+        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] =
           AnyoneUtils.normalizeEvmAddress(address)
       end
 
@@ -51,7 +51,7 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'List-Operator-Certificates-Response',
-        Data = json.encode(RelayRegistry.FingerprintsToOperatorAddresses)
+        Data = json.encode(OperatorRegistry.FingerprintsToOperatorAddresses)
       })
     end
   )
@@ -61,7 +61,7 @@ function RelayRegistry.init()
     Handlers.utils.hasMatchingTag('Action', 'Submit-Fingerprint-Certificate'),
     function (msg)
       assert(
-        RelayRegistry.BlockedOperatorAddresses[msg.From] == nil,
+        OperatorRegistry.BlockedOperatorAddresses[msg.From] == nil,
         ErrorMessages.AddressIsBlocked
       )
 
@@ -75,21 +75,21 @@ function RelayRegistry.init()
       local address = '0x'..string.upper(string.sub(msg.From, 3))
 
       assert(
-        RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] == address,
+        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] == address,
         ErrorMessages.InvalidCertificate
       )
 
-      if (RelayRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true) then
+      if (OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true) then
         assert(
-          RelayRegistry
+          OperatorRegistry
             .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
               == msg.From,
           ErrorMessages.RegistrationCreditRequired
         )
       end
 
-      RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = msg.From
-      RelayRegistry
+      OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] = msg.From
+      OperatorRegistry
           .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
@@ -107,7 +107,7 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'List-Fingerprint-Certificates-Response',
-        Data = json.encode(RelayRegistry.FingerprintsToOperatorAddresses)
+        Data = json.encode(OperatorRegistry.FingerprintsToOperatorAddresses)
       })
     end
   )
@@ -120,11 +120,11 @@ function RelayRegistry.init()
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
       AnyoneUtils.assertValidFingerprint(fingerprint)
       assert(
-        RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] == msg.From,
+        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] == msg.From,
         ErrorMessages.OnlyRelayOperatorCanRenounce
       )
 
-      RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -144,11 +144,11 @@ function RelayRegistry.init()
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
       assert(string.len(fingerprint) == 40, ErrorMessages.InvalidCertificate)
       assert(
-        RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] ~= nil,
+        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] ~= nil,
         ErrorMessages.UnknownFingerprint
       )
 
-      RelayRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -168,7 +168,7 @@ function RelayRegistry.init()
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
       AnyoneUtils.assertValidEvmAddress(address)
 
-      RelayRegistry.BlockedOperatorAddresses[address] = true
+      OperatorRegistry.BlockedOperatorAddresses[address] = true
 
       ao.send({
         Target = msg.From,
@@ -185,7 +185,7 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'List-Blocked-Operator-Addresses-Response',
-        Data = json.encode(RelayRegistry.BlockedOperatorAddresses)
+        Data = json.encode(OperatorRegistry.BlockedOperatorAddresses)
       })
     end
   )
@@ -201,11 +201,11 @@ function RelayRegistry.init()
       AnyoneUtils.assertValidEvmAddress(address)
 
       assert(
-        RelayRegistry.BlockedOperatorAddresses[address] ~= nil,
+        OperatorRegistry.BlockedOperatorAddresses[address] ~= nil,
         ErrorMessages.AddressIsNotBlocked
       )
 
-      RelayRegistry.BlockedOperatorAddresses[address] = nil
+      OperatorRegistry.BlockedOperatorAddresses[address] = nil
 
       ao.send({
         Target = msg.From,
@@ -230,13 +230,13 @@ function RelayRegistry.init()
       AnyoneUtils.assertValidFingerprint(fingerprint)
 
       assert(
-        RelayRegistry
+        OperatorRegistry
           .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
             == nil,
         ErrorMessages.RegistrationCreditAlreadyAdded
       )
 
-      RelayRegistry
+      OperatorRegistry
         .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
           = address
 
@@ -256,7 +256,7 @@ function RelayRegistry.init()
         Target = msg.From,
         Action = 'List-Registration-Credits-Response',
         Data = json.encode(
-          RelayRegistry.RegistrationCreditsFingerprintsToOperatorAddresses
+          OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses
         )
       })
     end
@@ -277,13 +277,13 @@ function RelayRegistry.init()
       AnyoneUtils.assertValidFingerprint(fingerprint)
 
       assert(
-        RelayRegistry
+        OperatorRegistry
           .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
             ~= nil,
         ErrorMessages.RegistrationCreditDoesNotExist
       )
 
-      RelayRegistry
+      OperatorRegistry
         .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
@@ -306,11 +306,11 @@ function RelayRegistry.init()
       for fingerprint in string.gmatch(fingerprints, '[^,]+') do
         AnyoneUtils.assertValidFingerprint(fingerprint)
         assert(
-          RelayRegistry.VerifiedHardwareFingerprints[fingerprint] == nil,
+          OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] == nil,
           ErrorMessages.DuplicateFingerprint
         )
 
-        RelayRegistry.VerifiedHardwareFingerprints[fingerprint] = true
+        OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] = true
       end
 
       ao.send({
@@ -328,7 +328,7 @@ function RelayRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'List-Verified-Hardware-Response',
-        Data = json.encode(RelayRegistry.VerifiedHardwareFingerprints)
+        Data = json.encode(OperatorRegistry.VerifiedHardwareFingerprints)
       })
     end
   )
@@ -345,11 +345,11 @@ function RelayRegistry.init()
       for fingerprint in string.gmatch(fingerprints, '[^,]+') do
         AnyoneUtils.assertValidFingerprint(fingerprint)
         assert(
-          RelayRegistry.VerifiedHardwareFingerprints[fingerprint] ~= nil,
+          OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] ~= nil,
           ErrorMessages.UnknownFingerprint
         )
 
-        RelayRegistry.VerifiedHardwareFingerprints[fingerprint] = nil
+        OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] = nil
       end
 
       ao.send({
@@ -361,4 +361,4 @@ function RelayRegistry.init()
   )
 end
 
-RelayRegistry.init()
+OperatorRegistry.init()

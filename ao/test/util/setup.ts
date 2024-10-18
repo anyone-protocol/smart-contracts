@@ -110,10 +110,11 @@ export const DEFAULT_HANDLE_OPTIONS = {
   From: ''
 }
 
-const BUNDLED_SOURCE = fs.readFileSync(
-  path.join(path.resolve(), './dist/bundled.lua'),
-  'utf-8',
-)
+const contractNames = [ 'operator-registry' ]
+const bundledContractSources = Object.fromEntries(contractNames.map(cn => [
+  cn,
+  fs.readFileSync(path.join(path.resolve(), `./dist/${cn}.lua`), 'utf-8')
+]))
 
 export type FullAOHandleFunction = (
   buffer: ArrayBuffer | null,
@@ -126,7 +127,7 @@ export type AOTestHandle = (
   mem?: ArrayBuffer | null
 ) => Promise<AoLoader.HandleResponse & { Error?: string }>
 
-export async function createLoader() {
+export async function createLoader(contractName: string) {
   const originalHandle = await AoLoader(AOS_WASM, {
     format: 'wasm64-unknown-emscripten-draft_2024_02_15',
     memoryLimit: '524288000', // in bytes
@@ -134,11 +135,15 @@ export async function createLoader() {
     extensions: []
   })
 
+  if (!bundledContractSources[contractName]) {
+    throw new Error(`Unknown contract: ${contractName}`)
+  }
+
   const programs = [
     {
       action: 'Eval',
       args: [{ name: 'Module', value: DEFAULT_MODULE_ID }],
-      Data: BUNDLED_SOURCE
+      Data: bundledContractSources[contractName]
     }
   ]
   let memory: ArrayBuffer | null = null
