@@ -91,7 +91,7 @@ describe('Operator Registry', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
-    handle = (await createLoader()).handle
+    handle = (await createLoader('operator-registry')).handle
   })
 
   describe('Admin Submit Operator Certificates', () => {

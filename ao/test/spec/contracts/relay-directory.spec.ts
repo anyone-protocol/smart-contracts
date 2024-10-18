@@ -104,7 +104,7 @@ describe('Relay Directory', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
-    handle = (await createLoader()).handle
+    handle = (await createLoader('relay-directory')).handle
   })
 
   /**
