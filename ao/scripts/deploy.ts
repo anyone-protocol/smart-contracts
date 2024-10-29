@@ -3,7 +3,7 @@ import dotenv from 'dotenv'
 import { createReadStream, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 import { EthereumSigner, TurboFactory } from '@ardrive/turbo-sdk'
-import { createDataItemSigner, spawn } from '@permaweb/aoconnect'
+import { spawn } from '@permaweb/aoconnect'
 
 import {
   createEthereumDataItemSigner,
