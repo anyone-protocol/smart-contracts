@@ -62,11 +62,8 @@ job "deploy-operator-registry-dev" {
             PHASE = "dev"
             CONSUL_IP = "127.0.0.1"
             CONSUL_PORT = "8500"
-
-            // CONTRACT_CONSUL_KEY="smart-contracts/dev/relay-registry-address"
-            // CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/dev/relay-registry-source"
-            // CONTRACT_SRC="../dist/contracts/relay-registry.js"
-            // INIT_STATE="../dist/contracts/relay-registry-init-state.json"
+            CONTRACT_NAME="operator-registry"
+            CONTRACT_CONSUL_KEY="smart-contracts/dev/operator-registry-address"
         }
     }
 }
