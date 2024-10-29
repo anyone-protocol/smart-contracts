@@ -110,7 +110,7 @@ export const DEFAULT_HANDLE_OPTIONS = {
   From: ''
 }
 
-const contractNames = [ 'operator-registry' ]
+const contractNames = [ 'operator-registry', 'relay-directory', 'relay-rewards' ]
 const bundledContractSources = Object.fromEntries(contractNames.map(cn => [
   cn,
   fs.readFileSync(path.join(path.resolve(), `./dist/${cn}.lua`), 'utf-8')
