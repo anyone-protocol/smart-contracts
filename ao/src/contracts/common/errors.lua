@@ -1,5 +1,10 @@
 return {
   OnlyOwner = 'This method is only available to the Owner',
+  MessageDataRequired = 'Message data is required to process request',
+  NumberValueRequired = 'Number value required',
+  IntegerValueRequired = 'Integer value required',
+  FloatValueRequired = 'Floating point value required',
+  BooleanValueRequired = 'Boolean value required',
   InvalidCertificate = 'Invalid certificate',
   FingerprintRequired = 'Fingerprint required',
   FingerprintsRequired = 'Fingerprints required',

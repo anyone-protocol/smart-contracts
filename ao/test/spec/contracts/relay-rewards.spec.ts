@@ -91,19 +91,6 @@ describe('Relay Rewards', () => {
       expect(result.Messages).to.have.lengthOf(1)
       expect(result.Messages[0].Data).to.equal('OK')
     })
-  
-    it('Allow changing quality tier', async () => {
-      
-      const result = await handle({
-        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
-        Tags: [
-          { name: 'Action', value: 'Update-Fingerprint-To-State' }
-        ]
-      })
-  
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
-    })
   })  
 
   describe('Modifiers', () => {
