@@ -28,7 +28,32 @@ describe('Relay Rewards', () => {
 
   describe('State per fingerprint', () => {
   
-    it('allows tracking of identified hardware relays', async () => {
+    it('Block non-controllers from doing updates', async () => {
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Fingerprint-To-State' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Validate update requests\' fingerprint', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Fingerprint-To-State' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Allow toggling hardware flag', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -41,7 +66,7 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
   
-    it('allows tracking family size', async () => {
+    it('Allow tracking family size', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -54,7 +79,20 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
   
-    it('allows tracking uptime streak', async () => {
+    it('Allow tracking uptime streak', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Fingerprint-To-State' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+  
+    it('Allow changing quality tier', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -68,8 +106,33 @@ describe('Relay Rewards', () => {
     })
   })  
 
-  describe('Modifiers', () => {  
-    it('allow modifying tokens per second distributed during one round', async () => {
+  describe('Modifiers', () => {
+    
+    it('Block non-controllers from doing updates', async () => {
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Allow setting distribution amount', async () => {
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Validates new distribution amount', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -82,7 +145,20 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
   
-    it('allow updating of the family modifier', async () => {
+    it('Allow updating family modifier', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Validate incorrect family modifier', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -95,7 +171,20 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
     
-    it('allow updating of the uptime modifier', async () => {
+    it('Allow updating uptime modifier', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Validate incorrect uptime modifier', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -108,7 +197,46 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
   
-    it('allow for updating of the hardware modifier', async () => {
+    it('Allow updating uptime tiers', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Validate incorrect uptime tiers', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+  
+    it('Allow updating hardware modifier', async () => {
+      
+      const result = await handle({
+        From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
+        Tags: [
+          { name: 'Action', value: 'Update-Modifiers-To-Relay-Rewards' }
+        ]
+      })
+  
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Validate incorrect hardware modifier', async () => {
       
       const result = await handle({
         From: EXAMPLE_RSA_IDENTITY_PUBLIC_KEY.toString('base64'),
@@ -122,9 +250,11 @@ describe('Relay Rewards', () => {
     })
   })
 
+
+
+
   describe('Scoring rounds', () => {
-
-    it('allows adding multiple scores to a new distribution round', async () => {
+    it('Block non-controllers from adding scores', async () => {
       
       const result = await handle({
         From: ALICE_ADDRESS,
@@ -137,7 +267,7 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
 
-    it('is accumulating rewards per address when the round is completed', async () => {
+    it('Allow controller to add scores to a new distribution round', async () => {
       
       const result = await handle({
         From: ALICE_ADDRESS,
@@ -150,12 +280,77 @@ describe('Relay Rewards', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
 
-    it('allows cancelling of a pending distribution round', async () => {
+    it('Accumulate rewards per address when the round is completed', async () => {
+      
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Scores-To-Pending-Round' }
+        ]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Allow cancelling of a pending distribution round', async () => {
       
       const result = await handle({
         From: ALICE_ADDRESS,
         Tags: [
           { name: 'Action', value: 'Cancel-Pending-Round' }
+        ]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Require a valid timestamp when adding scores', async () => {
+      
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Scores-To-Pending-Round' }
+        ]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Require valid score data', async () => {
+      
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Scores-To-Pending-Round' }
+        ]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Require at least one score when adding scores', async () => {
+      
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Scores-To-Pending-Round' }
+        ]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+    })
+
+    it('Require added scores to have unique fingerprints', async () => {
+      
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Scores-To-Pending-Round' }
         ]
       })
 

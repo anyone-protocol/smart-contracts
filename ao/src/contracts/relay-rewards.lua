@@ -3,8 +3,16 @@ local RelayRewards = {
   Modifiers = {
     TokensPerSecond = 0,
     Family = { Enabled = false, MultiplierOffset = 0.1 },
-    Uptime = { Enabled = false, TokensPerSecond = 0 },
-    Hardware = { Enabled = false, TokensPerSecond = 0 },
+    Uptime = { Enabled = false, TokensPerSecond = 0,
+      Tiers = [
+          {
+            Level = 0
+            RequiredSeconds = 0
+            TokensPerSecond = 0
+          }
+        ] 
+    },
+    Hardware = { Enabled = false, TokensPerSecond = 0 }
   },
   FingerprintToState = {},
   PreviousRounds = {},
