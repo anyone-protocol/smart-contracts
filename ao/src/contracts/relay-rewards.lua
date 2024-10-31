@@ -310,6 +310,7 @@ function RelayRewards.init()
       assert(msg.Data, ErrorMessages.MessageDataRequired)
       
       local timestamp = msg.Tags['Timestamp']
+      assertInteger(timestamp, 'Timestamp tag')
 
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
       RelayRewards.PendingRounds[timestamp] = nil
