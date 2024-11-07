@@ -5,6 +5,7 @@ local function initUtils()
 
   local EvmAddressPattern = '0x' .. ('%x'):rep(40)
   local FingerprintPattern = ('[0123456789ABCDEF]'):rep(40)
+  local H3CellPattern = '^8c' .. ('%d'):rep(6) .. '$'
 
   local function starts_with(str, start)
     return str:sub(1, #start) == start
@@ -32,6 +33,14 @@ local function initUtils()
       assert(
         string.find(fingerprint, FingerprintPattern),
         message or ErrorMessages.InvalidFingerprint
+      )
+    end,
+
+    assertH3Cell = function (input, fieldName)
+      assert(type(input) == 'string', ErrorMessages.InvalidH3Cell .. ' for ' .. fieldName)
+      assert(
+        string.find(input, H3CellPattern),
+        ErrorMessages.InvalidH3Cell .. ' for ' .. fieldName
       )
     end,
     
@@ -82,14 +91,18 @@ local function initUtils()
     bigIntFix = function (input)
       local LOW_CAP = 1_000_000_000_000_000_000
       if input.Low < LOW_CAP then
-        return { Low = lo, High = hi }
+        return { Low = input.Low, High = input.High }
       else
         return bigIntFix({ Low = input.Low - LOW_CAP, High = input.High + 1 })
       end
     end,
 
     bigAddScalar = function (input, value)
-      return bigIntFix({ Low = input.Low + value, High = input.High })
+      if input == nil then
+        return bigInt(value)
+      else
+        return bigIntFix({ Low = input.Low + value, High = input.High })
+      end
     end,
 
     EvmAddressPattern,

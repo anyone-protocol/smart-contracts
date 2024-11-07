@@ -5,6 +5,7 @@ return {
   IntegerValueRequired = 'Integer value required',
   FloatValueRequired = 'Floating point value required',
   BooleanValueRequired = 'Boolean value required',
+  InvalidH3Cell = 'Invalid H3 Cell data',
   InvalidCertificate = 'Invalid certificate',
   FingerprintRequired = 'Fingerprint required',
   FingerprintsRequired = 'Fingerprints required',
