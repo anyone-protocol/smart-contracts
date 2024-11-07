@@ -15,7 +15,7 @@ import {
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
-describe('Cancelling rewards round', () => {
+describe('Cancelling relay rewards round', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
@@ -29,7 +29,7 @@ describe('Cancelling rewards round', () => {
           { name: 'Action', value: 'Cancel-Round' }
       ]
     })
-
+    console.log(result)
     expect(result.Error).to.be.a('string').that.includes('This method is only available to the Owner')
   })
 

@@ -37,7 +37,7 @@ local RelayRewards = {
     Details = {
 -- [Fingerprint] = { 
 --   Address = ''
---   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 1, Location = '' }
+--   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 1, LocationSize = 0 }
 --   Rating = { Network, Hardware, Uptime, ExitBonus }
 --   Configuration = { Family = {}, Location = {}, Uptime = {} }
 --   Reward = {
@@ -56,8 +56,7 @@ local RelayRewards = {
 --       IsHardware = false
 --       UptimeStreak = 0
 --       FamilySize = 1
---       ExitBonus = false
---       LocationSize = 0
+--       ExitBonus = false, LocationSize = 0
 --     }
 --   }
 -- }
@@ -518,3 +517,5 @@ function RelayRewards.init()
   )
 
 end
+
+RelayRewards.init()
