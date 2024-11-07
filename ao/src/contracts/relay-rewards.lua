@@ -214,9 +214,10 @@ function RelayRewards.init()
       
       local request = json.decode(msg.Data)
       
-      AnyoneUtils.assertInteger(request.Timestamp, 'Timestamp')
-      assert(request.Timestamp > 0, 'Timestamp has to be > 0')
-      assert(request.Timestamp > RelayRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
+      local timestamp = tonumber(msg.Tags['Timestamp'])
+      AnyoneUtils.assertInteger(timestamp, 'Timestamp')
+      assert(timestamp > 0, 'Timestamp has to be > 0')
+      assert(timestamp > RelayRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
       
       assert(type(request.Scores) == 'table', 'Scores have to be a table')
 
@@ -237,21 +238,21 @@ function RelayRewards.init()
 
       for key, value in request.Scores do 
         assertScore(value, key)
-        if RelayRewards.PendingRounds[request.Timestamp] then
-          assert(RelayRewards.PendingRounds[request.Timestamp][value.Fingerprint] == nil, 'Duplicated score for ' .. fingerprint)
+        if RelayRewards.PendingRounds[timestamp] then
+          assert(RelayRewards.PendingRounds[timestamp][value.Fingerprint] == nil, 'Duplicated score for ' .. fingerprint)
         end
       end
 
-      if RelayRewards.PendingRounds[request.Timestamp] == nil then
-        RelayRewards.PendingRounds[request.Timestamp] = {}
+      if RelayRewards.PendingRounds[timestamp] == nil then
+        RelayRewards.PendingRounds[timestamp] = {}
       end
 
       for _, value in request.Scores do
-        RelayRewards.PendingRounds[request.Timestamp][value.Fingerprint] = {
+        RelayRewards.PendingRounds[timestamp][value.Fingerprint] = {
           Address = value.Address
           Score = {}
         }
-        RelayRewards.PendingRounds[request.Timestamp][value.Fingerprint].Score = {
+        RelayRewards.PendingRounds[timestamp][value.Fingerprint].Score = {
           Network = value.Network
           IsHardware = value.IsHardware
           UptimeStreak = value.UptimeStreak
@@ -280,7 +281,7 @@ function RelayRewards.init()
     function (msg)
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       
-      local timestamp = msg.Tags['Timestamp']
+      local timestamp = tonumber(msg.Tags['Timestamp'])
       assertInteger(timestamp, 'Timestamp tag')
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
 
@@ -464,7 +465,7 @@ function RelayRewards.init()
     function (msg)
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       
-      local timestamp = msg.Tags['Timestamp']
+      local timestamp = tonumber(msg.Tags['Timestamp'])
       assertInteger(timestamp, 'Timestamp tag')
 
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
