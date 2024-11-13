@@ -8,7 +8,7 @@ import {
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
-describe('Cancelling relay rewards round', () => {
+describe('Cancel-Round action of relay rewards', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
@@ -72,13 +72,14 @@ describe('Cancelling relay rewards round', () => {
           { name: 'Timestamp', value: '1234567890' }
       ],
       Data: JSON.stringify({
-        Scores: [
-          { Fingerprint: FINGERPRINT_A, Address: ALICE_ADDRESS, 
+        Scores: {
+          [FINGERPRINT_A]: { Address: ALICE_ADDRESS, 
             Network: 0, IsHardware: false, UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
           }
-        ]
+        }
       })
     })
+
     expect(newRoundResult.Messages).to.have.lengthOf(1)
     expect(newRoundResult.Messages[0].Data).to.equal('OK')
 

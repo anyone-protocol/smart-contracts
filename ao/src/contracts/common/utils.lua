@@ -45,13 +45,17 @@ local function initUtils()
     end,
     
     assertInteger = function (value, fieldName)
-      assert(type(value) == 'number', ErrorMessages.NumberValueRequired .. ' for ' .. fieldName)
-      assert(math.type(value) == 'integer', ErrorMessages.IntegerValueRequired .. ' for ' .. fieldName)
+      assert(type(value) == 'number', ErrorMessages.NumberValueRequired .. ' for ' .. fieldName .. ' got ' .. type(value))
+      assert(math.type(value) == 'integer', ErrorMessages.IntegerValueRequired .. ' for ' .. fieldName .. ' got ' .. math.type(value))
+    end,
+
+    assertNumber = function (value, fieldName)
+      assert(type(value) == 'number', ErrorMessages.NumberValueRequired .. ' for ' .. fieldName .. ' got ' .. type(value))
     end,
 
     assertFloat = function (value, fieldName)
-      assert(type(value) == 'number', ErrorMessages.NumberValueRequired .. ' for ' .. fieldName)
-      assert(math.type(value) == 'float', ErrorMessages.FloatValueRequired .. ' for ' .. fieldName)
+      assert(type(value) == 'number', ErrorMessages.NumberValueRequired .. ' for ' .. fieldName .. ' got ' .. type(value))
+      assert(math.type(value) == 'float', ErrorMessages.FloatValueRequired .. ' for ' .. fieldName .. ' got ' .. math.type(value))
     end,
 
     findHighestKey = function (table, fieldName)

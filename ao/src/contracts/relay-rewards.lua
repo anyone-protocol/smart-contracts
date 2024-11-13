@@ -81,7 +81,16 @@ function RelayRewards.init()
 
       local effects = {}
       local config = RelayRewards.Configuration
-      local request = json.decode(msg.Data)
+      
+      local request = nil
+      local function parseData()
+        request = json.decode(msg.Data)
+      end
+
+      local status, err = pcall(parseData)
+      assert(err == nil, 'Data must be valid JSON')
+      assert(status, 'Failed to parse input data')
+      assert(request, 'Failed to parse data')
       
       if request.TokensPerSecond then
         AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
@@ -99,7 +108,7 @@ function RelayRewards.init()
         end
         if request.Modifiers.Hardware then
           assert(type(request.Modifiers.Hardware.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Hardware.Enabled')
-          AnyoneUtils.asserNumber(request.Modifiers.Hardware.Share, 'Modifiers.Hardware.Share')
+          AnyoneUtils.assertNumber(request.Modifiers.Hardware.Share, 'Modifiers.Hardware.Share')
           assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share score has to be >= 0')
           assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share score has to be <= 1')
           config.Modifiers.Hardware.Enabled = request.Modifiers.Hardware.Enabled
@@ -118,11 +127,13 @@ function RelayRewards.init()
           if request.Modifiers.Uptime.Tiers then
             assert(type(request.Modifiers.Uptime.Tiers) == 'table', 'Table type required for Modifiers.Uptime.Tiers')
             local tierCount = 0
-            for key, score in pairs(request.Modifiers.Uptime.Tiers) do
-              AnyoneUtils.assertInteger(key, 'Modifiers.Uptime.Tiers Key')
-              assert(key >= 0, 'Modifiers.Uptime.Tiers Key has to be >= 0')
-              AnyoneUtils.assertNumber(score, 'Modifiers.Uptime.Tiers Value')
-              assert(score >= 0, 'Modifiers.Uptime.Tiers Value has to be >= 0')
+            for days, multiplier in pairs(request.Modifiers.Uptime.Tiers) do
+              local daysInt = tonumber(days)
+              AnyoneUtils.assertInteger(daysInt, 'Modifiers.Uptime.Tiers days')
+              assert(daysInt >= 0, 'Modifiers.Uptime.Tiers days has to be >= 0')
+              local multiplierFloat = tonumber(multiplier)
+              AnyoneUtils.assertNumber(multiplierFloat, 'Modifiers.Uptime.Tiers multiplier')
+              assert(multiplierFloat >= 0, 'Modifiers.Uptime.Tiers Value has to be >= 0')
               assert(tierCount < 42, 'Too many Modifiers.Uptime.Tiers')
               tierCount = tierCount + 1
             end
@@ -154,10 +165,10 @@ function RelayRewards.init()
       if request.Multipliers then
         if request.Multipliers.Family then
           assert(type(request.Multipliers.Family.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Family.Enabled')
-          AnyoneUtils.assertNumber(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
+          AnyoneUtils.assertFloat(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
           assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset score has to be >= 0')
           assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset score has to be <= 1')
-          AnyoneUtils.assertNumber(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
+          AnyoneUtils.assertFloat(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
           assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power score has to be >= 0')
           config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
           config.Multipliers.Family.Offset = request.Configuration.Multipliers.Family.Offset
@@ -166,10 +177,10 @@ function RelayRewards.init()
         end
         if request.Multipliers.Location then
           assert(type(request.Multipliers.Location.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Location.Enabled')
-          AnyoneUtils.assertNumber(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
+          AnyoneUtils.assertFloat(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
           assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset score has to be >= 0')
           assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset score has to be <= 1')
-          AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
+          AnyoneUtils.assertFloat(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
           assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power score has to be >= 0')
           config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
           config.Multipliers.Location.Offset = request.Configuration.Multipliers.Location.Offset
@@ -182,7 +193,7 @@ function RelayRewards.init()
         for operatorAddress, delegation in request.Delegates do
           AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
           AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address')
-          AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
+          AnyoneUtils.assertFloat(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
           assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share score has to be >= 0')
           assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share score has to be <= 1')
         end
@@ -208,34 +219,43 @@ function RelayRewards.init()
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       assert(msg.Data, ErrorMessages.MessageDataRequired)
       
-      local request = json.decode(msg.Data)
+      local request = nil
+      local function parseData()
+        request = json.decode(msg.Data)
+      end
+
+      local status, err = pcall(parseData)
+      assert(err == nil, 'Data must be valid JSON')
+      assert(status, 'Failed to parse input data')
+      assert(request, 'Failed to parse data')
       
       local timestamp = tonumber(msg.Tags['Timestamp'])
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp')
+      assert(timestamp, 'Timestamp tag must be a number')
+      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       assert(timestamp > 0, 'Timestamp has to be > 0')
       assert(timestamp > RelayRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
       
       assert(type(request.Scores) == 'table', 'Scores have to be a table')
 
-      local function assertScore(score, key)
-        AnyoneUtils.assertValidFingerprint(score.Fingerprint, 'Invalid Scores[' .. key .. '].Fingerprint')
-        AnyoneUtils.assertValidEvmAddress(score.Address, 'Invalid Scores[' .. key .. '].Address')
-        AnyoneUtils.assertInteger(score.Network, 'Scores[' .. key .. '].Network')
-        assert(score.Network >= 0, 'Scores[' .. key .. '].Network has to be >= 0')
-        assert(type(score.IsHardware) == 'boolean', 'Scores[' .. key .. '].IsHardware')
-        AnyoneUtils.assertInteger(score.UptimeStreak, 'Scores[' .. key .. '].UptimeStreak')
-        assert(score.UptimeStreak >= 0, 'Scores[' .. key .. '].UptimeStreak has to be >= 0')
-        assert(type(score.ExitBonus) == 'boolean', 'Scores[' .. key .. '].ExitBonus')
-        AnyoneUtils.assertInteger(score.FamilySize, 'Scores[' .. key .. '].FamilySize')
-        assert(score.FamilySize >= 0, 'Scores[' .. key .. '].FamilySize has to be >= 0')
-        AnyoneUtils.assertInteger(score.LocationSize, 'Scores[' .. key .. '].LocationSize')
-        assert(score.LocationSize >= 0, 'Scores[' .. key .. '].LocationSize has to be >= 0')
+      local function assertScore(score, fingerprint)
+        AnyoneUtils.assertValidFingerprint(fingerprint, 'Invalid Fingerprint' .. fingerprint)
+        AnyoneUtils.assertValidEvmAddress(score.Address, 'Invalid Scores[' .. fingerprint .. '].Address')
+        AnyoneUtils.assertInteger(score.Network, 'Scores[' .. fingerprint .. '].Network')
+        assert(score.Network >= 0, 'Scores[' .. fingerprint .. '].Network has to be >= 0')
+        assert(type(score.IsHardware) == 'boolean', 'Scores[' .. fingerprint .. '].IsHardware')
+        AnyoneUtils.assertInteger(score.UptimeStreak, 'Scores[' .. fingerprint .. '].UptimeStreak')
+        assert(score.UptimeStreak >= 0, 'Scores[' .. fingerprint .. '].UptimeStreak has to be >= 0')
+        assert(type(score.ExitBonus) == 'boolean', 'Scores[' .. fingerprint .. '].ExitBonus')
+        AnyoneUtils.assertInteger(score.FamilySize, 'Scores[' .. fingerprint .. '].FamilySize')
+        assert(score.FamilySize >= 0, 'Scores[' .. fingerprint .. '].FamilySize has to be >= 0')
+        AnyoneUtils.assertInteger(score.LocationSize, 'Scores[' .. fingerprint .. '].LocationSize')
+        assert(score.LocationSize >= 0, 'Scores[' .. fingerprint .. '].LocationSize has to be >= 0')
       end
 
-      for index, score in pairs(request.Scores) do
-        assertScore(score, index)
+      for fingerprint, score in pairs(request.Scores) do
+        assertScore(score, fingerprint)
         if RelayRewards.PendingRounds[timestamp] then
-          assert(RelayRewards.PendingRounds[timestamp][score.Fingerprint] == nil, 'Duplicated score for ' .. score.Fingerprint)
+          assert(RelayRewards.PendingRounds[timestamp][fingerprint] == nil, 'Duplicated score for ' .. fingerprint)
         end
       end
 
@@ -243,12 +263,12 @@ function RelayRewards.init()
         RelayRewards.PendingRounds[timestamp] = {}
       end
 
-      for index, score in pairs(request.Scores) do
-        RelayRewards.PendingRounds[timestamp][score.Fingerprint] = {
+      for fingerprint, score in pairs(request.Scores) do
+        RelayRewards.PendingRounds[timestamp][fingerprint] = {
           Address = score.Address,
           Score = {}
         }
-        RelayRewards.PendingRounds[timestamp][score.Fingerprint].Score = {
+        RelayRewards.PendingRounds[timestamp][fingerprint].Score = {
           Network = score.Network,
           IsHardware = score.IsHardware,
           UptimeStreak = score.UptimeStreak,
@@ -276,7 +296,7 @@ function RelayRewards.init()
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       
       local timestamp = tonumber(msg.Tags['Timestamp'])
-      assertInteger(timestamp, 'Timestamp tag')
+      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
 
       local roundData = {}
@@ -294,7 +314,7 @@ function RelayRewards.init()
 
         local familyMultiplier = 1 
         if RelayRewards.Configuration.Multipliers.Family.Enabled then
-          familyMultiplier = 1 + RelayRewards.Configuration.Multipliers.Family.Offset * math.Power(scoreData.Score.FamilySize, RelayRewards.Configuration.Multipliers.Family.Power)
+          familyMultiplier = 1 + RelayRewards.Configuration.Multipliers.Family.Offset * (scoreData.Score.FamilySize^RelayRewards.Configuration.Multipliers.Family.Power)
           if familyMultiplier < 0 then
             familyMultiplier = 0
           end
@@ -302,7 +322,7 @@ function RelayRewards.init()
         end
         local locationMultiplier = 1
         if RelayRewards.Configuration.Multipliers.Location.Enabled then
-          locationMultiplier = 1 + RelayRewards.Configuration.Multipliers.Location.Offset * math.Power(scoreData.Score.LocationSize, RelayRewards.Configuration.Multipliers.Location.Power)
+          locationMultiplier = 1 + RelayRewards.Configuration.Multipliers.Location.Offset * (scoreData.Score.LocationSize^RelayRewards.Configuration.Multipliers.Location.Power)
           if locationMultiplier < 0 then
             locationMultiplier = 0
           end
@@ -311,10 +331,13 @@ function RelayRewards.init()
 
         roundData[fingerprint].Rating = { Network = networkScore, Hardware = 0, Uptime = 0, ExitBonus = 0 }
 
-        local uptimeTierMultiplier = 0
-        for key, score in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
-          if key <= scoreData.Score.UptimeStreak and uptimeTierMultiplier < score then
-            uptimeTierMultiplier = score
+        local uptimeTierMultiplier = 0.0
+        for days, multiplier in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
+          local daysInt = tonumber(days)
+          local multiplierFloat = tonumber(multiplier)
+          assert(multiplierFloat, 'Multiplier must be a number')
+          if daysInt <= scoreData.Score.UptimeStreak and uptimeTierMultiplier < multiplierFloat then
+            uptimeTierMultiplier = multiplierFloat
           end
         end
         roundData[fingerprint].Rating.Uptime = uptimeTierMultiplier * networkScore
@@ -323,7 +346,7 @@ function RelayRewards.init()
           roundData[fingerprint].Rating.Hardware = 0.65 * networkScore + 0.35 * roundData[fingerprint].Rating.Uptime
         end
 
-        if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and state.ExitBonus then
+        if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.ExitBonus then
           roundData[fingerprint].Rating.ExitBonus = networkScore
         end
 
@@ -436,9 +459,9 @@ function RelayRewards.init()
         Details = roundData
       }
 
-      for key, _ in pairs(RelayRewards.PendingRounds) do
-        if key <= timestamp then
-          RelayRewards.PendingRounds[key] = nil
+      for roundStamp, _ in pairs(RelayRewards.PendingRounds) do
+        if roundStamp <= timestamp then
+          RelayRewards.PendingRounds[roundStamp] = nil
         end 
       end
 
@@ -481,7 +504,7 @@ function RelayRewards.init()
       'Set-Delegate'
     ),
     function (msg)
-      local address = AnyoneUtils.normalizeEvmAddress(msg.From, 3)
+      local address = AnyoneUtils.normalizeEvmAddress(msg.From)
       AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
       local result = 'NONE'
       local delegateAddress = msg.Tags['Address']
