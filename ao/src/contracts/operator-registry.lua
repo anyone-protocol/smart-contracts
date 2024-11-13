@@ -1,5 +1,10 @@
 local OperatorRegistry = {
-  FingerprintsToOperatorAddresses = {},
+  -- Operator Certificates
+  ClaimableFingerprintsToOperatorAddresses = {},
+
+  -- Fingerprint Certificates
+  VerifiedFingerprintsToOperatorAddresses = {},
+
   BlockedOperatorAddresses = {},
   RegistrationCreditsFingerprintsToOperatorAddresses = {},
   VerifiedHardwareFingerprints = {}
@@ -29,7 +34,7 @@ function OperatorRegistry.init()
         AnyoneUtils.assertValidFingerprint(fingerprint)
         AnyoneUtils.assertValidEvmAddress(address)
 
-        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] =
+        OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint] =
           AnyoneUtils.normalizeEvmAddress(address)
       end
 
@@ -51,7 +56,9 @@ function OperatorRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'List-Operator-Certificates-Response',
-        Data = json.encode(OperatorRegistry.FingerprintsToOperatorAddresses)
+        Data = json.encode(
+          OperatorRegistry.ClaimableFingerprintsToOperatorAddresses
+        )
       })
     end
   )
@@ -75,22 +82,26 @@ function OperatorRegistry.init()
       local address = '0x'..string.upper(string.sub(msg.From, 3))
 
       assert(
-        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] == address,
+        OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint]
+          == address,
         ErrorMessages.InvalidCertificate
       )
 
-      if (OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true) then
+      if (
+        OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true
+      ) then
         assert(
           OperatorRegistry
             .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
-              == msg.From,
+              == address,
           ErrorMessages.RegistrationCreditRequired
         )
       end
 
-      OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] = msg.From
       OperatorRegistry
-          .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
+        .VerifiedFingerprintsToOperatorAddresses[fingerprint] = address
+      OperatorRegistry
+        .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -107,7 +118,9 @@ function OperatorRegistry.init()
       ao.send({
         Target = msg.From,
         Action = 'List-Fingerprint-Certificates-Response',
-        Data = json.encode(OperatorRegistry.FingerprintsToOperatorAddresses)
+        Data = json.encode(
+          OperatorRegistry.VerifiedFingerprintsToOperatorAddresses
+        )
       })
     end
   )
@@ -119,12 +132,15 @@ function OperatorRegistry.init()
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
       AnyoneUtils.assertValidFingerprint(fingerprint)
+      local address = '0x'..string.upper(string.sub(msg.From, 3))
       assert(
-        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] == msg.From,
+        OperatorRegistry
+          .VerifiedFingerprintsToOperatorAddresses[fingerprint] == address,
         ErrorMessages.OnlyRelayOperatorCanRenounce
       )
 
-      OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry
+        .VerifiedFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -144,11 +160,11 @@ function OperatorRegistry.init()
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
       assert(string.len(fingerprint) == 40, ErrorMessages.InvalidCertificate)
       assert(
-        OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] ~= nil,
+        OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint] ~= nil,
         ErrorMessages.UnknownFingerprint
       )
 
-      OperatorRegistry.FingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -221,9 +237,9 @@ function OperatorRegistry.init()
     function (msg)
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
 
-      local address = msg.Tags['Address']
-      assert(type(address) == 'string', ErrorMessages.AddressRequired)
-      AnyoneUtils.assertValidEvmAddress(address)
+      assert(type(msg.Tags['Address']) == 'string', ErrorMessages.AddressRequired)
+      AnyoneUtils.assertValidEvmAddress(msg.Tags['Address'])
+      local address = '0x'..string.upper(string.sub(msg.Tags['Address'], 3))
 
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
@@ -356,6 +372,40 @@ function OperatorRegistry.init()
         Target = msg.From,
         Action = 'Remove-Verified-Hardware-Response',
         Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Info',
+    Handlers.utils.hasMatchingTag('Action', 'Info'),
+    function (msg)
+      local info = {
+        claimed = 0,
+        hardware = 0,
+        total = 0
+      }
+
+      for _ in pairs(
+        OperatorRegistry.VerifiedFingerprintsToOperatorAddresses
+      ) do
+        info.claimed = info.claimed + 1
+      end
+
+      for _ in pairs(
+        OperatorRegistry.ClaimableFingerprintsToOperatorAddresses
+      ) do
+        info.total = info.total + 1
+      end
+
+      for _ in pairs(OperatorRegistry.VerifiedHardwareFingerprints) do
+        info.hardware = info.hardware + 1
+      end
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Info-Response',
+        Data = json.encode(info)
       })
     end
   )
