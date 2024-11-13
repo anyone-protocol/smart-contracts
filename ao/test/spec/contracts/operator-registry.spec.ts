@@ -241,6 +241,11 @@ describe('Operator Registry', () => {
     })
 
     it('Lists Fingerprint & Operator Address Mappings', async () => {
+      await addRegistrationCredit(
+        handle,
+        ALICE_ADDRESS,
+        EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+      )
       await setupFingerprintCertificates(handle)
 
       const result = await handle({
@@ -1219,7 +1224,7 @@ describe('Operator Registry', () => {
     })
 
     describe('Listing', () => {
-      it('Lists VH', async () => {
+      it('Lists VH Fingerprints', async () => {
         const fingerprints = [
           FINGERPRINT_A,
           FINGERPRINT_B,
@@ -1350,6 +1355,55 @@ describe('Operator Registry', () => {
           .to.be.a('string')
           .that.includes('Registration Credit required')
       })
+    })
+  })
+
+  describe('Info Messages', () => {
+    it('Provides reply to Info messages', async () => {
+      const verifiedRelays = [
+        { address: ALICE_ADDRESS, fingerprint: FINGERPRINT_A },
+        { address: BOB_ADDRESS, fingerprint: FINGERPRINT_B },
+        { address: CHARLS_ADDRESS, fingerprint: FINGERPRINT_C }
+      ]
+      for (const { address, fingerprint } of verifiedRelays) {
+        await setupAdminAddOperatorCertificates(handle, address, fingerprint)
+        await addRegistrationCredit(handle, address, fingerprint)
+        await handle({
+          From: address,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+      }
+      const unclaimedRelays = [
+        { address: ALICE_ADDRESS, fingerprint: FINGERPRINT_D },
+        { address: BOB_ADDRESS, fingerprint: FINGERPRINT_E },
+        { address: CHARLS_ADDRESS, fingerprint: FINGERPRINT_F },
+      ]
+      for (const { address, fingerprint } of unclaimedRelays) {
+        await setupAdminAddOperatorCertificates(handle, address, fingerprint)
+      }
+
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Verified-Hardware' }
+        ],
+        Data: `${FINGERPRINT_B},${FINGERPRINT_E}`
+      })
+
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Info' }]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(JSON.parse(result.Messages[0].Data))
+        .to.deep.equal({ claimed: 3, hardware: 2, total: 6 })
     })
   })
 })
