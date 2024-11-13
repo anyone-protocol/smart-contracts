@@ -3,7 +3,7 @@
 local function initUtils()
   local ErrorMessages = require('.common.errors')
 
-  local EvmAddressPattern = '0x' .. ('%x'):rep(40)
+  local EvmAddressPattern = '0x' .. ('[%x]'):rep(40)
   local FingerprintPattern = ('[0123456789ABCDEF]'):rep(40)
   local H3CellPattern = '^8c' .. ('%d'):rep(6) .. '$'
 
@@ -21,7 +21,7 @@ local function initUtils()
     end,
 
     assertValidEvmAddress = function (address, message)
-      assert(type(fingerprint) == 'string', message or ErrorMessages.InvalidFingerprint)
+      assert(type(address) == 'string', message or ErrorMessages.InvalidFingerprint)
       assert(
         string.find(address, EvmAddressPattern),
         message or ErrorMessages.InvalidAddress
@@ -86,10 +86,10 @@ local function initUtils()
           Low = low, High = 0
         })
       end
-    end
+    end,
 
     bigIntFix = function (input)
-      local LOW_CAP = 1_000_000_000_000_000_000
+      local LOW_CAP = 1000000000000000000
       if input.Low < LOW_CAP then
         return { Low = input.Low, High = input.High }
       else

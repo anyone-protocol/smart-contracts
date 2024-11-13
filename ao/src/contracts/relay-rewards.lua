@@ -1,39 +1,39 @@
 local RelayRewards = {
   TotalAddressReward = {
 -- [Address] = { High: 0, Low: 0 }
-  }
+  },
   TotalFingerprintReward = {
 -- [Fingerprint] = { High: 0, Low: 0 }
-  }
+  },
 
   Configuration = {
-    TokensPerSecond = 28935184200000000
+    TokensPerSecond = 28935184200000000,
     Modifiers = {
-      Network = { Share = 0.56 }
-      Hardware = { Enabled = false, Share = 0.2 }
-      Uptime = { Enabled = false, Share = 0.14
+      Network = { Share = 0.56 },
+      Hardware = { Enabled = false, Share = 0.2 },
+      Uptime = { Enabled = false, Share = 0.14,
         Tiers = {
-          [0]: 0
-          [3]: 1
-          [14]: 3
+          [0] = 0,
+          [3] = 1,
+          [14] = 3,
         }
-      }
+      },
       ExitBonus = { Enabled = false, Share = 0.1 }
-    }
+    },
     Multipliers = {
-      Family = { Enabled = false, Offset = -0.01, Power = 1 }
+      Family = { Enabled = false, Offset = -0.01, Power = 1 },
       Location = { Enabled = false, Offset = -0.003, Power = 2 }
-    }
+    },
     Delegates = { 
 --      [Address] = { Address: '', Share = 0 }
     }
-  }
+  },
   PreviousRound = {
-    Timestamp = 0
+    Timestamp = 0,
     Summary = {
       Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 
-    }
-    Configuration = {}
+    },
+    Configuration = {},
     Details = {
 -- [Fingerprint] = { 
 --   Address = ''
@@ -46,7 +46,7 @@ local RelayRewards = {
 --   }
 -- }
     }
-  }
+  },
   PendingRounds = {
 -- Timestamp = {
 --   Fingerprint = {
@@ -79,65 +79,65 @@ function RelayRewards.init()
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       assert(msg.Data, ErrorMessages.MessageDataRequired)
 
-      local effects = []
+      local effects = {}
       local config = RelayRewards.Configuration
       local request = json.decode(msg.Data)
       
       if request.TokensPerSecond then
         AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
-        assert(request.TokensPerSecond >= 0, 'TokensPerSecond value has to be >= 0')
+        assert(request.TokensPerSecond >= 0, 'TokensPerSecond score has to be >= 0')
         config.TokensPerSecond = request.TokensPerSecond
-        effects += 'TokensPerSecond\n'
+        table.insert(effects, 'TokensPerSecond')
       end
       if request.Modifiers then
         if request.Modifiers.Network then
           AnyoneUtils.assertNumber(request.Modifiers.Network.Share, 'Modifiers.Network.Share')
-          assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share value has to be >= 0')
-          assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share value has to be <= 1')
+          assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share score has to be >= 0')
+          assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share score has to be <= 1')
           config.Modifiers.Network.Share = request.Modifiers.Network.Share
-          effects += 'Modifiers.Network\n'
+          table.insert(effects, 'Modifiers.Network')
         end
         if request.Modifiers.Hardware then
           assert(type(request.Modifiers.Hardware.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Hardware.Enabled')
           AnyoneUtils.asserNumber(request.Modifiers.Hardware.Share, 'Modifiers.Hardware.Share')
-          assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share value has to be >= 0')
-          assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share value has to be <= 1')
+          assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share score has to be >= 0')
+          assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share score has to be <= 1')
           config.Modifiers.Hardware.Enabled = request.Modifiers.Hardware.Enabled
           config.Modifiers.Hardware.Share = request.Modifiers.Hardware.Share
-          effects += 'Modifiers.Hardware\n'
+          table.insert(effects, 'Modifiers.Hardware')
         end
         if request.Modifiers.Uptime then
           assert(type(request.Modifiers.Uptime.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Uptime.Enabled')
           AnyoneUtils.assertNumber(request.Modifiers.Uptime.Share, 'Modifiers.Uptime.Share')
-          assert(request.Modifiers.Uptime.Share >= 0, 'Modifiers.Uptime.Share value has to be >= 0')
-          assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share value has to be <= 1')
+          assert(request.Modifiers.Uptime.Share >= 0, 'Modifiers.Uptime.Share score has to be >= 0')
+          assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share score has to be <= 1')
           config.Modifiers.Uptime.Enabled = request.Modifiers.Uptime.Enabled
           config.Modifiers.Uptime.Share = request.Modifiers.Uptime.Share
-          effects += 'Modifiers.Uptime\n'
+          table.insert(effects, 'Modifiers.Uptime')
 
           if request.Modifiers.Uptime.Tiers then
             assert(type(request.Modifiers.Uptime.Tiers) == 'table', 'Table type required for Modifiers.Uptime.Tiers')
             local tierCount = 0
-            for key, value in pairs(request.Modifiers.Uptime.Tiers) do
+            for key, score in pairs(request.Modifiers.Uptime.Tiers) do
               AnyoneUtils.assertInteger(key, 'Modifiers.Uptime.Tiers Key')
               assert(key >= 0, 'Modifiers.Uptime.Tiers Key has to be >= 0')
-              AnyoneUtils.assertNumber(value, 'Modifiers.Uptime.Tiers Value')
-              assert(value >= 0, 'Modifiers.Uptime.Tiers Value has to be >= 0')
+              AnyoneUtils.assertNumber(score, 'Modifiers.Uptime.Tiers Value')
+              assert(score >= 0, 'Modifiers.Uptime.Tiers Value has to be >= 0')
               assert(tierCount < 42, 'Too many Modifiers.Uptime.Tiers')
               tierCount = tierCount + 1
             end
             config.Modifiers.Uptime.Tiers = request.Modifiers.Uptime.Tiers
-            effects += 'Modifiers.Uptime.Tiers\n'
+            table.insert(effects, 'Modifiers.Uptime.Tiers')
           end
         end
         if request.Modifiers.ExitBonus then
           assert(type(request.Modifiers.ExitBonus.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.ExitBonus.Enabled')
           AnyoneUtils.assertNumber(request.Modifiers.ExitBonus.Share, 'Modifiers.ExitBonus.Share')
-          assert(request.Modifiers.ExitBonus.Share >= 0, 'Modifiers.ExitBonus.Share value has to be >= 0')
-          assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share value has to be <= 1')
+          assert(request.Modifiers.ExitBonus.Share >= 0, 'Modifiers.ExitBonus.Share score has to be >= 0')
+          assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share score has to be <= 1')
           config.Modifiers.ExitBonus.Enabled = request.Modifiers.ExitBonus.Enabled
           config.Modifiers.ExitBonus.Share = request.Modifiers.ExitBonus.Share
-          effects += 'Modifiers.ExitBonus.Share\n'
+          table.insert(effects, 'Modifiers.ExitBonus.Share')
         end
         local totalEffectiveShare = config.Modifiers.Network.Share
         if config.Modifiers.Hardware.Enabled then
@@ -155,26 +155,26 @@ function RelayRewards.init()
         if request.Multipliers.Family then
           assert(type(request.Multipliers.Family.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Family.Enabled')
           AnyoneUtils.assertNumber(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
-          assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset value has to be >= 0')
-          assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset value has to be <= 1')
+          assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset score has to be >= 0')
+          assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset score has to be <= 1')
           AnyoneUtils.assertNumber(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
-          assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power value has to be >= 0')
+          assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power score has to be >= 0')
           config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
           config.Multipliers.Family.Offset = request.Configuration.Multipliers.Family.Offset
           config.Multipliers.Family.Power = request.Configuration.Multipliers.Family.Power
-          effects += 'Multipliers.Family\n'
+          table.insert(effects, 'Multipliers.Family')
         end
         if request.Multipliers.Location then
           assert(type(request.Multipliers.Location.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Location.Enabled')
           AnyoneUtils.assertNumber(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
-          assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset value has to be >= 0')
-          assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset value has to be <= 1')
+          assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset score has to be >= 0')
+          assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset score has to be <= 1')
           AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
-          assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power value has to be >= 0')
+          assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power score has to be >= 0')
           config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
           config.Multipliers.Location.Offset = request.Configuration.Multipliers.Location.Offset
           config.Multipliers.Location.Power = request.Configuration.Multipliers.Location.Power
-          effects += 'Multipliers.Location\n'
+          table.insert(effects, 'Multipliers.Location')
         end
       end
       if request.Delegates then
@@ -182,9 +182,9 @@ function RelayRewards.init()
         for operatorAddress, delegation in request.Delegates do
           AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
           AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address')
-          AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. fingerprint .. '].Share')
-          assert(delegation.Share >= 0, 'Delegates['.. fingerprint .. '].Share value has to be >= 0')
-          assert(delegation.Share <= 1, 'Delegates['.. fingerprint .. '].Share value has to be <= 1')
+          AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
+          assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share score has to be >= 0')
+          assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share score has to be <= 1')
         end
       end
 
@@ -193,10 +193,7 @@ function RelayRewards.init()
       ao.send({
         Target = msg.From,
         Action = 'Update-Configuration-Response',
-        Data = {
-          Result = 'OK'
-          Effect = effects
-        }
+        Data = 'OK'
       })
     end
   )
@@ -235,10 +232,10 @@ function RelayRewards.init()
         assert(score.LocationSize >= 0, 'Scores[' .. key .. '].LocationSize has to be >= 0')
       end
 
-      for key, value in request.Scores do 
-        assertScore(value, key)
+      for index, score in pairs(request.Scores) do
+        assertScore(score, index)
         if RelayRewards.PendingRounds[timestamp] then
-          assert(RelayRewards.PendingRounds[timestamp][value.Fingerprint] == nil, 'Duplicated score for ' .. fingerprint)
+          assert(RelayRewards.PendingRounds[timestamp][score.Fingerprint] == nil, 'Duplicated score for ' .. score.Fingerprint)
         end
       end
 
@@ -246,27 +243,25 @@ function RelayRewards.init()
         RelayRewards.PendingRounds[timestamp] = {}
       end
 
-      for _, value in request.Scores do
-        RelayRewards.PendingRounds[timestamp][value.Fingerprint] = {
-          Address = value.Address
+      for index, score in pairs(request.Scores) do
+        RelayRewards.PendingRounds[timestamp][score.Fingerprint] = {
+          Address = score.Address,
           Score = {}
         }
-        RelayRewards.PendingRounds[timestamp][value.Fingerprint].Score = {
-          Network = value.Network
-          IsHardware = value.IsHardware
-          UptimeStreak = value.UptimeStreak
-          FamilySize = value.FamilySize
-          ExitBonus = value.ExitBonus
-          LocationSize = value.LocationSize
+        RelayRewards.PendingRounds[timestamp][score.Fingerprint].Score = {
+          Network = score.Network,
+          IsHardware = score.IsHardware,
+          UptimeStreak = score.UptimeStreak,
+          FamilySize = score.FamilySize,
+          ExitBonus = score.ExitBonus,
+          LocationSize = score.LocationSize
         }
       end
 
       ao.send({
         Target = msg.From,
         Action = 'Add-Scores-Response',
-        Data = {
-          Result = 'OK'
-        }
+        Data = 'OK'
       })
     end
   )
@@ -287,11 +282,11 @@ function RelayRewards.init()
       local roundData = {}
       
       local summary = {
-        Ratings = { Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 }
+        Ratings = { Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 },
         Rewards = { Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 }
       }
 
-      for fingerprint, scoreData in RelayRewards.PendingRounds[timestamp] do
+      for fingerprint, scoreData in pairs(RelayRewards.PendingRounds[timestamp]) do
         roundData[fingerprint].Address = scoreData.Address
         roundData[fingerprint].Score = scoreData.Score
         
@@ -317,9 +312,9 @@ function RelayRewards.init()
         roundData[fingerprint].Rating = { Network = networkScore, Hardware = 0, Uptime = 0, ExitBonus = 0 }
 
         local uptimeTierMultiplier = 0
-        for key, value in RelayRewards.Configuration.Modifiers.Uptime.Tiers do
-          if key <= scoreData.Score.UptimeStreak and uptimeTierMultiplier < value then
-            uptimeTierMultiplier = value
+        for key, score in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
+          if key <= scoreData.Score.UptimeStreak and uptimeTierMultiplier < score then
+            uptimeTierMultiplier = score
           end
         end
         roundData[fingerprint].Rating.Uptime = uptimeTierMultiplier * networkScore
@@ -333,8 +328,8 @@ function RelayRewards.init()
         end
 
         roundData[fingerprint].Configuration = { 
-          FamilyMultiplier = familyMultiplier
-          LocationMultiplier = locationMultiplier
+          FamilyMultiplier = familyMultiplier,
+          LocationMultiplier = locationMultiplier,
           UptimeTierMultiplier = uptimeTierMultiplier
         }
 
@@ -355,33 +350,36 @@ function RelayRewards.init()
       local networkRewards = networkRewardsPerSec * roundLength
 
       local hardwareRewards = 0
+      local hardwareRewardsPerSec = 0
       if RelayRewards.Configuration.Modifiers.Hardware.Enabled then
-        local hardwareRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Hardware.Share)
-        local hardwareRewards = hardwareRewardsPerSec * roundLength
+        hardwareRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Hardware.Share)
+        hardwareRewards = hardwareRewardsPerSec * roundLength
       end 
 
       local uptimeRewards = 0
+      local uptimeRewardsPerSec = 0
       if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
-        local uptimeRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Uptime.Share)
+        uptimeRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Uptime.Share)
         uptimeRewards = uptimeRewardsPerSec * roundLength
       end
 
       local exitBonusRewards = 0
+      local exitBonusRewardsPerSec = 0
       if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled then
-        local exitBonusRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.ExitBonus.Share)
+        exitBonusRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.ExitBonus.Share)
         exitBonusRewards = exitBonusRewardsPerSec * roundLength
       end
 
       assert(totalRewardsPerSec >= (networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewards), 'Failed rewards share calculation')
       
-      for fingerprint, ratedData in roundData do
+      for fingerprint, ratedData in pairs(roundData) do
         roundData[fingerprint].Reward = {
-          Total = 0
-          OperatorTotal = 0
-          DelegateTotal = 0
-          Network = 0
-          Hardware = 0
-          Uptime = 0
+          Total = 0,
+          OperatorTotal = 0,
+          DelegateTotal = 0,
+          Network = 0,
+          Hardware = 0,
+          Uptime = 0,
           ExitBonus = 0
         }
         if summary.Ratings.Network > 0 then
@@ -432,13 +430,13 @@ function RelayRewards.init()
       end
 
       RelayRewards.PreviousRound = {
-        Timestamp = timestamp
-        Summary = summary
-        Configuration = RelayRewards.Configuration
+        Timestamp = timestamp,
+        Summary = summary,
+        Configuration = RelayRewards.Configuration,
         Details = roundData
       }
 
-      for key, _ in RelayRewards.PendingRounds do
+      for key, _ in pairs(RelayRewards.PendingRounds) do
         if key <= timestamp then
           RelayRewards.PendingRounds[key] = nil
         end 
@@ -447,10 +445,7 @@ function RelayRewards.init()
       ao.send({
         Target = msg.From,
         Action = 'Complete-Round-Response',
-        Data = {
-          Result = 'OK'
-          Effect = RelayRewards.PreviousRound
-        }
+        Data = 'OK'
       })
     end
   )
@@ -465,17 +460,16 @@ function RelayRewards.init()
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       
       local timestamp = tonumber(msg.Tags['Timestamp'])
-      assertInteger(timestamp, 'Timestamp tag')
-
-      assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
-      RelayRewards.PendingRounds[timestamp] = nil
+      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
+      if timestamp then
+        assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
+        RelayRewards.PendingRounds[timestamp] = nil
+      end
 
       ao.send({
         Target = msg.From,
         Action = 'Cancel-Round-Response',
-        Data = {
-          Result = 'OK'
-        }
+        Data = 'OK'
       })
     end
   )
@@ -495,8 +489,8 @@ function RelayRewards.init()
         AnyoneUtils.assertValidEvmAddress(delegateAddress, 'Delegate address tag')
         local delegateShare = msg.Tags['Share']
         AnyoneUtils.assertNumber(delegateShare, 'Delegate.Share')
-        assert(delegation.Share >= 0, 'Delegate.Share value has to be >= 0')
-        assert(delegation.Share <= 1, 'Delegate.Share value has to be <= 1')
+        assert(delegateShare >= 0, 'Delegate.Share score has to be >= 0')
+        assert(delegateShare <= 1, 'Delegate.Share score has to be <= 1')
         result = 'OK'
         RelayRewards.Configuration.Delegates[address] = { 
           Address = delegateAddress, Share = delegateShare
@@ -509,9 +503,7 @@ function RelayRewards.init()
       ao.send({
         Target = msg.From,
         Action = 'Set-Delegate-Response',
-        Data = {
-          Result = result
-        }
+        Data = result
       })
     end
   )

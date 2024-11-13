@@ -1,11 +1,4 @@
-// ** Cancel round
-// Validate caller is process owner
-// Ensure provided timestamp is integer
-// Confirms pending round exists for timestamp
-// Removes pending round for timestamp
-
 import { expect } from 'chai'
-import { throwDeprecation } from 'process'
 
 import {
   ALICE_ADDRESS,
@@ -29,7 +22,6 @@ describe('Cancelling relay rewards round', () => {
           { name: 'Action', value: 'Cancel-Round' }
       ]
     })
-    console.log(result)
     expect(result.Error).to.be.a('string').that.includes('This method is only available to the Owner')
   })
 
@@ -79,16 +71,16 @@ describe('Cancelling relay rewards round', () => {
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '1234567890' }
       ],
-      Data: {
+      Data: JSON.stringify({
         Scores: [
           { Fingerprint: FINGERPRINT_A, Address: ALICE_ADDRESS, 
             Network: 0, IsHardware: false, UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
           }
         ]
-      }
+      })
     })
     expect(newRoundResult.Messages).to.have.lengthOf(1)
-    expect(newRoundResult.Messages[0].Data.Result).to.equal('OK')
+    expect(newRoundResult.Messages[0].Data).to.equal('OK')
 
     const missingRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -99,6 +91,6 @@ describe('Cancelling relay rewards round', () => {
     })
     
     expect(missingRoundResult.Messages).to.have.lengthOf(1)
-    expect(missingRoundResult.Messages[0].Data.Result).to.equal('OK')
+    expect(missingRoundResult.Messages[0].Data).to.equal('OK')
   })
 })

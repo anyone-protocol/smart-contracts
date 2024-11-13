@@ -148,19 +148,20 @@ export async function createLoader(contractName: string) {
   ]
   let memory: ArrayBuffer | null = null
   for (const { action, args, Data } of programs) {
-    await originalHandle(
-      memory,
-      {
-        ...DEFAULT_HANDLE_OPTIONS,
-        Tags: [
-          ...args,
-          { name: 'Action', value: action }
-        ],
-        Data,
-        From: OWNER_ADDRESS
-      },
-      AO_ENV
-    )
+    const result = await originalHandle(
+        memory,
+        {
+          ...DEFAULT_HANDLE_OPTIONS,
+          Tags: [
+            ...args,
+            { name: 'Action', value: action }
+          ],
+          Data,
+          From: OWNER_ADDRESS
+        },
+        AO_ENV
+      )
+    // console.log(`DEBUG - AO Result `, result)
   }
 
   async function handle(
