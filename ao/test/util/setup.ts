@@ -5,11 +5,11 @@ import AoLoader from '@permaweb/ao-loader'
 
 export const MODULE_NAME = 'Encrypted-Messages'
 export const OWNER_ADDRESS = '0x'.padEnd(42, '1')
-export const ALICE_ADDRESS = '0x'.padEnd(42, 'a')
+export const ALICE_ADDRESS = '0x'.padEnd(42, 'A')
 export const ALICE_PUBKEY = ''.padEnd(64, 'a')
-export const BOB_ADDRESS = '0x'.padEnd(42, 'b')
+export const BOB_ADDRESS = '0x'.padEnd(42, 'B')
 export const BOB_PUBKEY = ''.padEnd(64, 'b')
-export const CHARLS_ADDRESS = '0x'.padEnd(42, 'c')
+export const CHARLS_ADDRESS = '0x'.padEnd(42, 'C')
 export const PROCESS_ID = ''.padEnd(43, '2')
 export const MODULE_ID = ''.padEnd(43, '3')
 export const DEFAULT_MODULE_ID = ''.padEnd(43, '4')
