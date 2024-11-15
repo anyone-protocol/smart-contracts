@@ -1406,4 +1406,70 @@ describe('Operator Registry', () => {
         .to.deep.equal({ claimed: 3, hardware: 2, total: 6 })
     })
   })
+
+  describe('View State', () => {
+    it('Provides reply to View-State messages', async () => {
+      const verifiedRelays = [
+        { address: ALICE_ADDRESS, fingerprint: FINGERPRINT_A },
+        { address: BOB_ADDRESS, fingerprint: FINGERPRINT_B },
+        { address: CHARLS_ADDRESS, fingerprint: FINGERPRINT_C }
+      ]
+      for (const { address, fingerprint } of verifiedRelays) {
+        await setupAdminAddOperatorCertificates(handle, address, fingerprint)
+        await addRegistrationCredit(handle, address, fingerprint)
+        await handle({
+          From: address,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: fingerprint
+            }
+          ]
+        })
+      }
+      const unclaimedRelays = [
+        { address: ALICE_ADDRESS, fingerprint: FINGERPRINT_D },
+        { address: BOB_ADDRESS, fingerprint: FINGERPRINT_E },
+        { address: CHARLS_ADDRESS, fingerprint: FINGERPRINT_F },
+      ]
+      for (const { address, fingerprint } of unclaimedRelays) {
+        await setupAdminAddOperatorCertificates(handle, address, fingerprint)
+      }
+
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Add-Verified-Hardware' }
+        ],
+        Data: `${FINGERPRINT_B},${FINGERPRINT_E}`
+      })
+
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [{ name: 'Action', value: 'View-State' }]
+      })
+
+      const parsed = JSON.parse(result.Messages[0].Data)
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(parsed).to.deep.equal({
+        ClaimableFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_D]: ALICE_ADDRESS,
+          [FINGERPRINT_E]: BOB_ADDRESS,
+          [FINGERPRINT_F]: CHARLS_ADDRESS
+        },
+        VerifiedFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_A]: ALICE_ADDRESS,
+          [FINGERPRINT_B]: BOB_ADDRESS,
+          [FINGERPRINT_C]: CHARLS_ADDRESS
+        },
+        BlockedOperatorAddresses: [],
+        RegistrationCreditsFingerprintsToOperatorAddresses: [],
+        VerifiedHardwareFingerprints: {
+          [FINGERPRINT_B]: true,
+          [FINGERPRINT_E]: true
+        }
+      })
+    })
+  })
 })

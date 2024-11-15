@@ -102,6 +102,8 @@ function OperatorRegistry.init()
         .VerifiedFingerprintsToOperatorAddresses[fingerprint] = address
       OperatorRegistry
         .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry
+        .ClaimableFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -377,6 +379,24 @@ function OperatorRegistry.init()
   )
 
   Handlers.add(
+    'View-State',
+    Handlers.utils.hasMatchingTag('Action', 'View-State'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'View-State-Response',
+        Data = json.encode({
+          ClaimableFingerprintsToOperatorAddresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
+          VerifiedFingerprintsToOperatorAddresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses,
+          BlockedOperatorAddresses = OperatorRegistry.BlockedOperatorAddresses,
+          RegistrationCreditsFingerprintsToOperatorAddresses = OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses,
+          VerifiedHardwareFingerprints = OperatorRegistry.VerifiedHardwareFingerprints
+        })
+      })
+    end
+  )
+
+  Handlers.add(
     'Info',
     Handlers.utils.hasMatchingTag('Action', 'Info'),
     function (msg)
@@ -397,6 +417,8 @@ function OperatorRegistry.init()
       ) do
         info.total = info.total + 1
       end
+
+      info.total = info.total + info.claimed
 
       for _ in pairs(OperatorRegistry.VerifiedHardwareFingerprints) do
         info.hardware = info.hardware + 1
