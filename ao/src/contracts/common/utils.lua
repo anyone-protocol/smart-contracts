@@ -11,6 +11,15 @@ local function initUtils()
     return str:sub(1, #start) == start
   end
 
+  local function bigIntFix(input)
+    local LOW_CAP = 1000000000000000000
+    if input.Low < LOW_CAP then
+      return { Low = input.Low, High = input.High }
+    else
+      return bigIntFix({ Low = input.Low - LOW_CAP, High = input.High + 1 })
+    end
+  end
+
   return {
     normalizeEvmAddress = function (address)
       if (starts_with(address, '0x')) then
@@ -60,8 +69,7 @@ local function initUtils()
 
     findHighestKey = function (table, fieldName)
       local highest = -math.huge
-      for key, _ in pairs(t) do
-        assertInteger(key, fieldName)
+      for key, _ in pairs(table) do
         if key > highest then
             highest = key
         end
@@ -71,8 +79,7 @@ local function initUtils()
 
     findLowestKey = function (table, fieldName)
       local lowest = math.huge
-      for key, _ in pairs(t) do
-        assertInteger(key, fieldName)
+      for key, _ in pairs(table) do
         if key < lowest then
           lowest = key
         end
@@ -92,20 +99,21 @@ local function initUtils()
       end
     end,
 
-    bigIntFix = function (input)
-      local LOW_CAP = 1000000000000000000
-      if input.Low < LOW_CAP then
-        return { Low = input.Low, High = input.High }
-      else
-        return bigIntFix({ Low = input.Low - LOW_CAP, High = input.High + 1 })
-      end
-    end,
-
     bigAddScalar = function (input, value)
       if input == nil then
-        return bigInt(value)
+        return bigIntFix({
+          Low = value, High = 0
+        })
       else
         return bigIntFix({ Low = input.Low + value, High = input.High })
+      end
+    end,
+    
+    bigString = function (input)
+      if input == nil then
+        return '0'
+      else
+        return string.format('%d.%018d', input.High, input.Low)
       end
     end,
 

@@ -307,6 +307,7 @@ function RelayRewards.init()
       }
 
       for fingerprint, scoreData in pairs(RelayRewards.PendingRounds[timestamp]) do
+        roundData[fingerprint] = {}
         roundData[fingerprint].Address = scoreData.Address
         roundData[fingerprint].Score = scoreData.Score
         
@@ -363,7 +364,7 @@ function RelayRewards.init()
       end
 
       local roundLength = 0
-      if RelayRewards.PreviousRound then
+      if RelayRewards.PreviousRound.Timestamp > 0 then
         roundLength = (timestamp - RelayRewards.PreviousRound.Timestamp) // 1000
       end
 
@@ -393,7 +394,8 @@ function RelayRewards.init()
         exitBonusRewards = exitBonusRewardsPerSec * roundLength
       end
 
-      assert(totalRewardsPerSec >= (networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewards), 'Failed rewards share calculation')
+      local fingerprintRewardsPerSec = networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewards
+      assert(totalRewardsPerSec >= fingerprintRewardsPerSec * roundLength, 'Failed rewards share calculation')
       
       for fingerprint, ratedData in pairs(roundData) do
         roundData[fingerprint].Reward = {
@@ -434,6 +436,7 @@ function RelayRewards.init()
           roundData[fingerprint].Reward.OperatorTotal = operatorTotal
           roundData[fingerprint].Reward.DelegateTotal = delegateTotal
           local normalizedDelegateAddress = AnyoneUtils.normalizeEvmAddress(delegate.Address)
+
           RelayRewards.TotalAddressReward[normalizedDelegateAddress] = AnyoneUtils.bigAddScalar(
             RelayRewards.TotalAddressReward[normalizedDelegateAddress],
             roundData[fingerprint].Reward.DelegateTotal
@@ -526,6 +529,33 @@ function RelayRewards.init()
       ao.send({
         Target = msg.From,
         Action = 'Set-Delegate-Response',
+        Data = result
+      })
+    end
+  )
+  
+  Handlers.add(
+    'Get-Rewards',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Get-Rewards'
+    ),
+    function (msg)
+      local address = AnyoneUtils.normalizeEvmAddress(msg.From)
+      AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
+      local result = '0'
+      
+      local fingerprint = msg.Tags['Fingerprint']
+      if fingerprint then
+        AnyoneUtils.assertValidFingerprint(fingerprint, 'Fingerprint tag')
+        result = AnyoneUtils.bigString(RelayRewards.TotalFingerprintReward[fingerprint])
+      else
+        result = AnyoneUtils.bigString(RelayRewards.TotalAddressReward[address])
+      end
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Get-Rewards-Response',
         Data = result
       })
     end

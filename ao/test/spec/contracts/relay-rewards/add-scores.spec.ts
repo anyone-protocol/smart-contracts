@@ -16,7 +16,7 @@ describe('Add-Scores action of relay rewards', () => {
     FamilySize: 0, LocationSize: 0
   }
   let refRound1 = JSON.stringify({
-    Scores: { FINGERPRINT_A: score0 }
+    Scores: { [FINGERPRINT_A]: score0 }
   })
 
   beforeEach(async () => {
@@ -106,6 +106,23 @@ describe('Add-Scores action of relay rewards', () => {
   })
 
   it('Ensures timestamp is not backdated to previous round', async () => {
+    const configResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({
+        TokensPerSecond: 100,
+        Modifiers: {
+          Network: {
+            Share: 1
+          }
+        }
+      })
+    })
+    expect(configResult.Messages).to.have.lengthOf(1)
+    expect(configResult.Messages[0].Data).to.equal('OK')
+    
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -117,17 +134,37 @@ describe('Add-Scores action of relay rewards', () => {
     expect(noRoundResult.Messages).to.have.lengthOf(1)
     expect(noRoundResult.Messages[0].Data).to.equal('OK')
     
-    // TODO: complete round 10 so it becomes previous
+    const completeRoundResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Complete-Round' },
+          { name: 'Timestamp', value: '10' }
+      ]
+    })
+    expect(completeRoundResult.Messages).to.have.lengthOf(1)
+    expect(completeRoundResult.Messages[0].Data).to.equal('OK')
 
     const outdatedStampResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Timestamp', value: '10' }
       ],
       Data: refRound1
     })
     expect(outdatedStampResult.Error).to.be.a('string').that.includes('Timestamp is backdated')
+
+    
+    const newRoundResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Add-Scores' },
+          { name: 'Timestamp', value: '20' }
+      ],
+      Data: refRound1
+    })
+    expect(newRoundResult.Messages).to.have.lengthOf(1)
+    expect(newRoundResult.Messages[0].Data).to.equal('OK')
   })
 
   it('Scores must be a table/array', async () => {
