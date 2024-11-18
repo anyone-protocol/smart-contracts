@@ -1,10 +1,8 @@
 import { expect } from 'chai'
 
 import {
-  ALICE_ADDRESS,
   AOTestHandle,
   createLoader,
-  FINGERPRINT_A,
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
@@ -57,7 +55,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(maxNetworkResult.Error).to.be.a('string').that.includes('Modifiers.Network.Share score has to be <= 1')
+    expect(maxNetworkResult.Error).to.be.a('string').that.includes('Modifiers.Network.Share has to be <= 1')
     const minNetworkResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -71,7 +69,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(minNetworkResult.Error).to.be.a('string').that.includes('Modifiers.Network.Share score has to be >= 0')
+    expect(minNetworkResult.Error).to.be.a('string').that.includes('Modifiers.Network.Share has to be >= 0')
   })
 
   it('Hardware Enabled must be boolean', async () => {
@@ -151,7 +149,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(maxHardwareResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.Share score has to be <= 1')
+    expect(maxHardwareResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.Share has to be <= 1')
     const minHardwareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -166,7 +164,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(minHardwareResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.Share score has to be >= 0')
+    expect(minHardwareResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.Share has to be >= 0')
   })
   
 
@@ -247,7 +245,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(maxUptimeResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Share score has to be <= 1')
+    expect(maxUptimeResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Share has to be <= 1')
     const minUptimeResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -262,7 +260,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(minUptimeResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Share score has to be >= 0')
+    expect(minUptimeResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Share has to be >= 0')
   })
 
   it('Uptime Tiers validation - Must be table type', async () => {
@@ -534,7 +532,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(maxExitBonusResult.Error).to.be.a('string').that.includes('Modifiers.ExitBonus.Share score has to be <= 1')
+    expect(maxExitBonusResult.Error).to.be.a('string').that.includes('Modifiers.ExitBonus.Share has to be <= 1')
     const minExitBonusResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -549,7 +547,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(minExitBonusResult.Error).to.be.a('string').that.includes('Modifiers.ExitBonus.Share score has to be >= 0')
+    expect(minExitBonusResult.Error).to.be.a('string').that.includes('Modifiers.ExitBonus.Share has to be >= 0')
   })
 
   it('Ensures that total sum of shares of enabled modifiers equals 1', async () => {

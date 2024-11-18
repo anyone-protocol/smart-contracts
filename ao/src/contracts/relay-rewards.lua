@@ -94,23 +94,23 @@ function RelayRewards.init()
       
       if request.TokensPerSecond then
         AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
-        assert(request.TokensPerSecond >= 0, 'TokensPerSecond score has to be >= 0')
+        assert(request.TokensPerSecond >= 0, 'TokensPerSecond has to be >= 0')
         config.TokensPerSecond = request.TokensPerSecond
         table.insert(effects, 'TokensPerSecond')
       end
       if request.Modifiers then
         if request.Modifiers.Network then
           AnyoneUtils.assertNumber(request.Modifiers.Network.Share, 'Modifiers.Network.Share')
-          assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share score has to be >= 0')
-          assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share score has to be <= 1')
+          assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share has to be >= 0')
+          assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share has to be <= 1')
           config.Modifiers.Network.Share = request.Modifiers.Network.Share
           table.insert(effects, 'Modifiers.Network')
         end
         if request.Modifiers.Hardware then
           assert(type(request.Modifiers.Hardware.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Hardware.Enabled')
           AnyoneUtils.assertNumber(request.Modifiers.Hardware.Share, 'Modifiers.Hardware.Share')
-          assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share score has to be >= 0')
-          assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share score has to be <= 1')
+          assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share has to be >= 0')
+          assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share has to be <= 1')
           config.Modifiers.Hardware.Enabled = request.Modifiers.Hardware.Enabled
           config.Modifiers.Hardware.Share = request.Modifiers.Hardware.Share
           table.insert(effects, 'Modifiers.Hardware')
@@ -118,8 +118,8 @@ function RelayRewards.init()
         if request.Modifiers.Uptime then
           assert(type(request.Modifiers.Uptime.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Uptime.Enabled')
           AnyoneUtils.assertNumber(request.Modifiers.Uptime.Share, 'Modifiers.Uptime.Share')
-          assert(request.Modifiers.Uptime.Share >= 0, 'Modifiers.Uptime.Share score has to be >= 0')
-          assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share score has to be <= 1')
+          assert(request.Modifiers.Uptime.Share >= 0, 'Modifiers.Uptime.Share has to be >= 0')
+          assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share has to be <= 1')
           config.Modifiers.Uptime.Enabled = request.Modifiers.Uptime.Enabled
           config.Modifiers.Uptime.Share = request.Modifiers.Uptime.Share
           table.insert(effects, 'Modifiers.Uptime')
@@ -144,8 +144,8 @@ function RelayRewards.init()
         if request.Modifiers.ExitBonus then
           assert(type(request.Modifiers.ExitBonus.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.ExitBonus.Enabled')
           AnyoneUtils.assertNumber(request.Modifiers.ExitBonus.Share, 'Modifiers.ExitBonus.Share')
-          assert(request.Modifiers.ExitBonus.Share >= 0, 'Modifiers.ExitBonus.Share score has to be >= 0')
-          assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share score has to be <= 1')
+          assert(request.Modifiers.ExitBonus.Share >= 0, 'Modifiers.ExitBonus.Share has to be >= 0')
+          assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share has to be <= 1')
           config.Modifiers.ExitBonus.Enabled = request.Modifiers.ExitBonus.Enabled
           config.Modifiers.ExitBonus.Share = request.Modifiers.ExitBonus.Share
           table.insert(effects, 'Modifiers.ExitBonus.Share')
@@ -165,11 +165,11 @@ function RelayRewards.init()
       if request.Multipliers then
         if request.Multipliers.Family then
           assert(type(request.Multipliers.Family.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Family.Enabled')
-          AnyoneUtils.assertFloat(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
-          assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset score has to be >= 0')
-          assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset score has to be <= 1')
-          AnyoneUtils.assertFloat(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
-          assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power score has to be >= 0')
+          AnyoneUtils.assertNumber(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
+          assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset has to be >= 0')
+          assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset has to be <= 1')
+          AnyoneUtils.assertNumber(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
+          assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power has to be >= 0')
           config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
           config.Multipliers.Family.Offset = request.Configuration.Multipliers.Family.Offset
           config.Multipliers.Family.Power = request.Configuration.Multipliers.Family.Power
@@ -177,11 +177,11 @@ function RelayRewards.init()
         end
         if request.Multipliers.Location then
           assert(type(request.Multipliers.Location.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Location.Enabled')
-          AnyoneUtils.assertFloat(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
-          assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset score has to be >= 0')
-          assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset score has to be <= 1')
-          AnyoneUtils.assertFloat(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
-          assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power score has to be >= 0')
+          AnyoneUtils.assertNumber(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
+          assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset has to be >= 0')
+          assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset has to be <= 1')
+          AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
+          assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power has to be >= 0')
           config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
           config.Multipliers.Location.Offset = request.Configuration.Multipliers.Location.Offset
           config.Multipliers.Location.Power = request.Configuration.Multipliers.Location.Power
@@ -193,9 +193,9 @@ function RelayRewards.init()
         for operatorAddress, delegation in request.Delegates do
           AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
           AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address')
-          AnyoneUtils.assertFloat(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
-          assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share score has to be >= 0')
-          assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share score has to be <= 1')
+          AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
+          assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share has to be >= 0')
+          assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share has to be <= 1')
         end
       end
 
