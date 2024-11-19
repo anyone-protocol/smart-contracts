@@ -95,3 +95,5 @@ sw.*
 cache/
 
 data/data.json
+scripts/distribution/snapshots
+scripts/distribution/data
