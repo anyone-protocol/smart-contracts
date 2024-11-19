@@ -27,7 +27,7 @@ async function setupAdminAddOperatorCertificates(
     Tags: [
       { name: 'Action', value: 'Admin-Submit-Operator-Certificates' }
     ],
-    Data: JSON.stringify([{ fingerprint, address }])
+    Data: JSON.stringify([{ f: fingerprint, a: address }])
   })
 
   if (debug) {
@@ -97,12 +97,12 @@ describe('Operator Registry', () => {
   describe('Admin Submit Operator Certificates', () => {
     it('Accepts Operator Certificates from Admin', async () => {
       const certs = [
-        { fingerprint: FINGERPRINT_A, address: ALICE_ADDRESS },
-        { fingerprint: FINGERPRINT_B, address: BOB_ADDRESS },
-        { fingerprint: FINGERPRINT_C, address: CHARLS_ADDRESS },
-        { fingerprint: FINGERPRINT_D, address: ALICE_ADDRESS },
-        { fingerprint: FINGERPRINT_E, address: BOB_ADDRESS },
-        { fingerprint: FINGERPRINT_F, address: CHARLS_ADDRESS }
+        { f: FINGERPRINT_A, a: ALICE_ADDRESS },
+        { f: FINGERPRINT_B, a: BOB_ADDRESS },
+        { f: FINGERPRINT_C, a: CHARLS_ADDRESS },
+        { f: FINGERPRINT_D, a: ALICE_ADDRESS },
+        { f: FINGERPRINT_E, a: BOB_ADDRESS },
+        { f: FINGERPRINT_F, a: CHARLS_ADDRESS }
       ]
 
       const result = await handle({
@@ -117,12 +117,12 @@ describe('Operator Registry', () => {
 
     it('Lists Operator Certificates submitted by Admin', async () => {
       const certs = [
-        { fingerprint: FINGERPRINT_A, address: ALICE_ADDRESS },
-        { fingerprint: FINGERPRINT_B, address: BOB_ADDRESS },
-        { fingerprint: FINGERPRINT_C, address: CHARLS_ADDRESS },
-        { fingerprint: FINGERPRINT_D, address: ALICE_ADDRESS },
-        { fingerprint: FINGERPRINT_E, address: BOB_ADDRESS },
-        { fingerprint: FINGERPRINT_F, address: CHARLS_ADDRESS }
+        { f: FINGERPRINT_A, a: ALICE_ADDRESS },
+        { f: FINGERPRINT_B, a: BOB_ADDRESS },
+        { f: FINGERPRINT_C, a: CHARLS_ADDRESS },
+        { f: FINGERPRINT_D, a: ALICE_ADDRESS },
+        { f: FINGERPRINT_E, a: BOB_ADDRESS },
+        { f: FINGERPRINT_F, a: CHARLS_ADDRESS }
       ]
 
       await handle({
@@ -147,6 +147,50 @@ describe('Operator Registry', () => {
       })
     })
 
+    it('Allows VerifiedHardware flag when submitting Op Certs', async () => {
+      const certs = [
+        { f: FINGERPRINT_A, a: ALICE_ADDRESS, hw: true },
+        { f: FINGERPRINT_B, a: BOB_ADDRESS },
+        { f: FINGERPRINT_C, a: CHARLS_ADDRESS, hw: true },
+        { f: FINGERPRINT_D, a: ALICE_ADDRESS },
+        { f: FINGERPRINT_E, a: BOB_ADDRESS, hw: true },
+        { f: FINGERPRINT_F, a: CHARLS_ADDRESS }
+      ]
+
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Admin-Submit-Operator-Certificates' }],
+        Data: JSON.stringify(certs)
+      })
+
+      const listResult = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [{ name: 'Action', value: 'List-Operator-Certificates' }]
+      })
+
+      expect(listResult.Messages).to.have.lengthOf(1)
+      expect(JSON.parse(listResult.Messages[0].Data)).to.deep.equal({
+        [FINGERPRINT_A]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase(),
+        [FINGERPRINT_B]: '0x' + BOB_ADDRESS.substring(2).toUpperCase(),
+        [FINGERPRINT_C]: '0x' + CHARLS_ADDRESS.substring(2).toUpperCase(),
+        [FINGERPRINT_D]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase(),
+        [FINGERPRINT_E]: '0x' + BOB_ADDRESS.substring(2).toUpperCase(),
+        [FINGERPRINT_F]: '0x' + CHARLS_ADDRESS.substring(2).toUpperCase()
+      })
+
+      const listHardwareResult = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [{ name: 'Action', value: 'List-Verified-Hardware' }]
+      })
+
+      expect(listHardwareResult.Messages).to.have.lengthOf(1)
+      expect(JSON.parse(listHardwareResult.Messages[0].Data)).to.deep.equal({
+        [FINGERPRINT_A]: true,
+        [FINGERPRINT_C]: true,
+        [FINGERPRINT_E]: true
+      })
+    })
+
     it('Validates Operator Certificates from Admin', async () => {
       const missingCertsResult = await handle({
         From: OWNER_ADDRESS,
@@ -161,8 +205,8 @@ describe('Operator Registry', () => {
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Admin-Submit-Operator-Certificates' }],
         Data: JSON.stringify([
-          { fingerprint: FINGERPRINT_A, address: ALICE_ADDRESS },
-          { fingerprint: 'invalid-fingerprint' }
+          { f: FINGERPRINT_A, a: ALICE_ADDRESS },
+          { f: 'invalid-fingerprint' }
         ])
       })
 
@@ -174,8 +218,8 @@ describe('Operator Registry', () => {
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Admin-Submit-Operator-Certificates' }],
         Data: JSON.stringify([
-          { fingerprint: FINGERPRINT_A, address: ALICE_ADDRESS },
-          { fingerprint: FINGERPRINT_B, address: 'invalid-address' }
+          { f: FINGERPRINT_A, a: ALICE_ADDRESS },
+          { f: FINGERPRINT_B, a: 'invalid-address' }
         ])
       })
 
