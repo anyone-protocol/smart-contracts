@@ -84,8 +84,8 @@ describe('Round Completion of relay rewards', () => {
     expect(noRoundResult.Error).to.be.a('string').that.includes('No pending round for 1000')
   })
 
-  it('Score Processing - Verify base network score assignment', async () => {
-  const configResult = await handle({
+  it('Removes rounds dated before completed timestamp', async () => {
+    const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
@@ -102,7 +102,7 @@ describe('Round Completion of relay rewards', () => {
     expect(configResult.Messages).to.have.lengthOf(1)
     expect(configResult.Messages[0].Data).to.equal('OK')
 
-    const noRoundResult = await handle({
+    const round1Result = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
@@ -110,20 +110,80 @@ describe('Round Completion of relay rewards', () => {
       ],
       Data: refRound1
     })
-    expect(noRoundResult.Messages).to.have.lengthOf(1)
-    expect(noRoundResult.Messages[0].Data).to.equal('OK')
+    expect(round1Result.Messages).to.have.lengthOf(1)
+    expect(round1Result.Messages[0].Data).to.equal('OK')
 
-    const firstCompleteResult = await handle({
+    const round2Result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Add-Scores' },
+          { name: 'Timestamp', value: '2000' }
+      ],
+      Data: refRound1
+    })
+    expect(round2Result.Messages).to.have.lengthOf(1)
+    expect(round2Result.Messages[0].Data).to.equal('OK')
+
+    const round2CompleteResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Complete-Round' },
+          { name: 'Timestamp', value: '2000' }
+      ]
+    })
+    expect(round2CompleteResult.Messages).to.have.lengthOf(1)
+    expect(round2CompleteResult.Messages[0].Data).to.equal('OK')
+
+    const round1CancelResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Cancel-Round' },
+          { name: 'Timestamp', value: '1000' }
+      ]
+    })
+    expect(round1CancelResult.Error).to.be.a('string').that.includes('No pending round for 1000')
+  })
+
+  it('Tracks data and metadata of the last round', async () => {
+    const configResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({
+        TokensPerSecond: 123,
+        Modifiers: {
+          Network: {
+            Share: 1
+          }
+        }
+      })
+    })
+    expect(configResult.Messages).to.have.lengthOf(1)
+    expect(configResult.Messages[0].Data).to.equal('OK')
+
+    const round1Result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Add-Scores' },
+          { name: 'Timestamp', value: '1000' }
+      ],
+      Data: refRound1
+    })
+    expect(round1Result.Messages).to.have.lengthOf(1)
+    expect(round1Result.Messages[0].Data).to.equal('OK')
+    
+    const round1CompleteResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
-    
-    const scoredRoundResult = await handle({
+    expect(round1CompleteResult.Messages).to.have.lengthOf(1)
+    expect(round1CompleteResult.Messages[0].Data).to.equal('OK')
+
+    const round2Result = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
@@ -131,147 +191,47 @@ describe('Round Completion of relay rewards', () => {
       ],
       Data: refRound1
     })
-    expect(scoredRoundResult.Messages).to.have.lengthOf(1)
-    expect(scoredRoundResult.Messages[0].Data).to.equal('OK')
+    expect(round2Result.Messages).to.have.lengthOf(1)
+    expect(round2Result.Messages[0].Data).to.equal('OK')
 
-    const secondCompleteResult = await handle({
+    const round2CompleteResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
           { name: 'Timestamp', value: '2000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(round2CompleteResult.Messages).to.have.lengthOf(1)
+    expect(round2CompleteResult.Messages[0].Data).to.equal('OK')
 
-    const rewardsForAliceResult = await handle({
-      From: ALICE_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Get-Rewards' }
-      ]
-    })
-    expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0.000000000000000000')
-    
-    const rewardsForBobResult = await handle({
+    const roundDataResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
-          { name: 'Action', value: 'Get-Rewards' }
+          { name: 'Action', value: 'Last-Round-Data' },
+          { name: 'Fingerprint', value: FINGERPRINT_B }
       ]
     })
-    expect(rewardsForBobResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForBobResult.Messages[0].Data).to.equal('0.000000000000000123')
-
-    const thirdRoundResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '3000' }
-      ],
-      Data: refRound1
-    })
-    expect(thirdRoundResult.Messages).to.have.lengthOf(1)
-    expect(thirdRoundResult.Messages[0].Data).to.equal('OK')
-
-    const thirdCompleteResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '3000' }
-      ]
-    })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
-
-    const aliceResult = await handle({
-      From: ALICE_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Get-Rewards' }
-      ]
-    })
-    expect(aliceResult.Messages).to.have.lengthOf(1)
-    expect(aliceResult.Messages[0].Data).to.equal('0.000000000000000000')
     
-    const bobResult = await handle({
+    expect(roundDataResult.Messages).to.have.lengthOf(1)
+    const data = JSON.parse(roundDataResult.Messages[0].Data)
+    expect(data.Details.Reward.OperatorTotal).to.equal(123)
+
+    const roundMetadataResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
-          { name: 'Action', value: 'Get-Rewards' }
+          { name: 'Action', value: 'Last-Round-Metadata' }
       ]
     })
-    expect(bobResult.Messages).to.have.lengthOf(1)
-    expect(bobResult.Messages[0].Data).to.equal('0.000000000000000246')
-
-
-    const aResult = await handle({
-      From: ALICE_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Fingerprint', value: FINGERPRINT_A },
-      ]
-    })
-    expect(aResult.Messages).to.have.lengthOf(1)
-    expect(aResult.Messages[0].Data).to.equal('0.000000000000000000')
     
-    const bResult = await handle({
-      From: BOB_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Fingerprint', value: FINGERPRINT_B },
-      ]
-    })
-    expect(bResult.Messages).to.have.lengthOf(1)
-    expect(bResult.Messages[0].Data).to.equal('0.000000000000000246')
+    expect(roundMetadataResult.Messages).to.have.lengthOf(1)
+
+    const metadata = JSON.parse(roundMetadataResult.Messages[0].Data)
+    expect(metadata.Timestamp).to.equal(2000)
+    expect(metadata.Period).to.equal(1)
+    expect(metadata.Configuration.TokensPerSecond).to.equal(123)
+    expect(metadata.Summary.Ratings.Network).to.equal(100)
+    expect(metadata.Summary.Rewards.Total).to.equal(123)
+    expect(metadata.Summary.Rewards.Network).to.equal(123)
   })
 
 })
-
-// Score Processing
-//     Family multiplier calculations
-//         Check enabled/disabled state handling
-//         Validate multiplier formula with offset and power
-//         Ensure non-negative multiplier value
-//     Location multiplier calculations
-//         Check enabled/disabled state handling
-//         Validate multiplier formula with offset and power
-//         Ensure non-negative multiplier value
-
-// Rating Calculations
-//     Uptime Rating
-//         Verify tier multiplier selection
-//         Validate uptime streak calculations
-//     Hardware Rating
-//         Check enabled/disabled state handling
-//         Verify hardware bonus calculation (65% network + 35% uptime)
-//     Exit Bonus Rating
-//         Check enabled/disabled state handling
-//         Validate exit bonus assignment
-
-// Reward Calculations
-//     Round Length is correctly derived from previous timestamp
-//     Token Distribution
-//         Validate total rewards per second
-//         Network rewards calculation
-//         Hardware rewards calculation
-//         Uptime rewards calculation
-//         Exit bonus rewards calculation
-//         Verify total shares don't exceed 100%
-//     Per-Fingerprint Reward Distribution
-//         Network weight computation
-//         Hardware weight computation
-//         Uptime weight computation
-//         Exit bonus weight computation
-//     Reward Assignment
-//         Total reward summation
-//         Verify delegate share calculation
-//         Validate operator remainder
-//     Update total reward tracking
-//         Address rewards
-//         Fingerprint rewards
-// Round Completion
-//     Previous round state update
-//         Timestamp storage
-//         Summary storage
-//         Configuration storage
-//         Details storage
-//     Pending rounds cleanup
-//     Removes outdated rounds

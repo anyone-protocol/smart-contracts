@@ -13,9 +13,9 @@ local RelayRewards = {
       Hardware = { Enabled = false, Share = 0.2 },
       Uptime = { Enabled = false, Share = 0.14,
         Tiers = {
-          [0] = 0,
-          [3] = 1,
-          [14] = 3,
+          ['0'] = 0,
+          ['3'] = 1,
+          ['14'] = 3,
         }
       },
       ExitBonus = { Enabled = false, Share = 0.1 }
@@ -30,6 +30,7 @@ local RelayRewards = {
   },
   PreviousRound = {
     Timestamp = 0,
+    Length = 0,
     Summary = {
       Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 
     },
@@ -171,8 +172,8 @@ function RelayRewards.init()
           AnyoneUtils.assertNumber(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
           assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power has to be >= 0')
           config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
-          config.Multipliers.Family.Offset = request.Configuration.Multipliers.Family.Offset
-          config.Multipliers.Family.Power = request.Configuration.Multipliers.Family.Power
+          config.Multipliers.Family.Offset = request.Multipliers.Family.Offset
+          config.Multipliers.Family.Power = request.Multipliers.Family.Power
           table.insert(effects, 'Multipliers.Family')
         end
         if request.Multipliers.Location then
@@ -183,8 +184,8 @@ function RelayRewards.init()
           AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
           assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power has to be >= 0')
           config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
-          config.Multipliers.Location.Offset = request.Configuration.Multipliers.Location.Offset
-          config.Multipliers.Location.Power = request.Configuration.Multipliers.Location.Power
+          config.Multipliers.Location.Offset = request.Multipliers.Location.Offset
+          config.Multipliers.Location.Power = request.Multipliers.Location.Power
           table.insert(effects, 'Multipliers.Location')
         end
       end
@@ -315,7 +316,7 @@ function RelayRewards.init()
 
         local familyMultiplier = 1 
         if RelayRewards.Configuration.Multipliers.Family.Enabled then
-          familyMultiplier = 1 + RelayRewards.Configuration.Multipliers.Family.Offset * (scoreData.Score.FamilySize^RelayRewards.Configuration.Multipliers.Family.Power)
+          familyMultiplier = 1 - RelayRewards.Configuration.Multipliers.Family.Offset * (scoreData.Score.FamilySize^RelayRewards.Configuration.Multipliers.Family.Power)
           if familyMultiplier < 0 then
             familyMultiplier = 0
           end
@@ -323,7 +324,7 @@ function RelayRewards.init()
         end
         local locationMultiplier = 1
         if RelayRewards.Configuration.Multipliers.Location.Enabled then
-          locationMultiplier = 1 + RelayRewards.Configuration.Multipliers.Location.Offset * (scoreData.Score.LocationSize^RelayRewards.Configuration.Multipliers.Location.Power)
+          locationMultiplier = 1 - RelayRewards.Configuration.Multipliers.Location.Offset * (scoreData.Score.LocationSize^RelayRewards.Configuration.Multipliers.Location.Power)
           if locationMultiplier < 0 then
             locationMultiplier = 0
           end
@@ -453,10 +454,17 @@ function RelayRewards.init()
 
         RelayRewards.TotalFingerprintReward[fingerprint] = AnyoneUtils.bigAddScalar(
             RelayRewards.TotalFingerprintReward[fingerprint], roundData[fingerprint].Reward.Total)
+
+            summary.Rewards.Total = summary.Rewards.Total + roundData[fingerprint].Reward.Total
+            summary.Rewards.Network = summary.Rewards.Network + roundData[fingerprint].Reward.Network
+            summary.Rewards.Hardware = summary.Rewards.Hardware + roundData[fingerprint].Reward.Hardware
+            summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
+            summary.Rewards.ExitBonus = summary.Rewards.ExitBonus + roundData[fingerprint].Reward.ExitBonus
       end
 
       RelayRewards.PreviousRound = {
         Timestamp = timestamp,
+        Period = roundLength,
         Summary = summary,
         Configuration = RelayRewards.Configuration,
         Details = roundData
@@ -557,6 +565,53 @@ function RelayRewards.init()
         Target = msg.From,
         Action = 'Get-Rewards-Response',
         Data = result
+      })
+    end
+  )
+
+  Handlers.add(
+    'Last-Round-Metadata',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Last-Round-Metadata'
+    ),
+    function (msg)
+      local encoded = json.encode({
+        Timestamp = RelayRewards.PreviousRound.Timestamp,
+        Period = RelayRewards.PreviousRound.Period,
+        Configuration = RelayRewards.PreviousRound.Configuration,
+        Summary = RelayRewards.PreviousRound.Summary
+      })
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Last-Round-Metadata',
+        Data = encoded
+      })
+    end
+  )
+
+  Handlers.add(
+    'Last-Round-Data',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Last-Round-Data'
+    ),
+    function (msg)      
+      local fingerprint = msg.Tags['Fingerprint']
+      AnyoneUtils.assertValidFingerprint(fingerprint, 'Fingerprint tag')
+      assert(RelayRewards.PreviousRound.Details[fingerprint], 'Fingerprint not found in round')
+      
+      local encoded = json.encode({
+        Timestamp = RelayRewards.PreviousRound.Timestamp,
+        Period = RelayRewards.PreviousRound.Period,
+        Details = RelayRewards.PreviousRound.Details[fingerprint]
+      })
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Last-Round-Data',
+        Data = encoded
       })
     end
   )
