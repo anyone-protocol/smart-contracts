@@ -194,7 +194,7 @@ function RelayRewards.init()
         local normalizedDelegates = {}
         for operatorAddress, delegation in pairs(request.Delegates) do
           AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
-          AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address')
+          AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address for '.. operatorAddress)
           AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
           assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share has to be >= 0')
           assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share has to be <= 1')
@@ -525,13 +525,17 @@ function RelayRewards.init()
       if delegateAddress then
         AnyoneUtils.assertValidEvmAddress(delegateAddress, 'Delegate address tag')
         local delegateShare = msg.Tags['Share']
-        AnyoneUtils.assertNumber(delegateShare, 'Delegate.Share')
-        assert(delegateShare >= 0, 'Delegate.Share score has to be >= 0')
-        assert(delegateShare <= 1, 'Delegate.Share score has to be <= 1')
-        result = 'OK'
-        RelayRewards.Configuration.Delegates[address] = { 
-          Address = delegateAddress, Share = delegateShare
-        }
+        if delegateShare then
+          local share = tonumber(delegateShare)
+          AnyoneUtils.assertNumber(share, 'Delegate.Share')
+
+          assert(share >= 0, 'Delegate.Share has to be >= 0')
+          assert(share <= 1, 'Delegate.Share has to be <= 1')
+          result = 'OK'
+          RelayRewards.Configuration.Delegates[address] = { 
+            Address = delegateAddress, Share = share
+          }
+        end
       else
         RelayRewards.Configuration.Delegates[address] = nil
         result = 'RESET'
@@ -541,6 +545,28 @@ function RelayRewards.init()
         Target = msg.From,
         Action = 'Set-Delegate-Response',
         Data = result
+      })
+    end
+  )
+
+  Handlers.add(
+    'Get-Delegate',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Get-Delegate'
+    ),
+    function (msg)
+      local address = AnyoneUtils.normalizeEvmAddress(msg.From)
+      AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
+      local result = { Address = '', Share = 0 }
+      if RelayRewards.Configuration.Delegates[address] then
+        result = RelayRewards.Configuration.Delegates[address]
+      end
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Get-Delegate-Response',
+        Data = json.encode(result)
       })
     end
   )
