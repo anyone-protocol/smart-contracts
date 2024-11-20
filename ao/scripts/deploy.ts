@@ -16,8 +16,10 @@ dotenv.config()
 const contractName = process.env.CONTRACT_NAME || ''
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY
   || HardhatKeys.owner.key
-const schedulerUnitAddress = process.env.SCHEDULER_ADDRESS
+const schedulerUnitAddress = process.env.SCHEDULER_UNIT_ADDRESS
   || '_GQ33BkPtZrqxA84vM8Zk-N2aO0toNNu_C-l-rawrBA'
+const messagingUnitAddress = process.env.MESSAGING_UNIT_ADDRESS
+  || 'fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY'
 const aosModuleId = process.env.AOS_MODULE_ID
   || 'cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk'
 const consulToken = process.env.CONSUL_TOKEN || 'no-token'
@@ -66,7 +68,9 @@ async function deploy() {
     signer: ethereumDataItemSigner as any,
     tags: [
       { name: 'App-Name', value: 'ANYONE' },
-      { name: 'Contract-Name', value: contractName }
+      { name: 'Contract-Name', value: contractName },
+      { name: 'Authority', value: messagingUnitAddress },
+      { name: 'Timestamp', value: Date.now().toString() }
     ]
   })
 
