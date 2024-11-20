@@ -98,7 +98,7 @@ async function deploy() {
     )
     const consul = new Consul({
       host: process.env.CONSUL_IP,
-      port: process.env.CONSUL_PORT,
+      port: process.env.CONSUL_PORT
     })
     const sourceKey = process.env.CONTRACT_SOURCE_CONSUL_KEY || 'dummy-path'
     const consulKey = process.env.CONTRACT_CONSUL_KEY || 'dummy-path'

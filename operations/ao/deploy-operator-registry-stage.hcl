@@ -1,4 +1,4 @@
-job "deploy-operator-registry-dev" {
+job "deploy-operator-registry-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
 
@@ -28,22 +28,22 @@ job "deploy-operator-registry-dev" {
       ]
     }
 
-    vault { policies = [ "relay-registry-dev" ] }
+    vault { policies = [ "relay-registry-stage" ] }
 
     env {
-      PHASE = "dev"
+      PHASE = "stage"
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_NAME = "operator-registry"
-      CONTRACT_CONSUL_KEY = "smart-contracts/dev/operator-registry-address"
-      CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/dev/operator-registry-source"
+      CONTRACT_CONSUL_KEY = "smart-contracts/stage/operator-registry-address"
+      CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/operator-registry-source"
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/relay-registry/dev"}}
+      {{with secret "kv/relay-registry/stage"}}
         DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
@@ -54,7 +54,7 @@ job "deploy-operator-registry-dev" {
       destination = "local/operator-registry-init-state.json"
       env         = false
       data = <<EOH
-      {{with secret "kv/relay-registry/dev"}}
+      {{with secret "kv/relay-registry/stage"}}
         {
           "claimable":{},
           "owner":"{{.Data.data.RELAY_REGISTRY_OWNER_ADDRESS}}",
