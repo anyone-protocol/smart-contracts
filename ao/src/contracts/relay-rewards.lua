@@ -191,13 +191,17 @@ function RelayRewards.init()
       end
       if request.Delegates then
         assert(type(request.Delegates) == 'table', 'Delegates have to be a table')
-        for operatorAddress, delegation in request.Delegates do
+        local normalizedDelegates = {}
+        for operatorAddress, delegation in pairs(request.Delegates) do
           AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
           AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address')
           AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
           assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share has to be >= 0')
           assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share has to be <= 1')
+          local normalizedOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+          normalizedDelegates[normalizedOperatorAddress] = delegation
         end
+        config.Delegates = normalizedDelegates
       end
 
       RelayRewards.Configuration = config
@@ -320,7 +324,7 @@ function RelayRewards.init()
           if familyMultiplier < 0 then
             familyMultiplier = 0
           end
-          networkScore = networkScore * familyMultiplier
+          networkScore = math.floor(networkScore * familyMultiplier)
         end
         local locationMultiplier = 1
         if RelayRewards.Configuration.Multipliers.Location.Enabled then
@@ -328,7 +332,7 @@ function RelayRewards.init()
           if locationMultiplier < 0 then
             locationMultiplier = 0
           end
-          networkScore = networkScore * locationMultiplier
+          networkScore = math.floor(networkScore * locationMultiplier)
         end
 
         roundData[fingerprint].Rating = { Network = networkScore, Hardware = 0, Uptime = 0, ExitBonus = 0 }
@@ -345,7 +349,7 @@ function RelayRewards.init()
         roundData[fingerprint].Rating.Uptime = uptimeTierMultiplier * networkScore
 
         if RelayRewards.Configuration.Modifiers.Hardware.Enabled and scoreData.Score.IsHardware then
-          roundData[fingerprint].Rating.Hardware = 0.65 * networkScore + 0.35 * roundData[fingerprint].Rating.Uptime
+          roundData[fingerprint].Rating.Hardware = math.floor(0.65 * networkScore + 0.35 * roundData[fingerprint].Rating.Uptime)
         end
 
         if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.Score.ExitBonus then
@@ -369,7 +373,7 @@ function RelayRewards.init()
         roundLength = (timestamp - RelayRewards.PreviousRound.Timestamp) // 1000
       end
 
-      local totalRewardsPerSec = RelayRewards.Configuration.TokensPerSecond * roundLength
+      local totalRewardsPerRound = RelayRewards.Configuration.TokensPerSecond * roundLength
       
       local networkRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Network.Share)
       local networkRewards = networkRewardsPerSec * roundLength
@@ -395,8 +399,8 @@ function RelayRewards.init()
         exitBonusRewards = exitBonusRewardsPerSec * roundLength
       end
 
-      local fingerprintRewardsPerSec = networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewards
-      assert(totalRewardsPerSec >= fingerprintRewardsPerSec * roundLength, 'Failed rewards share calculation')
+      local fingerprintRewardsPerSec = networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewardsPerSec
+      assert(totalRewardsPerRound >= fingerprintRewardsPerSec * roundLength, 'Failed rewards share calculation')
       
       for fingerprint, ratedData in pairs(roundData) do
         roundData[fingerprint].Reward = {
@@ -473,7 +477,7 @@ function RelayRewards.init()
       for roundStamp, _ in pairs(RelayRewards.PendingRounds) do
         if roundStamp <= timestamp then
           RelayRewards.PendingRounds[roundStamp] = nil
-        end 
+        end
       end
 
       ao.send({
@@ -492,7 +496,6 @@ function RelayRewards.init()
     ),
     function (msg)
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
-      
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       if timestamp then
