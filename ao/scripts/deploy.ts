@@ -70,7 +70,11 @@ async function deploy() {
       { name: 'App-Name', value: 'ANYONE' },
       { name: 'Contract-Name', value: contractName },
       { name: 'Authority', value: messagingUnitAddress },
-      { name: 'Timestamp', value: Date.now().toString() }
+      { name: 'Timestamp', value: Date.now().toString() },
+      {
+        name: 'Source-Code-TX-ID',
+        value: uploadResult.id
+      }
     ]
   })
 
