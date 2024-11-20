@@ -50,6 +50,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@irys/query": "^0.0.9",
     "arweave": "1.14.4",
     "lodash": "^4.17.21",
     "warp-contracts": "1.4.32",

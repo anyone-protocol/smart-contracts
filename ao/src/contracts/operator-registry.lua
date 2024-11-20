@@ -10,6 +10,19 @@ local OperatorRegistry = {
   VerifiedHardwareFingerprints = {}
 }
 
+function OperatorRegistry._addVerifiedHardwareFingerprint(fingerprint)
+  local ErrorMessages = require('.common.errors')
+  local AnyoneUtils = require('.common.utils')
+
+  AnyoneUtils.assertValidFingerprint(fingerprint)
+  assert(
+    OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] == nil,
+    ErrorMessages.DuplicateFingerprint
+  )
+
+  OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] = true
+end
+
 function OperatorRegistry.init()
   local json = require('json')
 
@@ -28,14 +41,19 @@ function OperatorRegistry.init()
       local certs = json.decode(msg.Data)
 
       for _, cert in ipairs(certs) do
-        local fingerprint = cert['fingerprint']
-        local address = cert['address']
+        local fingerprint = cert['f']
+        local address = cert['a']
+        local hw = cert['hw']
 
         AnyoneUtils.assertValidFingerprint(fingerprint)
         AnyoneUtils.assertValidEvmAddress(address)
 
         OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint] =
           AnyoneUtils.normalizeEvmAddress(address)
+
+        if hw then
+          OperatorRegistry._addVerifiedHardwareFingerprint(fingerprint)
+        end
       end
 
       ao.send({
@@ -102,6 +120,8 @@ function OperatorRegistry.init()
         .VerifiedFingerprintsToOperatorAddresses[fingerprint] = address
       OperatorRegistry
         .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry
+        .ClaimableFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -320,13 +340,7 @@ function OperatorRegistry.init()
       assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
 
       for fingerprint in string.gmatch(fingerprints, '[^,]+') do
-        AnyoneUtils.assertValidFingerprint(fingerprint)
-        assert(
-          OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] == nil,
-          ErrorMessages.DuplicateFingerprint
-        )
-
-        OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] = true
+        OperatorRegistry._addVerifiedHardwareFingerprint(fingerprint)
       end
 
       ao.send({
@@ -377,6 +391,24 @@ function OperatorRegistry.init()
   )
 
   Handlers.add(
+    'View-State',
+    Handlers.utils.hasMatchingTag('Action', 'View-State'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'View-State-Response',
+        Data = json.encode({
+          ClaimableFingerprintsToOperatorAddresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
+          VerifiedFingerprintsToOperatorAddresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses,
+          BlockedOperatorAddresses = OperatorRegistry.BlockedOperatorAddresses,
+          RegistrationCreditsFingerprintsToOperatorAddresses = OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses,
+          VerifiedHardwareFingerprints = OperatorRegistry.VerifiedHardwareFingerprints
+        })
+      })
+    end
+  )
+
+  Handlers.add(
     'Info',
     Handlers.utils.hasMatchingTag('Action', 'Info'),
     function (msg)
@@ -397,6 +429,8 @@ function OperatorRegistry.init()
       ) do
         info.total = info.total + 1
       end
+
+      info.total = info.total + info.claimed
 
       for _ in pairs(OperatorRegistry.VerifiedHardwareFingerprints) do
         info.hardware = info.hardware + 1

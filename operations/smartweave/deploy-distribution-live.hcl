@@ -35,7 +35,29 @@ job "deploy-distribution-live" {
             env         = true
         }
 
+        env {
+            PHASE="live"
+            CONSUL_IP="127.0.0.1"
+            CONSUL_PORT="8500"
+            CONTRACT_CONSUL_KEY="smart-contracts/live/distribution-address"
+            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/live/distribution-source"
+            CONTRACT_SRC="../dist/contracts/distribution.js"
+            INIT_STATE="../dist/contracts/distribution-init-state.json"
+        }
+
+        restart {
+            attempts = 0
+            mode = "fail"
+        }
+
+        resources {
+            cpu    = 4096
+            memory = 4096
+        }
+
         template {
+            destination = "local/distribution-init-state.json"
+            env         = false
             data = <<EOH
             {{with secret "kv/distribution/live"}}
 {
@@ -73,28 +95,6 @@ job "deploy-distribution-live" {
 
             {{end}}
             EOH
-            destination = "local/distribution-init-state.json"
-            env         = false
-        }
-
-        env {
-            PHASE="live"
-            CONSUL_IP="127.0.0.1"
-            CONSUL_PORT="8500"
-            CONTRACT_CONSUL_KEY="smart-contracts/live/distribution-address"
-            CONTRACT_SOURCE_CONSUL_KEY="smart-contracts/live/distribution-source"
-            CONTRACT_SRC="../dist/contracts/distribution.js"
-            INIT_STATE="../dist/contracts/distribution-init-state.json"
-        }
-
-        restart {
-            attempts = 0
-            mode = "fail"
-        }
-
-        resources {
-            cpu    = 4096
-            memory = 4096
         }
     }
 }
