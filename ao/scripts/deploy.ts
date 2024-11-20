@@ -1,5 +1,5 @@
 import dotenv from 'dotenv'
-// import Consul from 'consul'
+import Consul from 'consul'
 import { createReadStream, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 import { EthereumSigner, TurboFactory } from '@ardrive/turbo-sdk'
@@ -22,6 +22,7 @@ const messagingUnitAddress = process.env.MESSAGING_UNIT_ADDRESS
   || 'fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY'
 const aosModuleId = process.env.AOS_MODULE_ID
   || 'cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk'
+const consulToken = process.env.CONSUL_TOKEN || 'no-token'
 
 if (!contractName) {
   throw new Error('CONTRACT_NAME is not set!')
@@ -90,8 +91,38 @@ async function deploy() {
 
   console.log(`Process Published and Evaluated at: ${processId}`)
 
-  // TODO -> Update consul vars with SOURCE ID from uploadResult.id
-  // TODO -> Update consul vars with PROCESS ID (CONTRACT ID) from processId
+  if (process.env.PHASE && process.env.CONSUL_IP) {
+    console.log(
+      `Connecting to Consul at` +
+        ` ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}...`
+    )
+    const consul = new Consul({
+      host: process.env.CONSUL_IP,
+      port: process.env.CONSUL_PORT
+    })
+    const sourceKey = process.env.CONTRACT_SOURCE_CONSUL_KEY || 'dummy-path'
+    const consulKey = process.env.CONTRACT_CONSUL_KEY || 'dummy-path'
+    console.log(`Using consul keys ${consulKey} / ${sourceKey}`)
+
+    const contractResult = await consul.kv.set({
+      key: consulKey,
+      value: processId,
+      token: consulToken
+    })
+    console.log(`Contract address updated: ${contractResult}`)
+
+    const sourceResult = await consul.kv.set({
+      key: sourceKey,
+      value: uploadResult.id,
+      token: consulToken
+    })
+    console.log(`Contract source updated: ${sourceResult}`)
+  } else {
+    console.warn(
+      'Deployment env var PHASE not defined,' +
+        ' skipping update of cluster variable in Consul.'
+    )
+  }
 }
 
 deploy().catch(e => { console.error(e); process.exit(1); })
