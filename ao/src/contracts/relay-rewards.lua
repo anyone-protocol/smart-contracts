@@ -21,8 +21,8 @@ local RelayRewards = {
       ExitBonus = { Enabled = false, Share = 0.1 }
     },
     Multipliers = {
-      Family = { Enabled = false, Offset = -0.01, Power = 1 },
-      Location = { Enabled = false, Offset = -0.003, Power = 2 }
+      Family = { Enabled = false, Offset = 0.01, Power = 1 },
+      Location = { Enabled = false, Offset = 0.003, Power = 2 }
     },
     Delegates = { 
 --      [Address] = { Address: '', Share = 0 }
@@ -348,7 +348,7 @@ function RelayRewards.init()
           roundData[fingerprint].Rating.Hardware = 0.65 * networkScore + 0.35 * roundData[fingerprint].Rating.Uptime
         end
 
-        if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.ExitBonus then
+        if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.Score.ExitBonus then
           roundData[fingerprint].Rating.ExitBonus = networkScore
         end
 
