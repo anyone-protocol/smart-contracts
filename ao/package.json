@@ -1,9 +1,10 @@
 {
   "name": "@anyone/smart-contracts-ao",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "contributors": [
     "Anyone Labs",
-    "Jim Toth <jim@memeticblock.com>"
+    "Jim Toth <jim@memeticblock.com>",
+    "Andrzej Tuchołka <kanshi@memeticblock.com>"
   ],
   "license": "AGPL-3.0-only",
   "description": "ANyONe Protocol AO Modules & Processes (Smart Contracts)",
@@ -17,7 +18,7 @@
     "deploy": "tsx scripts/deploy.ts",
     "process:build": "npm run process:clean && tsx scripts/bundle.ts",
     "process:clean": "rimraf [ dist ]",
-    "test": "npm run process:build && mocha test/spec/**/*.ts"
+    "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
   },
   "devDependencies": {
     "@ardrive/turbo-sdk": "^1.19.1",

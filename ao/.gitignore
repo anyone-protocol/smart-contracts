@@ -24,6 +24,8 @@ dist
 .husky/_
 cache
 
+.vscode
+
 # IDEs and editors
 .DS_Store
 yarn-error.log
