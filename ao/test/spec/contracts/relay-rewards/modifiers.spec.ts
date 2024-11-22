@@ -457,7 +457,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
         }
       })
     })
-    expect(stringTierValueResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Tiers multiplier')
+    expect(stringTierValueResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Tiers weight')
     const negativeTierValueResult = await handle({
         From: OWNER_ADDRESS,
         Tags: [
@@ -493,7 +493,7 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
           }
         })
       })
-      expect(boolTierValueResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Tiers multiplier')
+      expect(boolTierValueResult.Error).to.be.a('string').that.includes('Modifiers.Uptime.Tiers weight')
   })
 
 

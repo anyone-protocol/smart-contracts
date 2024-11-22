@@ -270,13 +270,11 @@ describe('Scoring relay rewards based on ratings', () => {
     expect(aData.Details.Reward.Total).to.equal(Math.floor(5600 * aData.Details.Rating.Network/summary2data.Summary.Ratings.Network))
     expect(bData.Details.Reward.Total).to.equal(
       Math.floor(5600 * bData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
-      Math.floor(2000 * bData.Details.Rating.Hardware/summary2data.Summary.Ratings.Hardware) + 
       Math.floor(1400 * bData.Details.Rating.Uptime/summary2data.Summary.Ratings.Uptime) + 
       Math.floor(1000 * bData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)
     )
     expect(cData.Details.Reward.Total).to.equal(
       Math.floor(5600 * cData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
-      Math.floor(2000 * cData.Details.Rating.Hardware/summary2data.Summary.Ratings.Hardware) + 
       Math.floor(1400 * cData.Details.Rating.Uptime/summary2data.Summary.Ratings.Uptime) + 
       Math.floor(1000 * cData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)
     ) 

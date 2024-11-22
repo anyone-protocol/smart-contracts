@@ -53,6 +53,10 @@ describe('Score ratings of relay rewards', () => {
           Network: {
             Share: 0.9
           },
+          Hardware: {
+            Enabled: true,
+            Share: 0
+          },
           Uptime: {
             Enabled: true,
             Share: 0.1,
@@ -138,7 +142,6 @@ describe('Score ratings of relay rewards', () => {
     })
     expect(rewards2ForAliceResult.Messages).to.have.lengthOf(1)
     const alice2data = JSON.parse(rewards2ForAliceResult.Messages[0].Data)
-    expect(alice2data.Details.Configuration.UptimeTierMultiplier).to.equal(0)
     expect(alice2data.Details.Rating.Uptime).to.equal(0)
     expect(alice2data.Details.Reward.Uptime).to.equal(0)
     
@@ -152,7 +155,6 @@ describe('Score ratings of relay rewards', () => {
     
     expect(rewards2ForBobResult.Messages).to.have.lengthOf(1)
     const bob2data = JSON.parse(rewards2ForBobResult.Messages[0].Data)
-    expect(bob2data.Details.Configuration.UptimeTierMultiplier).to.equal(0)
     expect(bob2data.Details.Rating.Uptime).to.equal(0)
     expect(bob2data.Details.Reward.Uptime).to.equal(0)
     expect(bob2data.Details.Reward.Network).to.equal(600)
@@ -193,9 +195,10 @@ describe('Score ratings of relay rewards', () => {
     
     expect(summary3.Messages).to.have.lengthOf(1)
     const summary3data = JSON.parse(summary3.Messages[0].Data)
-    // bob uptime 14 no hw, alice uptime 3 with hw
+    expect(summary3data.Summary.Ratings.Uptime).to.equal(1) 
     expect(summary3data.Summary.Rewards.Uptime).to.equal(100)
-    expect(summary3data.Summary.Ratings.Uptime).to.equal(100) 
+
+    // bob uptime 14 no hw, alice uptime 3 with hw
     const rewards3ForAliceResult = await handle({
       From: ALICE_ADDRESS,
       Tags: [
@@ -205,8 +208,7 @@ describe('Score ratings of relay rewards', () => {
     })
     expect(rewards3ForAliceResult.Messages).to.have.lengthOf(1)
     const alice3data = JSON.parse(rewards3ForAliceResult.Messages[0].Data)
-    expect(alice3data.Details.Configuration.UptimeTierMultiplier).to.equal(1)
-    expect(alice3data.Details.Rating.Uptime).to.equal(100)
+    expect(alice3data.Details.Rating.Uptime).to.equal(1)
     expect(alice3data.Details.Reward.Uptime).to.equal(100)
     
     const rewards3ForBobResult = await handle({
@@ -219,7 +221,6 @@ describe('Score ratings of relay rewards', () => {
     
     expect(rewards3ForBobResult.Messages).to.have.lengthOf(1)
     const bob3data = JSON.parse(rewards3ForBobResult.Messages[0].Data)
-    expect(bob3data.Details.Configuration.UptimeTierMultiplier).to.equal(0)
     expect(bob3data.Details.Rating.Uptime).to.equal(0)
     expect(bob3data.Details.Reward.Uptime).to.equal(0)
     expect(bob3data.Details.Reward.Network).to.equal(600)
@@ -318,7 +319,6 @@ describe('Score ratings of relay rewards', () => {
     expect(summary2data.Summary.Rewards.Uptime).to.equal(0)
     expect(summary2data.Summary.Rewards.Hardware).to.equal(0)
     expect(summary2data.Summary.Ratings.Uptime).to.equal(0) 
-    expect(summary2data.Summary.Ratings.Hardware).to.equal(0) 
     const rewards2ForAliceResult = await handle({
       From: ALICE_ADDRESS,
       Tags: [
@@ -328,9 +328,7 @@ describe('Score ratings of relay rewards', () => {
     })
     expect(rewards2ForAliceResult.Messages).to.have.lengthOf(1)
     const alice2data = JSON.parse(rewards2ForAliceResult.Messages[0].Data)
-    expect(alice2data.Details.Configuration.UptimeTierMultiplier).to.equal(0)
     expect(alice2data.Details.Rating.Uptime).to.equal(0)
-    expect(alice2data.Details.Rating.Hardware).to.equal(0)
     expect(alice2data.Details.Reward.Uptime).to.equal(0)
     expect(alice2data.Details.Reward.Hardware).to.equal(0)
     expect(alice2data.Details.Reward.Network).to.equal(560)
@@ -372,8 +370,7 @@ describe('Score ratings of relay rewards', () => {
     // alice uptime 3 with hw
     expect(summary3data.Summary.Rewards.Uptime).to.equal(140)
     expect(summary3data.Summary.Rewards.Hardware).to.equal(300)
-    expect(summary3data.Summary.Ratings.Uptime).to.equal(100) 
-    expect(summary3data.Summary.Ratings.Hardware).to.equal(100)
+    expect(summary3data.Summary.Ratings.Uptime).to.equal(1)
     const rewards3ForAliceResult = await handle({
       From: ALICE_ADDRESS,
       Tags: [
@@ -383,9 +380,7 @@ describe('Score ratings of relay rewards', () => {
     })
     expect(rewards3ForAliceResult.Messages).to.have.lengthOf(1)
     const alice3data = JSON.parse(rewards3ForAliceResult.Messages[0].Data)
-    expect(alice3data.Details.Configuration.UptimeTierMultiplier).to.equal(1)
-    expect(alice3data.Details.Rating.Uptime).to.equal(100)
-    expect(alice3data.Details.Rating.Hardware).to.equal(100)
+    expect(alice3data.Details.Rating.Uptime).to.equal(1)
     expect(alice3data.Details.Reward.Uptime).to.equal(140)
     expect(alice3data.Details.Reward.Hardware).to.equal(300)
     expect(alice3data.Details.Reward.Network).to.equal(560)
@@ -427,10 +422,9 @@ describe('Score ratings of relay rewards', () => {
     expect(summary4.Messages).to.have.lengthOf(1)
     const summary4data = JSON.parse(summary4.Messages[0].Data)
     // alice uptime 14 with hw, bob uptime 3 no hw
+    expect(summary4data.Summary.Ratings.Uptime).to.equal(3)
     expect(summary4data.Summary.Rewards.Uptime).to.equal(140) // 1000 * 0.14
-    expect(summary4data.Summary.Rewards.Hardware).to.equal(300) // 1000 * 0.3
-    expect(summary4data.Summary.Ratings.Uptime).to.equal(300) // 3*100
-    expect(summary4data.Summary.Ratings.Hardware).to.equal(170) // 0.65*100 + 0.35 * 300 + 0
+    expect(summary4data.Summary.Rewards.Hardware).to.equal(123)
     const rewards4ForAliceResult = await handle({
       From: ALICE_ADDRESS,
       Tags: [
@@ -441,12 +435,13 @@ describe('Score ratings of relay rewards', () => {
     expect(rewards4ForAliceResult.Messages).to.have.lengthOf(1)
     
     const alice4data = JSON.parse(rewards4ForAliceResult.Messages[0].Data)
-    expect(alice4data.Details.Configuration.UptimeTierMultiplier).to.equal(3)
-    expect(alice4data.Details.Rating.Uptime).to.equal(300) // 3 * 100
-    expect(alice4data.Details.Rating.Hardware).to.equal(170) // 0.65*100 + 0.35 * 300
+    console.log(summary4.Messages[0].Data)
+    console.log(rewards4ForAliceResult.Messages[0].Data)
+
+    expect(alice4data.Details.Rating.Uptime).to.equal(3)
     expect(alice4data.Details.Reward.Uptime).to.equal(140)
-    expect(alice4data.Details.Reward.Hardware).to.equal(300) // solo hw gets all
     expect(alice4data.Details.Reward.Network).to.equal(186) // floor(560 * (100/300))
+    expect(alice4data.Details.Reward.Hardware).to.equal(300) // 123 = 300 * 0.4{169.9{120.9{0.65 * 186} + 49{0.35 * 140}}/ 418{363{0.65*559} + 49{0.35*140}}}
     expect(alice4data.Details.Reward.Total).to.equal(626) // 140+300+186
     const rewards4ForBobResult = await handle({
       From: BOB_ADDRESS,
@@ -458,7 +453,6 @@ describe('Score ratings of relay rewards', () => {
     expect(rewards4ForBobResult.Messages).to.have.lengthOf(1)
     
     const bob4data = JSON.parse(rewards4ForBobResult.Messages[0].Data)
-    expect(bob4data.Details.Configuration.UptimeTierMultiplier).to.equal(0)
     expect(bob4data.Details.Rating.Uptime).to.equal(0)
     expect(bob4data.Details.Rating.Hardware).to.equal(0)
     expect(bob4data.Details.Reward.Uptime).to.equal(0) // no hw
