@@ -290,8 +290,8 @@ describe('Score processing of relay rewards', () => {
     
     const data = JSON.parse(bobResult.Messages[0].Data)
     
-    expect(data.Details.Configuration.FamilyMultiplier).to.equal(0.9)
-    expect(data.Details.Rating.Network).to.equal(90)
+    expect(data.Details.Configuration.FamilyMultiplier).to.equal(1.1)
+    expect(data.Details.Rating.Network).to.equal(110)
   })
   it('Validate reference location multiplier formula', async () => {
     const configResult = await handle({

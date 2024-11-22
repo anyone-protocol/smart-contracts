@@ -539,12 +539,12 @@ describe('Scoring relay rewards based on ratings', () => {
     })
     expect(cFingerprintResult.Messages).to.have.lengthOf(1)
 
-    expect(aResult.Messages[0].Data).to.equal('0.000000000000000570')
-    expect(aFingerprintResult.Messages[0].Data).to.equal('0.000000000000000949')
-    expect(bResult.Messages[0].Data).to.equal('0.000000000000003472')
-    expect(bFingerprintResult.Messages[0].Data).to.equal('0.000000000000003093')
-    expect(cResult.Messages[0].Data).to.equal('0.000000000000005954')
-    expect(cFingerprintResult.Messages[0].Data).to.equal('0.000000000000005954')
+    expect(aResult.Messages[0].Data).to.equal('0.000000000000000558')
+    expect(aFingerprintResult.Messages[0].Data).to.equal('0.000000000000000930')
+    expect(bResult.Messages[0].Data).to.equal('0.000000000000003395')
+    expect(bFingerprintResult.Messages[0].Data).to.equal('0.000000000000003023')
+    expect(cResult.Messages[0].Data).to.equal('0.000000000000006043')
+    expect(cFingerprintResult.Messages[0].Data).to.equal('0.000000000000006043')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -605,10 +605,10 @@ describe('Scoring relay rewards based on ratings', () => {
       ]
     })
     expect(b2FingerprintResult.Messages).to.have.lengthOf(1)
-    expect(a2Result.Messages[0].Data).to.equal('0.000000000000003930')
-    expect(a2FingerprintResult.Messages[0].Data).to.equal('0.000000000000006549')
-    expect(b2Result.Messages[0].Data).to.equal('0.000000000000005712')
-    expect(b2FingerprintResult.Messages[0].Data).to.equal('0.000000000000003093')
+    expect(a2Result.Messages[0].Data).to.equal('0.000000000000003918')
+    expect(a2FingerprintResult.Messages[0].Data).to.equal('0.000000000000006530')
+    expect(b2Result.Messages[0].Data).to.equal('0.000000000000005635')
+    expect(b2FingerprintResult.Messages[0].Data).to.equal('0.000000000000003023')
   })
 
 })

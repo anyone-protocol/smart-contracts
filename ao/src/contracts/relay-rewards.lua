@@ -32,7 +32,7 @@ local RelayRewards = {
     Timestamp = 0,
     Length = 0,
     Summary = {
-      Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 
+      Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0
     },
     Configuration = {},
     Details = {
@@ -318,9 +318,9 @@ function RelayRewards.init()
         
         local networkScore = scoreData.Score.Network
 
-        local familyMultiplier = 1 
+        local familyMultiplier = 1
         if RelayRewards.Configuration.Multipliers.Family.Enabled then
-          familyMultiplier = 1 - RelayRewards.Configuration.Multipliers.Family.Offset * (scoreData.Score.FamilySize^RelayRewards.Configuration.Multipliers.Family.Power)
+          familyMultiplier = 1 + RelayRewards.Configuration.Multipliers.Family.Offset * (scoreData.Score.FamilySize^RelayRewards.Configuration.Multipliers.Family.Power)
           if familyMultiplier < 0 then
             familyMultiplier = 0
           end
@@ -356,7 +356,7 @@ function RelayRewards.init()
           roundData[fingerprint].Rating.ExitBonus = networkScore
         end
 
-        roundData[fingerprint].Configuration = { 
+        roundData[fingerprint].Configuration = {
           FamilyMultiplier = familyMultiplier,
           LocationMultiplier = locationMultiplier,
           UptimeTierMultiplier = uptimeTierMultiplier
@@ -429,8 +429,8 @@ function RelayRewards.init()
           roundData[fingerprint].Reward.ExitBonus = math.floor(exitBonusRewards * exitBonusWeight)
         end
         
-        roundData[fingerprint].Reward.Total = roundData[fingerprint].Reward.Network + 
-            roundData[fingerprint].Reward.Hardware + roundData[fingerprint].Reward.Uptime + 
+        roundData[fingerprint].Reward.Total = roundData[fingerprint].Reward.Network +
+            roundData[fingerprint].Reward.Hardware + roundData[fingerprint].Reward.Uptime +
             roundData[fingerprint].Reward.ExitBonus
         
         local operatorAddress = roundData[fingerprint].Address
@@ -532,7 +532,7 @@ function RelayRewards.init()
           assert(share >= 0, 'Delegate.Share has to be >= 0')
           assert(share <= 1, 'Delegate.Share has to be <= 1')
           result = 'OK'
-          RelayRewards.Configuration.Delegates[address] = { 
+          RelayRewards.Configuration.Delegates[address] = {
             Address = delegateAddress, Share = share
           }
         end
