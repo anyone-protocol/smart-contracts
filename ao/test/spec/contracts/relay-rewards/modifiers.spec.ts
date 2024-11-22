@@ -167,6 +167,72 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
     expect(minHardwareResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.Share has to be >= 0')
   })
   
+  it('UptimeInfluence on Hardware must be number between 0 and 1 inclusive', async () => {
+    const stringUptimeInfluenceResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({
+        Modifiers: {
+            Hardware: {
+                Enabled: false,
+                Share: 0.1,
+                UptimeInfluence: 'abc'
+            }
+        }
+      })
+    })
+    expect(stringUptimeInfluenceResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.UptimeInfluence')
+    const boolUptimeInfluenceResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({
+        Modifiers: {
+            Hardware: {
+                Enabled: false,
+                Share: 0.1,
+                UptimeInfluence: true
+            }
+        }
+      })
+    })
+    expect(boolUptimeInfluenceResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.UptimeInfluence')
+    const maxUptimeInfluenceResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({
+        Modifiers: {
+            Hardware: {
+                Enabled: false,
+                Share: 0.2,
+                UptimeInfluence: 2
+            }
+        }
+      })
+    })
+    expect(maxUptimeInfluenceResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.UptimeInfluence has to be <= 1')
+    const minUptimeInfluenceResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({
+        Modifiers: {
+            Hardware: {
+                Enabled: false,
+                Share: 0.1,
+                UptimeInfluence: -1
+            }
+        }
+      })
+    })
+    expect(minUptimeInfluenceResult.Error).to.be.a('string').that.includes('Modifiers.Hardware.UptimeInfluence has to be >= 0')
+  })
 
   it('Uptime Enabled must be boolean', async () => {
     const stringUptimeResult = await handle({

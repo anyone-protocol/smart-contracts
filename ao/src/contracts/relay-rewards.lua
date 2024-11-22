@@ -10,7 +10,7 @@ local RelayRewards = {
     TokensPerSecond = 28935184200000000,
     Modifiers = {
       Network = { Share = 0.56 },
-      Hardware = { Enabled = false, Share = 0.2 },
+      Hardware = { Enabled = false, Share = 0.2, UptimeInfluence = 0.35 },
       Uptime = { Enabled = false, Share = 0.14,
         Tiers = {
           ['0'] = 0,
@@ -80,7 +80,6 @@ function RelayRewards.init()
       assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       assert(msg.Data, ErrorMessages.MessageDataRequired)
 
-      local effects = {}
       local config = RelayRewards.Configuration
       
       local request = nil
@@ -97,7 +96,6 @@ function RelayRewards.init()
         AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
         assert(request.TokensPerSecond >= 0, 'TokensPerSecond has to be >= 0')
         config.TokensPerSecond = request.TokensPerSecond
-        table.insert(effects, 'TokensPerSecond')
       end
       if request.Modifiers then
         if request.Modifiers.Network then
@@ -105,7 +103,6 @@ function RelayRewards.init()
           assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share has to be >= 0')
           assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share has to be <= 1')
           config.Modifiers.Network.Share = request.Modifiers.Network.Share
-          table.insert(effects, 'Modifiers.Network')
         end
         if request.Modifiers.Hardware then
           assert(type(request.Modifiers.Hardware.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Hardware.Enabled')
@@ -114,7 +111,12 @@ function RelayRewards.init()
           assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share has to be <= 1')
           config.Modifiers.Hardware.Enabled = request.Modifiers.Hardware.Enabled
           config.Modifiers.Hardware.Share = request.Modifiers.Hardware.Share
-          table.insert(effects, 'Modifiers.Hardware')
+          if request.Modifiers.Hardware.UptimeInfluence then
+            AnyoneUtils.assertNumber(request.Modifiers.Hardware.UptimeInfluence, 'Modifiers.Hardware.UptimeInfluence')
+            assert(request.Modifiers.Hardware.UptimeInfluence >= 0, 'Modifiers.Hardware.UptimeInfluence has to be >= 0')
+            assert(request.Modifiers.Hardware.UptimeInfluence <= 1, 'Modifiers.Hardware.UptimeInfluence has to be <= 1')
+            config.Modifiers.Hardware.UptimeInfluence = request.Modifiers.Hardware.UptimeInfluence
+          end
         end
         if request.Modifiers.Uptime then
           assert(type(request.Modifiers.Uptime.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Uptime.Enabled')
@@ -123,7 +125,6 @@ function RelayRewards.init()
           assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share has to be <= 1')
           config.Modifiers.Uptime.Enabled = request.Modifiers.Uptime.Enabled
           config.Modifiers.Uptime.Share = request.Modifiers.Uptime.Share
-          table.insert(effects, 'Modifiers.Uptime')
 
           if request.Modifiers.Uptime.Tiers then
             assert(type(request.Modifiers.Uptime.Tiers) == 'table', 'Table type required for Modifiers.Uptime.Tiers')
@@ -139,7 +140,6 @@ function RelayRewards.init()
               tierCount = tierCount + 1
             end
             config.Modifiers.Uptime.Tiers = request.Modifiers.Uptime.Tiers
-            table.insert(effects, 'Modifiers.Uptime.Tiers')
           end
         end
         if request.Modifiers.ExitBonus then
@@ -149,7 +149,6 @@ function RelayRewards.init()
           assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share has to be <= 1')
           config.Modifiers.ExitBonus.Enabled = request.Modifiers.ExitBonus.Enabled
           config.Modifiers.ExitBonus.Share = request.Modifiers.ExitBonus.Share
-          table.insert(effects, 'Modifiers.ExitBonus.Share')
         end
         local totalEffectiveShare = config.Modifiers.Network.Share
         if config.Modifiers.Hardware.Enabled then
@@ -174,7 +173,6 @@ function RelayRewards.init()
           config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
           config.Multipliers.Family.Offset = request.Multipliers.Family.Offset
           config.Multipliers.Family.Power = request.Multipliers.Family.Power
-          table.insert(effects, 'Multipliers.Family')
         end
         if request.Multipliers.Location then
           assert(type(request.Multipliers.Location.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Location.Enabled')
@@ -186,7 +184,6 @@ function RelayRewards.init()
           config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
           config.Multipliers.Location.Offset = request.Multipliers.Location.Offset
           config.Multipliers.Location.Power = request.Multipliers.Location.Power
-          table.insert(effects, 'Multipliers.Location')
         end
       end
       if request.Delegates then
@@ -310,7 +307,12 @@ function RelayRewards.init()
         Ratings = { Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 },
         Rewards = { Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 }
       }
-
+      local uptimeInfluenceOnHw = 0
+      if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
+        uptimeInfluenceOnHw = RelayRewards.Configuration.Modifiers.Hardware.UptimeInfluence
+      end
+      local networkInfluenceOnHw = 1 - uptimeInfluenceOnHw
+      
       for fingerprint, scoreData in pairs(RelayRewards.PendingRounds[timestamp]) do
         roundData[fingerprint] = {}
         roundData[fingerprint].Address = scoreData.Address
@@ -349,7 +351,8 @@ function RelayRewards.init()
         roundData[fingerprint].Rating.Uptime = uptimeTierMultiplier * networkScore
 
         if RelayRewards.Configuration.Modifiers.Hardware.Enabled and scoreData.Score.IsHardware then
-          roundData[fingerprint].Rating.Hardware = math.floor(0.65 * networkScore + 0.35 * roundData[fingerprint].Rating.Uptime)
+          
+          roundData[fingerprint].Rating.Hardware = math.floor(networkInfluenceOnHw * networkScore + uptimeInfluenceOnHw * roundData[fingerprint].Rating.Uptime)
         end
 
         if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.Score.ExitBonus then
