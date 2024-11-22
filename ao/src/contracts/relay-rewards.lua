@@ -340,19 +340,21 @@ function RelayRewards.init()
         roundData[fingerprint].Rating = { Network = networkScore, Hardware = 0, Uptime = 0, ExitBonus = 0 }
 
         local uptimeTierMultiplier = 0.0
-        for days, multiplier in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
-          local daysInt = tonumber(days)
-          local multiplierFloat = tonumber(multiplier)
-          assert(multiplierFloat, 'Multiplier must be a number')
-          if daysInt <= scoreData.Score.UptimeStreak and uptimeTierMultiplier < multiplierFloat then
-            uptimeTierMultiplier = multiplierFloat
+        if scoreData.Score.IsHardware then
+          for days, multiplier in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
+            local daysInt = tonumber(days)
+            local multiplierFloat = tonumber(multiplier)
+            assert(multiplierFloat, 'Multiplier must be a number')
+            if daysInt <= scoreData.Score.UptimeStreak and uptimeTierMultiplier < multiplierFloat then
+              uptimeTierMultiplier = multiplierFloat
+            end
           end
-        end
-        roundData[fingerprint].Rating.Uptime = uptimeTierMultiplier * networkScore
+          roundData[fingerprint].Rating.Uptime = uptimeTierMultiplier * networkScore
 
-        if RelayRewards.Configuration.Modifiers.Hardware.Enabled and scoreData.Score.IsHardware then
-          
-          roundData[fingerprint].Rating.Hardware = math.floor(networkInfluenceOnHw * networkScore + uptimeInfluenceOnHw * roundData[fingerprint].Rating.Uptime)
+          if RelayRewards.Configuration.Modifiers.Hardware.Enabled then
+            
+            roundData[fingerprint].Rating.Hardware = math.floor(networkInfluenceOnHw * networkScore + uptimeInfluenceOnHw * roundData[fingerprint].Rating.Uptime)
+          end
         end
 
         if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.Score.ExitBonus then
