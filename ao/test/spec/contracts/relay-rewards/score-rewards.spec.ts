@@ -271,11 +271,13 @@ describe('Scoring relay rewards based on ratings', () => {
     expect(bData.Details.Reward.Total).to.equal(
       Math.floor(5600 * bData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
       Math.floor(1400 * bData.Details.Rating.Uptime/summary2data.Summary.Ratings.Uptime) + 
+      Math.floor(bData.Details.Reward.Hardware) + 
       Math.floor(1000 * bData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)
     )
     expect(cData.Details.Reward.Total).to.equal(
       Math.floor(5600 * cData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
       Math.floor(1400 * cData.Details.Rating.Uptime/summary2data.Summary.Ratings.Uptime) + 
+      Math.floor(cData.Details.Reward.Hardware) + 
       Math.floor(1000 * cData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)
     ) 
   })
@@ -539,10 +541,10 @@ describe('Scoring relay rewards based on ratings', () => {
 
     expect(aResult.Messages[0].Data).to.equal('0.000000000000000558')
     expect(aFingerprintResult.Messages[0].Data).to.equal('0.000000000000000930')
-    expect(bResult.Messages[0].Data).to.equal('0.000000000000003395')
-    expect(bFingerprintResult.Messages[0].Data).to.equal('0.000000000000003023')
-    expect(cResult.Messages[0].Data).to.equal('0.000000000000006043')
-    expect(cFingerprintResult.Messages[0].Data).to.equal('0.000000000000006043')
+    expect(bResult.Messages[0].Data).to.equal('0.000000000000003691')
+    expect(bFingerprintResult.Messages[0].Data).to.equal('0.000000000000003319')
+    expect(cResult.Messages[0].Data).to.equal('0.000000000000005748')
+    expect(cFingerprintResult.Messages[0].Data).to.equal('0.000000000000005748')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -605,8 +607,8 @@ describe('Scoring relay rewards based on ratings', () => {
     expect(b2FingerprintResult.Messages).to.have.lengthOf(1)
     expect(a2Result.Messages[0].Data).to.equal('0.000000000000003918')
     expect(a2FingerprintResult.Messages[0].Data).to.equal('0.000000000000006530')
-    expect(b2Result.Messages[0].Data).to.equal('0.000000000000005635')
-    expect(b2FingerprintResult.Messages[0].Data).to.equal('0.000000000000003023')
+    expect(b2Result.Messages[0].Data).to.equal('0.000000000000005931')
+    expect(b2FingerprintResult.Messages[0].Data).to.equal('0.000000000000003319')
   })
 
 })

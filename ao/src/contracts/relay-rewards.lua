@@ -418,12 +418,11 @@ function RelayRewards.init()
           summary.Rewards.Network = summary.Rewards.Network + roundData[fingerprint].Reward.Network
         end
         if ratedData.Rating.IsHardware then
-          totalHwNetworkRewards = totalHwNetworkRewards + summary.Rewards.Network
+          totalHwNetworkRewards = totalHwNetworkRewards + roundData[fingerprint].Reward.Network
           if summary.Ratings.Uptime > 0 then
             local uptimeWeight = ratedData.Rating.Uptime / summary.Ratings.Uptime
             roundData[fingerprint].Reward.Uptime = math.floor(uptimeRewards * uptimeWeight)
             summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
-            
           end
         end
       end
@@ -432,8 +431,7 @@ function RelayRewards.init()
 
       for fingerprint, ratedData in pairs(roundData) do
         if ratedData.Rating.IsHardware then
-          local weigedHwWeight = networkInfluenceOnHw * roundData[fingerprint].Reward.Network +
-            uptimeInfluenceOnHw * roundData[fingerprint].Reward.Uptime
+          local weigedHwWeight = networkInfluenceOnHw * roundData[fingerprint].Reward.Network + uptimeInfluenceOnHw * roundData[fingerprint].Reward.Uptime
           local hardwareWeight = weigedHwWeight / weighedHwTotalWeight
           roundData[fingerprint].Reward.Hardware = math.floor(hardwareRewards * hardwareWeight)
         end
