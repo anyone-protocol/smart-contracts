@@ -11,7 +11,7 @@ job "distribution-distribute-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.9"
+      image = "ghcr.io/anyone-protocol/smart-contracts:0.3.10"
       entrypoint = ["npx"]
       command = "ts-node"
       args = ["scripts/distribution/distribute.ts"]

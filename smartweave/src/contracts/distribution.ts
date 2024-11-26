@@ -706,6 +706,8 @@ export class DistributionContract extends Evolvable(Object) {
       ? Number.parseInt(timestamp) - lastDistribution
       : 0
 
+    ContractAssert(epochLengthInMs > 0, 'EPOCH LENGTH SHOULD NOT BE NEGATIVE')
+
     let distributionResult = {
       baseActualDistributedTokens: BigNumber(0),
       hwBonusActualDistributedTokens: BigNumber(0),

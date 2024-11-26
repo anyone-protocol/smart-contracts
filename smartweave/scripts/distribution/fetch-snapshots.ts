@@ -2,10 +2,15 @@ import Query from '@irys/query'
 import axios from 'axios'
 import _ from 'lodash'
 import fs from 'fs'
+import BigNumber from 'bignumber.js'
+
+BigNumber.config({ EXPONENTIAL_AT: 50 })
 
 async function fetchSnapshots() {
-  const from = 1728479113000
-  const to = 1731242011000
+  const from = new Date('Nov 13 2024 12:00:00 PM').getTime()
+  // const from = 1731242011000
+  // const to = 1731242011000
+  const to = Date.now()
 
   console.log(
     `Querying distribution results` +
@@ -30,29 +35,50 @@ async function fetchSnapshots() {
       irysTimestamp: result.timestamp,
       tagTimestamp: Number.parseInt(
         result.tags.find(t => t.name === 'Content-Timestamp')?.value || ''
-      )
+      ),
+      timeElapsed: Number.parseInt(
+        result.tags.find(t => t.name === 'Time-Elapsed')?.value || ''
+      ),
+      totalDistributed: BigNumber(
+        result.tags.find(t => t.name === 'Total-Distributed')?.value || ''
+      ).toString()
     })),
     'tagTimestamp'
   )
 
   let current = 1
-  for (const { result, irysTimestamp, tagTimestamp } of mapped) {
-    console.log(
-      `[${current}/${mapped.length}] Fetching snapshot` +
-        ` ${result.id} - ${irysTimestamp} - ${tagTimestamp}`
-    )
-    const response = await axios.get(
-      `https://gateway.irys.xyz/${result.id}`,
-      { transformResponse: res => res }
-    )
-    console.log(
-      `[${current}/${mapped.length}] Got snapshot ${result.id}, saving to disk`
-    )
-    fs.writeFileSync(
-      `./scripts/distribution/snapshots/${tagTimestamp}-${result.id}.json`,
-      response.data
-    )
-    console.log(`[${current}/${mapped.length}] Saved snapshot ${result.id}`)
+  for (const {
+    result,
+    irysTimestamp,
+    tagTimestamp,
+    timeElapsed,
+    totalDistributed
+  } of mapped) {
+    if (BigNumber(totalDistributed).lt(0)) {
+      console.warn(
+        `[${current}/${mapped.length}] Skipping bad snapshot ${result.id}`
+      )
+    } else {
+      console.log(
+        `[${current}/${mapped.length}] Fetching snapshot` +
+          ` ${result.id} - ${irysTimestamp} - ${tagTimestamp},` +
+          ` Epoch = ${new Date(tagTimestamp).toUTCString()},` +
+          ` Elapsed = ${timeElapsed}, Distributed = ${totalDistributed}`
+      )
+      const response = await axios.get(
+        `https://gateway.irys.xyz/${result.id}`,
+        { transformResponse: res => res }
+      )
+      console.log(
+        `[${current}/${mapped.length}] Got snapshot ${result.id}, saving to disk`
+      )
+      fs.writeFileSync(
+        `./scripts/distribution/snapshots/${tagTimestamp}-${result.id}.json`,
+        response.data
+      )
+      console.log(`[${current}/${mapped.length}] Saved snapshot ${result.id}`)
+    }
+
     current++
   }
 

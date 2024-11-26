@@ -60,7 +60,7 @@ type DistributionResult = {
   }
 }
 
-const lastSafeTimestamp = 1731082380618
+// const lastSafeTimestamp = 1731082380618
 
 async function generateRecoveryState() {
   const paths = fs.readdirSync('./scripts/distribution/snapshots')
@@ -76,14 +76,19 @@ async function generateRecoveryState() {
         ) as { [timestamp:string]: DistributionResult }
 
         return { timestamp, snapshot }
-      })
-      .filter(({ timestamp }) => timestamp <= lastSafeTimestamp),
+      }),
+      // .filter(({ timestamp }) => timestamp <= lastSafeTimestamp),
     'timestamp'
   )
 
   console.log(`Got ${snapshots.length} snapshots`)
 
-  const claimable: { [ address: string ]: string } = {}
+  const previousRecoveryState = JSON.parse(
+    fs.readFileSync('./scripts/distribution/data/recovery-state.json', 'utf8')
+  )
+
+  const claimable: { [ address: string ]: string } =
+    previousRecoveryState['claimable']
   let current = 1
   let lastTimestamp: string = ''
   for (const { timestamp, snapshot } of snapshots) {
@@ -122,7 +127,7 @@ async function generateRecoveryState() {
   if (lastTimestamp) {
     const recoveryState = JSON.parse(
       fs.readFileSync(
-        './scripts/distribution/data/base-init-state.json',
+        './scripts/distribution/data/base-init-state-2.json',
         'utf8'
       )
     )
@@ -133,7 +138,7 @@ async function generateRecoveryState() {
     }
 
     fs.writeFileSync(
-      './scripts/distribution/data/recovery-state.json',
+      './scripts/distribution/data/recovery-state-2.json',
       JSON.stringify(recoveryState)
     )
   }
