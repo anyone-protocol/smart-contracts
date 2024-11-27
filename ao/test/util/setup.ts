@@ -92,7 +92,8 @@ export const AO_ENV = {
 const AOS_WASM = fs.readFileSync(
   path.join(
     path.resolve(),
-    './test/util/aos-cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk.wasm'
+    // './test/util/aos-cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk.wasm'
+    './test/util/aos-Pq2Zftrqut0hdisH_MC2pDOT6S4eQFoxGsFUzR6r350.wasm'
   )
 )
 
