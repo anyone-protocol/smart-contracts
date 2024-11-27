@@ -169,7 +169,7 @@ export async function createLoader(contractName: string) {
     options: Partial<AoLoader.Message> = {},
     mem = memory
   ) {
-    return originalHandle(
+    const result = await originalHandle(
       mem,
       {
         ...DEFAULT_HANDLE_OPTIONS,
@@ -177,6 +177,15 @@ export async function createLoader(contractName: string) {
       },
       AO_ENV
     )
+
+    // NB: ao-loader isn't updated for this aos wasm, so stitch Error back in
+    if (
+      (result.Output.data as string || '').startsWith('\x1B[31mError\x1B[90m')
+    ) {
+      result.Error = result.Output.data
+    }
+
+    return result
   }
 
   return {

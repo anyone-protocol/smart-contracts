@@ -1,4 +1,6 @@
 local OperatorRegistry = {
+  _initialized = false,
+
   -- Operator Certificates
   ClaimableFingerprintsToOperatorAddresses = {},
 
@@ -440,6 +442,105 @@ function OperatorRegistry.init()
         Target = msg.From,
         Action = 'Info-Response',
         Data = json.encode(info)
+      })
+    end
+  )
+
+  Handlers.add(
+    'Init',
+    Handlers.utils.hasMatchingTag('Action', 'Init'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      assert(
+        OperatorRegistry._initialized == false,
+        ErrorMessages.AlreadyInitialized
+      )
+
+      local initState = json.decode(msg.Data or '{}')
+
+      assert(
+        type(initState.BlockedOperatorAddresses) == 'table' or
+        type(initState.BlockedOperatorAddresses) == 'nil',
+        ErrorMessages.InvalidFingerprint
+      )
+      if (type(initState.BlockedOperatorAddresses) == 'table') then
+        for address, isBlocked in pairs(initState.BlockedOperatorAddresses) do
+          AnyoneUtils.assertValidEvmAddress(address)
+          assert(
+            isBlocked == true,
+            ErrorMessages.InvalidBlockedOperatorAddressesValue
+          )
+        end
+      end
+
+      assert(
+        type(initState.ClaimableFingerprintsToOperatorAddresses) == 'table' or
+        type(initState.ClaimableFingerprintsToOperatorAddresses) == 'nil',
+        ErrorMessages.InvalidFingerprint
+      )
+      if (type(initState.ClaimableFingerprintsToOperatorAddresses) == 'table') then
+        for fingerprint, address in pairs(initState.ClaimableFingerprintsToOperatorAddresses) do
+          AnyoneUtils.assertValidFingerprint(fingerprint)
+          AnyoneUtils.assertValidEvmAddress(address)
+        end
+      end
+
+      assert(
+        type(initState.RegistrationCreditsFingerprintsToOperatorAddresses) == 'table' or
+        type(initState.RegistrationCreditsFingerprintsToOperatorAddresses) == 'nil',
+        ErrorMessages.InvalidFingerprint
+      )
+      if (type(initState.RegistrationCreditsFingerprintsToOperatorAddresses) == 'table') then
+        for fingerprint, address in pairs(initState.RegistrationCreditsFingerprintsToOperatorAddresses) do
+          AnyoneUtils.assertValidFingerprint(fingerprint)
+          AnyoneUtils.assertValidEvmAddress(address)
+        end
+      end
+
+      assert(
+        type(initState.VerifiedFingerprintsToOperatorAddresses) == 'table' or
+        type(initState.VerifiedFingerprintsToOperatorAddresses) == 'nil',
+        ErrorMessages.InvalidFingerprint
+      )
+      if (type(initState.VerifiedFingerprintsToOperatorAddresses) == 'table') then
+        for fingerprint, address in pairs(initState.VerifiedFingerprintsToOperatorAddresses) do
+          AnyoneUtils.assertValidFingerprint(fingerprint)
+          AnyoneUtils.assertValidEvmAddress(address)
+        end
+      end
+
+      assert(
+        type(initState.VerifiedHardwareFingerprints) == 'table' or
+        type(initState.VerifiedHardwareFingerprints) == 'nil',
+        ErrorMessages.InvalidFingerprint
+      )
+      if (type(initState.VerifiedHardwareFingerprints) == 'table') then
+        for fingerprint, isVerifiedHardware in pairs(initState.VerifiedHardwareFingerprints) do
+          AnyoneUtils.assertValidFingerprint(fingerprint)
+          assert(
+            isVerifiedHardware == true,
+            ErrorMessages.InvalidVerifiedHardwareValue
+          )
+        end
+      end
+
+      OperatorRegistry.BlockedOperatorAddresses =
+        initState.BlockedOperatorAddresses or {}
+      OperatorRegistry.ClaimableFingerprintsToOperatorAddresses =
+        initState.ClaimableFingerprintsToOperatorAddresses or {}
+      OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses =
+        initState.RegistrationCreditsFingerprintsToOperatorAddresses or {}
+      OperatorRegistry.VerifiedFingerprintsToOperatorAddresses =
+        initState.VerifiedFingerprintsToOperatorAddresses or {}
+      OperatorRegistry.VerifiedHardwareFingerprints =
+        initState.VerifiedHardwareFingerprints or {}
+
+      OperatorRegistry._initialized = true
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Init-Response',
+        Data = 'OK'
       })
     end
   )
