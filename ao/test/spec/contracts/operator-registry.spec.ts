@@ -1516,4 +1516,245 @@ describe('Operator Registry', () => {
       })
     })
   })
+
+  describe('Initialization', () => {
+    it('Allows Admin to run Init action', async () => {
+      const initState = {
+        ClaimableFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_B]: ALICE_ADDRESS,
+          [FINGERPRINT_C]: ALICE_ADDRESS
+        },
+        VerifiedFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_A]: ALICE_ADDRESS
+        },
+        BlockedOperatorAddresses: {
+          [BOB_ADDRESS]: true
+        },
+        RegistrationCreditsFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_B]: ALICE_ADDRESS
+        },
+        VerifiedHardwareFingerprints: {
+          [FINGERPRINT_C]: true
+        }
+      }
+
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(initState)
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+
+      const viewStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'View-State' }]
+      })
+
+      expect(viewStateResult.Messages).to.have.lengthOf(1)
+      expect(
+        JSON.parse(viewStateResult.Messages[0].Data)
+      ).to.deep.equal(initState)
+    })
+
+    it('Prevents non-admin from calling Init action', async () => {
+      const result = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify({})
+      })
+
+      expect(result.Error)
+        .to.be.a('string')
+        .that.includes('This method is only available to the Owner')
+    })
+
+    it('Allows empty state initialization', async () => {
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+
+      const viewStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'View-State' }]
+      })
+
+      expect(viewStateResult.Messages).to.have.lengthOf(1)
+      expect(
+        JSON.parse(viewStateResult.Messages[0].Data)
+      ).to.deep.equal({
+        ClaimableFingerprintsToOperatorAddresses: [],
+        VerifiedFingerprintsToOperatorAddresses: [],
+        BlockedOperatorAddresses: [],
+        RegistrationCreditsFingerprintsToOperatorAddresses: [],
+        VerifiedHardwareFingerprints: []
+      })
+    })
+
+    it('Validates migrated state initialization', async () => {
+      const invalidClaimableFingerprintState = {
+        ClaimableFingerprintsToOperatorAddresses: {
+          ['invalid-fingerprint']: ALICE_ADDRESS
+        }
+      }
+      const invalidClaimableFingerprintStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidClaimableFingerprintState)
+      })
+      expect(invalidClaimableFingerprintStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Fingerprint')
+
+      const invalidClaimableAddressState = {
+        ClaimableFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_A]: 'invalid-address'
+        }
+      }
+      const invalidClaimableAddressStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidClaimableAddressState)
+      })
+      expect(invalidClaimableAddressStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Address')
+
+      const invalidVerifiedFingerprintState = {
+        VerifiedFingerprintsToOperatorAddresses: {
+          ['invalid-fingerprint']: ALICE_ADDRESS
+        }
+      }
+      const invalidVerifiedFingerprintStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidVerifiedFingerprintState)
+      })
+      expect(invalidVerifiedFingerprintStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Fingerprint')
+
+      const invalidVerifiiedAddressState = {
+        VerifiedFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_A]: 'invalid-address'
+        }
+      }
+      const invalidVerifiiedAddressStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidVerifiiedAddressState)
+      })
+      expect(invalidVerifiiedAddressStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Address')
+
+      const invalidBlockedAddressState = {
+        BlockedOperatorAddresses: {
+          ['invalid-address']: true
+        }
+      }
+      const invalidBlockedAddressStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidBlockedAddressState)
+      })
+      expect(invalidBlockedAddressStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Address')
+
+      const invalidBlockedValueState = {
+        BlockedOperatorAddresses: {
+          [ALICE_ADDRESS]: 8
+        }
+      }
+      const invalidBlockedValueStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidBlockedValueState)
+      })
+      expect(invalidBlockedValueStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid BlockedOperatorAddresses value')
+
+      const invalidRegistrationCreditsFingerprintState = {
+        RegistrationCreditsFingerprintsToOperatorAddresses: {
+          ['invalid-fingerprint']: ALICE_ADDRESS
+        }
+      }
+      const invalidRegistrationCreditsFingerprintStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidRegistrationCreditsFingerprintState)
+      })
+      expect(invalidRegistrationCreditsFingerprintStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Fingerprint')
+
+      const invalidRegistrationCreditsAddressState = {
+        RegistrationCreditsFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_A]: 'invalid-address'
+        }
+      }
+      const invalidRegistrationCreditsAddressStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidRegistrationCreditsAddressState)
+      })
+      expect(invalidRegistrationCreditsAddressStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Address')
+
+      const invalidVerifiedHardwareFingerprintState = {
+        VerifiedHardwareFingerprints: {
+          ['invalid-fingerprint']: true
+        }
+      }
+      const invalidVerifiedHardwareFingerprintStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidVerifiedHardwareFingerprintState)
+      })
+      expect(invalidVerifiedHardwareFingerprintStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid Fingerprint')
+
+      const invalidVerifiedHardwareValueState = {
+        VerifiedHardwareFingerprints: {
+          [FINGERPRINT_A]: 309
+        }
+      }
+      const invalidVerifiedHardwareValueStateResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }],
+        Data: JSON.stringify(invalidVerifiedHardwareValueState)
+      })
+      expect(invalidVerifiedHardwareValueStateResult.Error)
+        .to.be.a('string')
+        .that.includes('Invalid VerifiedHardware value')
+    })
+
+    it('Prevents Init action from running twice', async () => {
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }]
+      })
+
+      expect(result.Messages).to.have.lengthOf(1)
+      expect(result.Messages[0].Data).to.equal('OK')
+
+      const secondInitResult = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Init' }]
+      })
+
+      expect(secondInitResult.Error)
+        .to.be.a('string')
+        .that.includes('Already Initialized')
+    })
+  })
 })

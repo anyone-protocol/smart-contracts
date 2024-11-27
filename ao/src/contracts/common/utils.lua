@@ -30,7 +30,7 @@ local function initUtils()
     end,
 
     assertValidEvmAddress = function (address, message)
-      assert(type(address) == 'string', message or ErrorMessages.InvalidFingerprint)
+      assert(type(address) == 'string', message or ErrorMessages.InvalidAddress)
       assert(
         string.find(address, EvmAddressPattern),
         message or ErrorMessages.InvalidAddress

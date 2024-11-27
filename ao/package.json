@@ -22,8 +22,8 @@
   },
   "devDependencies": {
     "@ardrive/turbo-sdk": "^1.19.1",
-    "@permaweb/ao-loader": "^0.0.36",
-    "@permaweb/aoconnect": "^0.0.59",
+    "@permaweb/ao-loader": "^0.0.43",
+    "@permaweb/aoconnect": "^0.0.62",
     "@types/chai": "^4.3.19",
     "@types/consul": "^0.40.3",
     "@types/mocha": "^10.0.7",

@@ -23,5 +23,10 @@ return {
   RegistrationCreditDoesNotExist = 'Registration Credit does not exist',
   FamiliesRequiredAsMessageData = 'Families required as Message Data',
   InvalidFamilies = 'Invalid Families',
-  FamilyNotSet = 'Family not set'
+  FamilyNotSet = 'Family not set',
+  AlreadyInitialized = 'Already Initialized',
+  InvalidBlockedOperatorAddressesValue =
+    'Invalid BlockedOperatorAddresses value',
+  InvalidVerifiedHardwareValue = 'Invalid VerifiedHardware value',
+  InvalidInitializedValue = 'Invalid _initialized value'
 }
