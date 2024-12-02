@@ -30,7 +30,7 @@ local RelayRewards = {
   },
   PreviousRound = {
     Timestamp = 0,
-    Length = 0,
+    Period = 0,
     Summary = {
       Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0
     },
@@ -38,9 +38,9 @@ local RelayRewards = {
     Details = {
 -- [Fingerprint] = { 
 --   Address = ''
---   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 1, LocationSize = 0 }
---   Rating = { Network, Hardware, Uptime, ExitBonus }
---   Configuration = { Family = {}, Location = {}, Uptime = {} }
+--   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 }
+--   Variables = { FamilyMultiplier = 0, LocationMultiplier = 0 }
+--   Rating = { Network = 0, Uptime = 0, ExitBonus = 0 }
 --   Reward = {
 --     Total = 0, OperatorTotal = 0, DelegateTotal = 0,
 --     Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 
