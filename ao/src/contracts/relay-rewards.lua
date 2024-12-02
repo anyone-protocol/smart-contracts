@@ -623,7 +623,7 @@ function RelayRewards.init()
 
       ao.send({
         Target = msg.From,
-        Action = 'Last-Round-Metadata',
+        Action = 'Last-Round-Metadata-Response',
         Data = encoded
       })
     end
@@ -648,7 +648,24 @@ function RelayRewards.init()
 
       ao.send({
         Target = msg.From,
-        Action = 'Last-Round-Data',
+        Action = 'Last-Round-Data-Response',
+        Data = encoded
+      })
+    end
+  )
+
+  Handlers.add(
+    'Last-Snapshot',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Last-Snapshot'
+    ),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      local encoded = json.encode(RelayRewards.PreviousRound)
+      ao.send({
+        Target = msg.From,
+        Action = 'Last-Snapshot-Response',
         Data = encoded
       })
     end

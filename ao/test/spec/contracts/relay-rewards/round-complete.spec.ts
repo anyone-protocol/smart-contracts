@@ -232,6 +232,19 @@ describe('Round Completion of relay rewards', () => {
     expect(metadata.Summary.Ratings.Network).to.equal(100)
     expect(metadata.Summary.Rewards.Total).to.equal(123)
     expect(metadata.Summary.Rewards.Network).to.equal(123)
+
+    
+    const snapshotResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Last-Snapshot' }
+      ]
+    })
+    
+    expect(roundMetadataResult.Messages).to.have.lengthOf(1)
+    const snapshot = JSON.parse(snapshotResult.Messages[0].Data)
+    expect(snapshot.Timestamp).to.equal(2000)
+    expect(Object.keys(snapshot.Details).length).to.equal(2)
   })
 
 })
