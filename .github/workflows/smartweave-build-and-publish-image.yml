@@ -3,7 +3,7 @@ name: Build & Publish Smartweave Image
 on:
   push:
     tags:
-      - v*
+      - s*
 env:
   IMAGE_NAME: smart-contracts
 
