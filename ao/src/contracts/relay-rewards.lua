@@ -9,7 +9,7 @@ local RelayRewards = {
   Configuration = {
     TokensPerSecond = 28935184200000000,
     Modifiers = {
-      Network = { Share = 0.56 },
+      Network = { Share = 1 },
       Hardware = { Enabled = false, Share = 0.2, UptimeInfluence = 0.35 },
       Uptime = { Enabled = false, Share = 0.14,
         Tiers = {
@@ -24,7 +24,7 @@ local RelayRewards = {
       Family = { Enabled = false, Offset = 0.01, Power = 1 },
       Location = { Enabled = false, Offset = 0.003, Power = 2 }
     },
-    Delegates = { 
+    Delegates = {
 --      [Address] = { Address: '', Share = 0 }
     }
   },
