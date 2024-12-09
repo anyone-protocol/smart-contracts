@@ -587,7 +587,7 @@ function RelayRewards.init()
       'Get-Rewards'
     ),
     function (msg)
-      local address = AnyoneUtils.normalizeEvmAddress(msg.From)
+      local address = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
       AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
       local result = '0'
       
