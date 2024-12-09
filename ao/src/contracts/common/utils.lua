@@ -92,7 +92,7 @@ local function initUtils()
         return bigIntFix({
           Low = low, High = high
         })
-      else 
+      else
         return bigIntFix({
           Low = low, High = 0
         })

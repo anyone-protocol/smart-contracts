@@ -1,4 +1,6 @@
 local RelayRewards = {
+  _initialized = false,
+
   TotalAddressReward = {
 -- [Address] = { High: 0, Low: 0 }
   },
@@ -64,6 +66,122 @@ local RelayRewards = {
   }
 }
 
+function RelayRewards._updateConfiguration(config, request)
+  local ErrorMessages = require('.common.errors')
+  local AnyoneUtils = require('.common.utils')
+
+  if request.TokensPerSecond then
+    AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
+    assert(request.TokensPerSecond >= 0, 'TokensPerSecond has to be >= 0')
+    config.TokensPerSecond = request.TokensPerSecond
+  end
+  if request.Modifiers then
+    if request.Modifiers.Network then
+      AnyoneUtils.assertNumber(request.Modifiers.Network.Share, 'Modifiers.Network.Share')
+      assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share has to be >= 0')
+      assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share has to be <= 1')
+      config.Modifiers.Network.Share = request.Modifiers.Network.Share
+    end
+    if request.Modifiers.Hardware then
+      assert(type(request.Modifiers.Hardware.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Hardware.Enabled')
+      AnyoneUtils.assertNumber(request.Modifiers.Hardware.Share, 'Modifiers.Hardware.Share')
+      assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share has to be >= 0')
+      assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share has to be <= 1')
+      config.Modifiers.Hardware.Enabled = request.Modifiers.Hardware.Enabled
+      config.Modifiers.Hardware.Share = request.Modifiers.Hardware.Share
+      if request.Modifiers.Hardware.UptimeInfluence then
+        AnyoneUtils.assertNumber(request.Modifiers.Hardware.UptimeInfluence, 'Modifiers.Hardware.UptimeInfluence')
+        assert(request.Modifiers.Hardware.UptimeInfluence >= 0, 'Modifiers.Hardware.UptimeInfluence has to be >= 0')
+        assert(request.Modifiers.Hardware.UptimeInfluence <= 1, 'Modifiers.Hardware.UptimeInfluence has to be <= 1')
+        config.Modifiers.Hardware.UptimeInfluence = request.Modifiers.Hardware.UptimeInfluence
+      end
+    end
+    if request.Modifiers.Uptime then
+      assert(type(request.Modifiers.Uptime.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Uptime.Enabled')
+      AnyoneUtils.assertNumber(request.Modifiers.Uptime.Share, 'Modifiers.Uptime.Share')
+      assert(request.Modifiers.Uptime.Share >= 0, 'Modifiers.Uptime.Share has to be >= 0')
+      assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share has to be <= 1')
+      config.Modifiers.Uptime.Enabled = request.Modifiers.Uptime.Enabled
+      config.Modifiers.Uptime.Share = request.Modifiers.Uptime.Share
+
+      if request.Modifiers.Uptime.Tiers then
+        assert(type(request.Modifiers.Uptime.Tiers) == 'table', 'Table type required for Modifiers.Uptime.Tiers')
+        local tierCount = 0
+        for days, weight in pairs(request.Modifiers.Uptime.Tiers) do
+          local daysInt = tonumber(days)
+          AnyoneUtils.assertInteger(daysInt, 'Modifiers.Uptime.Tiers days')
+          assert(daysInt >= 0, 'Modifiers.Uptime.Tiers days has to be >= 0')
+          local weightFloat = tonumber(weight)
+          AnyoneUtils.assertNumber(weightFloat, 'Modifiers.Uptime.Tiers weight')
+          assert(weightFloat >= 0, 'Modifiers.Uptime.Tiers Value has to be >= 0')
+          assert(tierCount < 42, 'Too many Modifiers.Uptime.Tiers')
+          tierCount = tierCount + 1
+        end
+        config.Modifiers.Uptime.Tiers = request.Modifiers.Uptime.Tiers
+      end
+    end
+    if request.Modifiers.ExitBonus then
+      assert(type(request.Modifiers.ExitBonus.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.ExitBonus.Enabled')
+      AnyoneUtils.assertNumber(request.Modifiers.ExitBonus.Share, 'Modifiers.ExitBonus.Share')
+      assert(request.Modifiers.ExitBonus.Share >= 0, 'Modifiers.ExitBonus.Share has to be >= 0')
+      assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share has to be <= 1')
+      config.Modifiers.ExitBonus.Enabled = request.Modifiers.ExitBonus.Enabled
+      config.Modifiers.ExitBonus.Share = request.Modifiers.ExitBonus.Share
+    end
+    local totalEffectiveShare = config.Modifiers.Network.Share
+    if config.Modifiers.Hardware.Enabled then
+      totalEffectiveShare = totalEffectiveShare + config.Modifiers.Hardware.Share
+    end
+    if config.Modifiers.Uptime.Enabled then
+      totalEffectiveShare = totalEffectiveShare + config.Modifiers.Uptime.Share
+    end
+    if config.Modifiers.ExitBonus.Enabled then
+      totalEffectiveShare = totalEffectiveShare + config.Modifiers.ExitBonus.Share
+    end
+    assert(totalEffectiveShare == 1, 'Sum of shares for enabled modifiers has to equal 1')
+  end
+  if request.Multipliers then
+    if request.Multipliers.Family then
+      assert(type(request.Multipliers.Family.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Family.Enabled')
+      AnyoneUtils.assertNumber(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
+      assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset has to be >= 0')
+      assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset has to be <= 1')
+      AnyoneUtils.assertNumber(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
+      assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power has to be >= 0')
+      config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
+      config.Multipliers.Family.Offset = request.Multipliers.Family.Offset
+      config.Multipliers.Family.Power = request.Multipliers.Family.Power
+    end
+    if request.Multipliers.Location then
+      assert(type(request.Multipliers.Location.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Location.Enabled')
+      AnyoneUtils.assertNumber(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
+      assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset has to be >= 0')
+      assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset has to be <= 1')
+      AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
+      assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power has to be >= 0')
+      config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
+      config.Multipliers.Location.Offset = request.Multipliers.Location.Offset
+      config.Multipliers.Location.Power = request.Multipliers.Location.Power
+    end
+  end
+  if request.Delegates then
+    assert(type(request.Delegates) == 'table', 'Delegates have to be a table')
+    local normalizedDelegates = {}
+    for operatorAddress, delegation in pairs(request.Delegates) do
+      AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
+      AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address for '.. operatorAddress)
+      AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
+      assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share has to be >= 0')
+      assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share has to be <= 1')
+      local normalizedOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+      normalizedDelegates[normalizedOperatorAddress] = delegation
+    end
+    config.Delegates = normalizedDelegates
+  end
+
+  RelayRewards.Configuration = config
+end
+
 function RelayRewards.init()
   local json = require("json")
 
@@ -92,116 +210,7 @@ function RelayRewards.init()
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
       
-      if request.TokensPerSecond then
-        AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
-        assert(request.TokensPerSecond >= 0, 'TokensPerSecond has to be >= 0')
-        config.TokensPerSecond = request.TokensPerSecond
-      end
-      if request.Modifiers then
-        if request.Modifiers.Network then
-          AnyoneUtils.assertNumber(request.Modifiers.Network.Share, 'Modifiers.Network.Share')
-          assert(request.Modifiers.Network.Share >= 0, 'Modifiers.Network.Share has to be >= 0')
-          assert(request.Modifiers.Network.Share <= 1, 'Modifiers.Network.Share has to be <= 1')
-          config.Modifiers.Network.Share = request.Modifiers.Network.Share
-        end
-        if request.Modifiers.Hardware then
-          assert(type(request.Modifiers.Hardware.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Hardware.Enabled')
-          AnyoneUtils.assertNumber(request.Modifiers.Hardware.Share, 'Modifiers.Hardware.Share')
-          assert(request.Modifiers.Hardware.Share >= 0, 'Modifiers.Hardware.Share has to be >= 0')
-          assert(request.Modifiers.Hardware.Share <= 1, 'Modifiers.Hardware.Share has to be <= 1')
-          config.Modifiers.Hardware.Enabled = request.Modifiers.Hardware.Enabled
-          config.Modifiers.Hardware.Share = request.Modifiers.Hardware.Share
-          if request.Modifiers.Hardware.UptimeInfluence then
-            AnyoneUtils.assertNumber(request.Modifiers.Hardware.UptimeInfluence, 'Modifiers.Hardware.UptimeInfluence')
-            assert(request.Modifiers.Hardware.UptimeInfluence >= 0, 'Modifiers.Hardware.UptimeInfluence has to be >= 0')
-            assert(request.Modifiers.Hardware.UptimeInfluence <= 1, 'Modifiers.Hardware.UptimeInfluence has to be <= 1')
-            config.Modifiers.Hardware.UptimeInfluence = request.Modifiers.Hardware.UptimeInfluence
-          end
-        end
-        if request.Modifiers.Uptime then
-          assert(type(request.Modifiers.Uptime.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.Uptime.Enabled')
-          AnyoneUtils.assertNumber(request.Modifiers.Uptime.Share, 'Modifiers.Uptime.Share')
-          assert(request.Modifiers.Uptime.Share >= 0, 'Modifiers.Uptime.Share has to be >= 0')
-          assert(request.Modifiers.Uptime.Share <= 1, 'Modifiers.Uptime.Share has to be <= 1')
-          config.Modifiers.Uptime.Enabled = request.Modifiers.Uptime.Enabled
-          config.Modifiers.Uptime.Share = request.Modifiers.Uptime.Share
-
-          if request.Modifiers.Uptime.Tiers then
-            assert(type(request.Modifiers.Uptime.Tiers) == 'table', 'Table type required for Modifiers.Uptime.Tiers')
-            local tierCount = 0
-            for days, weight in pairs(request.Modifiers.Uptime.Tiers) do
-              local daysInt = tonumber(days)
-              AnyoneUtils.assertInteger(daysInt, 'Modifiers.Uptime.Tiers days')
-              assert(daysInt >= 0, 'Modifiers.Uptime.Tiers days has to be >= 0')
-              local weightFloat = tonumber(weight)
-              AnyoneUtils.assertNumber(weightFloat, 'Modifiers.Uptime.Tiers weight')
-              assert(weightFloat >= 0, 'Modifiers.Uptime.Tiers Value has to be >= 0')
-              assert(tierCount < 42, 'Too many Modifiers.Uptime.Tiers')
-              tierCount = tierCount + 1
-            end
-            config.Modifiers.Uptime.Tiers = request.Modifiers.Uptime.Tiers
-          end
-        end
-        if request.Modifiers.ExitBonus then
-          assert(type(request.Modifiers.ExitBonus.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Modifiers.ExitBonus.Enabled')
-          AnyoneUtils.assertNumber(request.Modifiers.ExitBonus.Share, 'Modifiers.ExitBonus.Share')
-          assert(request.Modifiers.ExitBonus.Share >= 0, 'Modifiers.ExitBonus.Share has to be >= 0')
-          assert(request.Modifiers.ExitBonus.Share <= 1, 'Modifiers.ExitBonus.Share has to be <= 1')
-          config.Modifiers.ExitBonus.Enabled = request.Modifiers.ExitBonus.Enabled
-          config.Modifiers.ExitBonus.Share = request.Modifiers.ExitBonus.Share
-        end
-        local totalEffectiveShare = config.Modifiers.Network.Share
-        if config.Modifiers.Hardware.Enabled then
-          totalEffectiveShare = totalEffectiveShare + config.Modifiers.Hardware.Share
-        end
-        if config.Modifiers.Uptime.Enabled then
-          totalEffectiveShare = totalEffectiveShare + config.Modifiers.Uptime.Share
-        end
-        if config.Modifiers.ExitBonus.Enabled then
-          totalEffectiveShare = totalEffectiveShare + config.Modifiers.ExitBonus.Share
-        end
-        assert(totalEffectiveShare == 1, 'Sum of shares for enabled modifiers has to equal 1')
-      end
-      if request.Multipliers then
-        if request.Multipliers.Family then
-          assert(type(request.Multipliers.Family.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Family.Enabled')
-          AnyoneUtils.assertNumber(request.Multipliers.Family.Offset, 'Multipliers.Family.Offset')
-          assert(request.Multipliers.Family.Offset >= 0, 'Multipliers.Family.Offset has to be >= 0')
-          assert(request.Multipliers.Family.Offset <= 1, 'Multipliers.Family.Offset has to be <= 1')
-          AnyoneUtils.assertNumber(request.Multipliers.Family.Power, 'Multipliers.Family.Power')
-          assert(request.Multipliers.Family.Power >= 0, 'Multipliers.Family.Power has to be >= 0')
-          config.Multipliers.Family.Enabled = request.Multipliers.Family.Enabled
-          config.Multipliers.Family.Offset = request.Multipliers.Family.Offset
-          config.Multipliers.Family.Power = request.Multipliers.Family.Power
-        end
-        if request.Multipliers.Location then
-          assert(type(request.Multipliers.Location.Enabled) == 'boolean', ErrorMessages.BooleanValueRequired .. ' for Multipliers.Location.Enabled')
-          AnyoneUtils.assertNumber(request.Multipliers.Location.Offset, 'Multipliers.Location.Offset')
-          assert(request.Multipliers.Location.Offset >= 0, 'Multipliers.Location.Offset has to be >= 0')
-          assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset has to be <= 1')
-          AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
-          assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power has to be >= 0')
-          config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
-          config.Multipliers.Location.Offset = request.Multipliers.Location.Offset
-          config.Multipliers.Location.Power = request.Multipliers.Location.Power
-        end
-      end
-      if request.Delegates then
-        assert(type(request.Delegates) == 'table', 'Delegates have to be a table')
-        local normalizedDelegates = {}
-        for operatorAddress, delegation in pairs(request.Delegates) do
-          AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid operator address')
-          AnyoneUtils.assertValidEvmAddress(delegation.Address, 'Invalid delegated address for '.. operatorAddress)
-          AnyoneUtils.assertNumber(delegation.Share, 'Delegates['.. operatorAddress .. '].Share')
-          assert(delegation.Share >= 0, 'Delegates['.. operatorAddress .. '].Share has to be >= 0')
-          assert(delegation.Share <= 1, 'Delegates['.. operatorAddress .. '].Share has to be <= 1')
-          local normalizedOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
-          normalizedDelegates[normalizedOperatorAddress] = delegation
-        end
-        config.Delegates = normalizedDelegates
-      end
-
-      RelayRewards.Configuration = config
+      RelayRewards._updateConfiguration(config, request)
 
       ao.send({
         Target = msg.From,
@@ -667,6 +676,50 @@ function RelayRewards.init()
         Target = msg.From,
         Action = 'Last-Snapshot-Response',
         Data = encoded
+      })
+    end
+  )
+
+  Handlers.add(
+    'Init',
+    Handlers.utils.hasMatchingTag('Action', 'Init'),
+    function (msg)
+      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      assert(
+        RelayRewards._initialized == false,
+        ErrorMessages.AlreadyInitialized
+      )
+
+      local initState = json.decode(msg.Data or '{}')
+
+      if initState.Claimable then
+        for address, claimable in pairs(initState.Claimable) do
+          AnyoneUtils.assertValidEvmAddress(address)
+          local normalizedAddress = AnyoneUtils.normalizeEvmAddress(address)
+          local claimableNumber = tonumber(claimable)
+          assert(
+            type(claimableNumber) == 'number',
+            'Claimable value must be a number'
+          )
+          assert(claimableNumber > 0, 'Claimable value must be positive')
+          RelayRewards
+            .TotalAddressReward[normalizedAddress] = AnyoneUtils.bigInt(
+              claimableNumber
+            )
+        end
+      end
+
+      if initState.Configuration then
+        local config = RelayRewards.Configuration
+        RelayRewards._updateConfiguration(config, initState.Configuration)
+      end
+
+      RelayRewards._initialized = true
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Init-Response',
+        Data = 'OK'
       })
     end
   )
