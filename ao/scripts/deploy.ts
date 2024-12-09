@@ -23,6 +23,8 @@ const messagingUnitAddress = process.env.MESSAGING_UNIT_ADDRESS
 const aosModuleId = process.env.AOS_MODULE_ID
   || 'cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk'
 const consulToken = process.env.CONSUL_TOKEN || 'no-token'
+const callInitHandler = process.env.CALL_INIT_HANDLER === 'true'
+const initData = process.env.INIT_DATA
 
 if (!contractName) {
   throw new Error('CONTRACT_NAME is not set!')
@@ -94,6 +96,31 @@ async function deploy() {
   })
 
   console.log(`Process Published and Evaluated at: ${processId}`)
+
+  if (callInitHandler) {
+    console.log('Initializing with INIT action')
+    
+    if (!initData) {
+      console.error('INIT_DATA is not present, could not initialize')
+    } else {
+      console.log('Sleeping 10s to allow EVAL action to settle')
+      await new Promise(resolve => setTimeout(resolve, 10_000))
+      const { messageId, result } = await sendAosMessage({
+        processId,
+        data: initData,
+        signer: ethereumDataItemSigner as any,
+        tags: [{ name: 'Action', value: 'Init' }]
+      })
+
+      if (result.Error) {
+        console.error('Init Action resulted in an error', result.Error)
+      } else {
+        console.log(`Init Action successful with message id ${messageId}`)
+      }
+    }
+  } else {
+    console.log('CALL_INIT_HANDLER is not set to "true", skipping INIT')
+  }
 
   if (process.env.PHASE && process.env.CONSUL_IP) {
     console.log(
