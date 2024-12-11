@@ -635,7 +635,7 @@ function RelayRewards.init()
       'Action',
       'Last-Round-Data'
     ),
-    function (msg)      
+    function (msg)
       local fingerprint = msg.Tags['Fingerprint']
       AnyoneUtils.assertValidFingerprint(fingerprint, 'Fingerprint tag')
       assert(RelayRewards.PreviousRound.Details[fingerprint], 'Fingerprint not found in round')
@@ -661,7 +661,6 @@ function RelayRewards.init()
       'Last-Snapshot'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
       local encoded = json.encode(RelayRewards.PreviousRound)
       ao.send({
         Target = msg.From,
