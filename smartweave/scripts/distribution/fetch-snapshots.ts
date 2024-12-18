@@ -7,7 +7,8 @@ import BigNumber from 'bignumber.js'
 BigNumber.config({ EXPONENTIAL_AT: 50 })
 
 async function fetchSnapshots() {
-  const from = new Date('Nov 13 2024 12:00:00 PM').getTime()
+  const from = new Date('Nov 26 2024 07:19:07 PM (GMT-5)').getTime()
+  // const from = new Date('Nov 13 2024 12:00:00 PM').getTime()
   // const from = 1731242011000
   // const to = 1731242011000
   const to = Date.now()
@@ -56,11 +57,11 @@ async function fetchSnapshots() {
   } of mapped) {
     if (BigNumber(totalDistributed).lt(0)) {
       console.warn(
-        `[${current}/${mapped.length}] Skipping bad snapshot ${result.id}`
+        `${logSnapshotIndex(current, mapped.length)} Skipping bad snapshot ${result.id}`
       )
     } else {
       console.log(
-        `[${current}/${mapped.length}] Fetching snapshot` +
+        `${logSnapshotIndex(current, mapped.length)} Fetching snapshot` +
           ` ${result.id} - ${irysTimestamp} - ${tagTimestamp},` +
           ` Epoch = ${new Date(tagTimestamp).toUTCString()},` +
           ` Elapsed = ${timeElapsed}, Distributed = ${totalDistributed}`
@@ -70,13 +71,13 @@ async function fetchSnapshots() {
         { transformResponse: res => res }
       )
       console.log(
-        `[${current}/${mapped.length}] Got snapshot ${result.id}, saving to disk`
+        `${logSnapshotIndex(current, mapped.length)} Got snapshot ${result.id}, saving to disk`
       )
       fs.writeFileSync(
         `./scripts/distribution/snapshots/${tagTimestamp}-${result.id}.json`,
         response.data
       )
-      console.log(`[${current}/${mapped.length}] Saved snapshot ${result.id}`)
+      console.log(`${logSnapshotIndex(current, mapped.length)} Saved snapshot ${result.id}`)
     }
 
     current++
@@ -89,3 +90,7 @@ fetchSnapshots().catch(err => {
   console.error(err)
   process.exit(1)
 })
+
+function logSnapshotIndex(current: number, total: number) {
+  return `[${current.toString().padStart(total.toString().length, '0')}/${total}]`
+}
