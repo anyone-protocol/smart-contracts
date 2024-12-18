@@ -4,7 +4,7 @@ import fs from 'fs'
 import { bundle } from './lua-bundler'
 
 async function main() {
-  const contractNames = [ 'operator-registry', 'relay-rewards' ]
+  const contractNames = [ 'operator-registry', 'relay-rewards', 'acl-test' ]
 
   console.log(
     `Bundling ${contractNames.length} contracts: ${contractNames.join(',')}`

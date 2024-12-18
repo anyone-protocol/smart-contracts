@@ -56,7 +56,7 @@ export const EXAMPLE_RSA_IDENTITY_PUBLIC_KEY = crypto
 
 export const EXAMPLE_FINGERPRINT = crypto
   .createHash('sha1')
-  .update(EXAMPLE_RSA_IDENTITY_PUBLIC_KEY)
+  .update(EXAMPLE_RSA_IDENTITY_PUBLIC_KEY as any)
   .digest()
 
 // const okcc = Buffer.concat([
@@ -111,7 +111,11 @@ export const DEFAULT_HANDLE_OPTIONS = {
   From: ''
 }
 
-const contractNames = [ 'operator-registry', 'relay-rewards' ]
+const contractNames = [
+  'operator-registry',
+  'relay-rewards',
+  'acl-test'
+]
 const bundledContractSources = Object.fromEntries(contractNames.map(cn => [
   cn,
   fs.readFileSync(path.join(path.resolve(), `./dist/${cn}.lua`), 'utf-8')
@@ -128,7 +132,10 @@ export type AOTestHandle = (
   mem?: ArrayBuffer | null
 ) => Promise<AoLoader.HandleResponse & { Error?: string }>
 
-export async function createLoader(contractName: string) {
+export async function createLoader(
+  contractName: string,
+  contractSource?: string
+) {
   const originalHandle = await AoLoader(AOS_WASM, {
     format: 'wasm64-unknown-emscripten-draft_2024_02_15',
     memoryLimit: '524288000', // in bytes
@@ -136,7 +143,7 @@ export async function createLoader(contractName: string) {
     extensions: []
   })
 
-  if (!bundledContractSources[contractName]) {
+  if (!bundledContractSources[contractName] && !contractSource) {
     throw new Error(`Unknown contract: ${contractName}`)
   }
 
@@ -144,7 +151,7 @@ export async function createLoader(contractName: string) {
     {
       action: 'Eval',
       args: [{ name: 'Module', value: DEFAULT_MODULE_ID }],
-      Data: bundledContractSources[contractName]
+      Data: contractSource || bundledContractSources[contractName]
     }
   ]
   let memory: ArrayBuffer | null = null
