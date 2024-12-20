@@ -237,7 +237,7 @@ describe('Operator Registry', () => {
 
       expect(result.Error)
         .to.be.a('string')
-        .that.includes('This method is only available to the Owner')
+        .that.includes('Permission Denied')
     })
   })
 
@@ -448,7 +448,7 @@ describe('Operator Registry', () => {
 
       expect(result.Error)
         .to.be.a('string')
-        .that.includes('This method is only available to the Owner')
+        .that.includes('Permission Denied')
     })
 
     it('Rejects removing of unknown Fingerprints', async () => {
@@ -522,7 +522,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it(
@@ -652,7 +652,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it(
@@ -830,7 +830,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Requires RC when submitting Fingerprint Certificates', async () => {
@@ -1072,7 +1072,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Requires RC when submitting Fingerprint Certificates', async () => {
@@ -1219,7 +1219,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Does not require Registration Credits for VH', async () => {
@@ -1352,7 +1352,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Requires Registration Credits if removed VH', async () => {
@@ -1567,7 +1567,7 @@ describe('Operator Registry', () => {
 
       expect(result.Error)
         .to.be.a('string')
-        .that.includes('This method is only available to the Owner')
+        .that.includes('Permission Denied')
     })
 
     it('Allows empty state initialization', async () => {
@@ -1755,6 +1755,12 @@ describe('Operator Registry', () => {
       expect(secondInitResult.Error)
         .to.be.a('string')
         .that.includes('Already Initialized')
+    })
+  })
+
+  describe('ACL', async () => {
+    describe('Enforcing Roles', () => {
+      it('todo -> enforcing roles tests')
     })
   })
 })
