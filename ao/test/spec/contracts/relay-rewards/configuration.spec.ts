@@ -23,7 +23,7 @@ describe('Update-Configuration action of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ]
     })
-    expect(result.Error).to.be.a('string').that.includes('This method is only available to the Owner')
+    expect(result.Error).to.be.a('string').that.includes('Permission Denied')
   })
 
   it('Requires message data to be JSON', async () => {

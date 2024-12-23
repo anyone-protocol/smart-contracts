@@ -1567,7 +1567,7 @@ describe('Operator Registry', () => {
 
       expect(result.Error)
         .to.be.a('string')
-        .that.includes('Permission Denied')
+        .that.includes('This method is only available to the Owner')
     })
 
     it('Allows empty state initialization', async () => {
