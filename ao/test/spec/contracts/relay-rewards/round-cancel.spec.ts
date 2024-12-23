@@ -22,7 +22,7 @@ describe('Cancel-Round action of relay rewards', () => {
           { name: 'Action', value: 'Cancel-Round' }
       ]
     })
-    expect(result.Error).to.be.a('string').that.includes('This method is only available to the Owner')
+    expect(result.Error).to.be.a('string').that.includes('Permission Denied')
   })
 
   it('Ensure provided timestamp is integer', async () => {

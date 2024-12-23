@@ -187,6 +187,7 @@ function RelayRewards.init()
 
   local ErrorMessages = require('.common.errors')
   local AnyoneUtils = require('.common.utils')
+  local ACL = require('.common.acl')
 
   Handlers.add(
     'Update-Configuration',
@@ -195,7 +196,11 @@ function RelayRewards.init()
       'Update-Configuration'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Update-Configuration' }
+      )
+
       assert(msg.Data, ErrorMessages.MessageDataRequired)
 
       local config = RelayRewards.Configuration
@@ -227,7 +232,11 @@ function RelayRewards.init()
       'Add-Scores'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Add-Scores' }
+      )
+
       assert(msg.Data, ErrorMessages.MessageDataRequired)
       
       local request = nil
@@ -304,7 +313,10 @@ function RelayRewards.init()
       'Complete-Round'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Complete-Round' }
+      )
       
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
@@ -513,7 +525,11 @@ function RelayRewards.init()
       'Cancel-Round'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Cancel-Round' }
+      )
+
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       if timestamp then
@@ -675,6 +691,34 @@ function RelayRewards.init()
         Target = msg.From,
         Action = 'Last-Snapshot-Response',
         Data = encoded
+      })
+    end
+  )
+
+  Handlers.add(
+    'Update-Roles',
+    Handlers.utils.hasMatchingTag('Action', 'Update-Roles'),
+    function (msg)
+      ACL.assertHasOneOfRole(msg.From, { 'owner', 'admin', 'Update-Roles' })
+
+      ACL.updateRoles(json.decode(msg.Data))
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Update-Roles-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'View-Roles',
+    Handlers.utils.hasMatchingTag('Action', 'View-Roles'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'View-Roles-Response',
+        Data = json.encode(ACL.State)
       })
     end
   )
