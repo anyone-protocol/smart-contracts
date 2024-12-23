@@ -196,7 +196,11 @@ function RelayRewards.init()
       'Update-Configuration'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Update-Configuration' }
+      )
+
       assert(msg.Data, ErrorMessages.MessageDataRequired)
 
       local config = RelayRewards.Configuration
@@ -228,7 +232,11 @@ function RelayRewards.init()
       'Add-Scores'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Add-Scores' }
+      )
+
       assert(msg.Data, ErrorMessages.MessageDataRequired)
       
       local request = nil
@@ -305,7 +313,10 @@ function RelayRewards.init()
       'Complete-Round'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Complete-Round' }
+      )
       
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
@@ -514,7 +525,11 @@ function RelayRewards.init()
       'Cancel-Round'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Cancel-Round' }
+      )
+
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       if timestamp then
