@@ -30,6 +30,7 @@ function OperatorRegistry.init()
 
   local ErrorMessages = require('.common.errors')
   local AnyoneUtils = require('.common.utils')
+  local ACL = require('.common.acl')
 
   Handlers.add(
     'Admin-Submit-Operator-Certificates',
@@ -38,7 +39,11 @@ function OperatorRegistry.init()
       'Admin-Submit-Operator-Certificates'
     ),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Admin-Submit-Operator-Certificates' }
+      )
+
       assert(msg.Data, ErrorMessages.OperatorCertificatesRequired)
       local certs = json.decode(msg.Data)
 
@@ -176,7 +181,10 @@ function OperatorRegistry.init()
     'Remove-Fingerprint-Certificate',
     Handlers.utils.hasMatchingTag('Action', 'Remove-Fingerprint-Certificate'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Remove-Fingerprint-Certificate' }
+      )
 
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
@@ -200,7 +208,10 @@ function OperatorRegistry.init()
     'Block-Operator-Address',
     Handlers.utils.hasMatchingTag('Action', 'Block-Operator-Address'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Block-Operator-Address' }
+      )
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
@@ -232,7 +243,10 @@ function OperatorRegistry.init()
     'Unblock-Operator-Address',
     Handlers.utils.hasMatchingTag('Action', 'Unblock-Operator-Address'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Unblock-Operator-Address' }
+      )
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
@@ -257,7 +271,10 @@ function OperatorRegistry.init()
     'Add-Registration-Credit',
     Handlers.utils.hasMatchingTag('Action', 'Add-Registration-Credit'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Add-Registration-Credit' }
+      )
 
       assert(type(msg.Tags['Address']) == 'string', ErrorMessages.AddressRequired)
       AnyoneUtils.assertValidEvmAddress(msg.Tags['Address'])
@@ -304,7 +321,10 @@ function OperatorRegistry.init()
     'Remove-Registration-Credit',
     Handlers.utils.hasMatchingTag('Action', 'Remove-Registration-Credit'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Remove-Registration-Credit' }
+      )
 
       local address = msg.Tags['Address']
       assert(type(address) == 'string', ErrorMessages.AddressRequired)
@@ -336,7 +356,10 @@ function OperatorRegistry.init()
     'Add-Verified-Hardware',
     Handlers.utils.hasMatchingTag('Action', 'Add-Verified-Hardware'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Add-Verified-Hardware' }
+      )
 
       local fingerprints = msg.Data
       assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
@@ -369,7 +392,10 @@ function OperatorRegistry.init()
     'Remove-Verified-Hardware',
     Handlers.utils.hasMatchingTag('Action', 'Remove-Verified-Hardware'),
     function (msg)
-      assert(msg.From == ao.env.Process.Owner, ErrorMessages.OnlyOwner)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Remove-Verified-Hardware' }
+      )
 
       local fingerprints = msg.Data
       assert(type(fingerprints) == 'string', ErrorMessages.FingerprintsRequired)
@@ -388,6 +414,34 @@ function OperatorRegistry.init()
         Target = msg.From,
         Action = 'Remove-Verified-Hardware-Response',
         Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'Update-Roles',
+    Handlers.utils.hasMatchingTag('Action', 'Update-Roles'),
+    function (msg)
+      ACL.assertHasOneOfRole(msg.From, { 'owner', 'admin', 'Update-Roles' })
+
+      ACL.updateRoles(json.decode(msg.Data))
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Update-Roles-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
+    'View-Roles',
+    Handlers.utils.hasMatchingTag('Action', 'View-Roles'),
+    function (msg)
+      ao.send({
+        Target = msg.From,
+        Action = 'View-Roles-Response',
+        Data = json.encode(ACL.State)
       })
     end
   )

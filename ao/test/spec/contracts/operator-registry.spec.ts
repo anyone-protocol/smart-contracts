@@ -94,8 +94,8 @@ describe('Operator Registry', () => {
     handle = (await createLoader('operator-registry')).handle
   })
 
-  describe('Admin Submit Operator Certificates', () => {
-    it('Accepts Operator Certificates from Admin', async () => {
+  describe('Submitting Operator Certificates', () => {
+    it('Accepts Operator Certificates from Owner', async () => {
       const certs = [
         { f: FINGERPRINT_A, a: ALICE_ADDRESS },
         { f: FINGERPRINT_B, a: BOB_ADDRESS },
@@ -115,7 +115,7 @@ describe('Operator Registry', () => {
       expect(result.Messages[0].Data).to.equal('OK')
     })
 
-    it('Lists Operator Certificates submitted by Admin', async () => {
+    it('Lists Operator Certificates submitted by Owner', async () => {
       const certs = [
         { f: FINGERPRINT_A, a: ALICE_ADDRESS },
         { f: FINGERPRINT_B, a: BOB_ADDRESS },
@@ -191,7 +191,7 @@ describe('Operator Registry', () => {
       })
     })
 
-    it('Validates Operator Certificates from Admin', async () => {
+    it('Validates Operator Certificates from Owner', async () => {
       const missingCertsResult = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Admin-Submit-Operator-Certificates' }]
@@ -228,7 +228,7 @@ describe('Operator Registry', () => {
         .that.includes('Invalid Address')
     })
 
-    it('Rejects Operator Certificates from non-Admin', async () => {
+    it('Rejects Operator Certificates from non-Owner', async () => {
       const result = await handle({
         From: ALICE_ADDRESS,
         Tags: [{ name: 'Action', value: 'Admin-Submit-Operator-Certificates' }],
@@ -237,7 +237,7 @@ describe('Operator Registry', () => {
 
       expect(result.Error)
         .to.be.a('string')
-        .that.includes('This method is only available to the Owner')
+        .that.includes('Permission Denied')
     })
   })
 
@@ -388,8 +388,8 @@ describe('Operator Registry', () => {
     })
   })
 
-  describe('Admin Removing Fingerprint Certificates', () => {
-    it('Allows Admin to remove Fingerprint Certificates', async () => {
+  describe('Removing Fingerprint Certificates', () => {
+    it('Allows Owner to remove Fingerprint Certificates', async () => {
       await setupFingerprintCertificates(handle)
 
       const result = await handle({
@@ -432,7 +432,7 @@ describe('Operator Registry', () => {
         .that.includes('Fingerprint required')
     })
 
-    it('Rejects removing from non-Admin', async () => {
+    it('Rejects removing from non-Owner', async () => {
       await setupFingerprintCertificates(handle)
 
       const result = await handle({
@@ -448,7 +448,7 @@ describe('Operator Registry', () => {
 
       expect(result.Error)
         .to.be.a('string')
-        .that.includes('This method is only available to the Owner')
+        .that.includes('Permission Denied')
     })
 
     it('Rejects removing of unknown Fingerprints', async () => {
@@ -471,7 +471,7 @@ describe('Operator Registry', () => {
 
   describe('Blocking Operator Addresses', () => {
     describe('Blocking', () => {
-      it('Allows Admin to block addresses', async () => {
+      it('Allows Owner to block addresses', async () => {
         const result = await handle({
           From: OWNER_ADDRESS,
           Tags: [
@@ -511,7 +511,7 @@ describe('Operator Registry', () => {
           .that.includes('Invalid Address')
       })
 
-      it('Rejects blocking addresses from non-admin', async () => {
+      it('Rejects blocking addresses from non-Owner', async () => {
         const result = await handle({
           From: BOB_ADDRESS,
           Tags: [
@@ -522,7 +522,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it(
@@ -579,7 +579,7 @@ describe('Operator Registry', () => {
     })
 
     describe('Unblocking', () => {
-      it('Allows Admin to unblock addresses', async () => {
+      it('Allows Owner to unblock addresses', async () => {
         await handle({
           From: OWNER_ADDRESS,
           Tags: [
@@ -641,7 +641,7 @@ describe('Operator Registry', () => {
           .that.includes('Address is not blocked')
       })
 
-      it('Rejects unblocking addresses from non-admin', async () => {
+      it('Rejects unblocking addresses from non-Owner', async () => {
         const result = await handle({
           From: ALICE_ADDRESS,
           Tags: [
@@ -652,7 +652,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it(
@@ -702,7 +702,7 @@ describe('Operator Registry', () => {
 
   describe('Registration Credits', () => {
     describe('Adding', () => {
-      it('Allows Admin to add RC', async () => {
+      it('Allows Owner to add RC', async () => {
         const result = await handle({
           From: OWNER_ADDRESS,
           Tags: [
@@ -815,7 +815,7 @@ describe('Operator Registry', () => {
           .that.includes('Registration Credit already added')
       })
 
-      it('Rejects adding RC from non-admin', async () => {
+      it('Rejects adding RC from non-Owner', async () => {
         const result = await handle({
           From: ALICE_ADDRESS,
           Tags: [
@@ -830,7 +830,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Requires RC when submitting Fingerprint Certificates', async () => {
@@ -948,7 +948,7 @@ describe('Operator Registry', () => {
     })
 
     describe('Removing', () => {
-      it('Allows Admin to remove RC', async () => {
+      it('Allows Owner to remove RC', async () => {
         const credits = {
           [FINGERPRINT_A]: ALICE_ADDRESS,
           [FINGERPRINT_B]: BOB_ADDRESS,
@@ -1060,7 +1060,7 @@ describe('Operator Registry', () => {
           .that.includes('Registration Credit does not exist')
       })
 
-      it('Rejects removing RC from non-admin', async () => {
+      it('Rejects removing RC from non-Owner', async () => {
         const result = await handle({
           From: ALICE_ADDRESS,
           Tags: [
@@ -1072,7 +1072,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Requires RC when submitting Fingerprint Certificates', async () => {
@@ -1136,7 +1136,7 @@ describe('Operator Registry', () => {
 
   describe('Verified Hardware', () => {
     describe('Adding', () => {
-      it('Allows Admin to add VH Fingerprints', async () => {
+      it('Allows Owner to add VH Fingerprints', async () => {
         const fingerprints = [
           FINGERPRINT_A,
           FINGERPRINT_B,
@@ -1205,7 +1205,7 @@ describe('Operator Registry', () => {
           .that.includes('Duplicate Fingerprint')
       })
 
-      it('Rejects adding VH from non-admin', async () => {
+      it('Rejects adding VH from non-Owner', async () => {
         const result = await handle({
           From: ALICE_ADDRESS,
           Tags: [
@@ -1219,7 +1219,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Does not require Registration Credits for VH', async () => {
@@ -1293,7 +1293,7 @@ describe('Operator Registry', () => {
     })
 
     describe('Removing', () => {
-      it('Allows Admin to remove VH Fingerprints', async () => {
+      it('Allows Owner to remove VH Fingerprints', async () => {
         const fingerprints = [
           FINGERPRINT_A,
           FINGERPRINT_B,
@@ -1341,7 +1341,7 @@ describe('Operator Registry', () => {
           .that.includes('Unknown Fingerprint')
       })
 
-      it('Rejects non-Admin removing VH', async () => {
+      it('Rejects non-Owner removing VH', async () => {
         const result = await handle({
           From: ALICE_ADDRESS,
           Tags: [
@@ -1352,7 +1352,7 @@ describe('Operator Registry', () => {
 
         expect(result.Error)
           .to.be.a('string')
-          .that.includes('This method is only available to the Owner')
+          .that.includes('Permission Denied')
       })
 
       it('Requires Registration Credits if removed VH', async () => {
@@ -1518,7 +1518,7 @@ describe('Operator Registry', () => {
   })
 
   describe('Initialization', () => {
-    it('Allows Admin to run Init action', async () => {
+    it('Allows Owner to run Init action', async () => {
       const initState = {
         ClaimableFingerprintsToOperatorAddresses: {
           [FINGERPRINT_B]: ALICE_ADDRESS,
@@ -1558,7 +1558,7 @@ describe('Operator Registry', () => {
       ).to.deep.equal(initState)
     })
 
-    it('Prevents non-admin from calling Init action', async () => {
+    it('Prevents non-Owner from calling Init action', async () => {
       const result = await handle({
         From: ALICE_ADDRESS,
         Tags: [{ name: 'Action', value: 'Init' }],
@@ -1755,6 +1755,251 @@ describe('Operator Registry', () => {
       expect(secondInitResult.Error)
         .to.be.a('string')
         .that.includes('Already Initialized')
+    })
+  })
+
+  describe('ACL - Enforcing Roles', async () => {
+    beforeEach(async () => {
+      // NB: Grant ALICE_ADDRESS 'admin' role for each of the admin tests below
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Roles' }],
+        Data: JSON.stringify({
+          Grant: { [ALICE_ADDRESS]: [ 'admin' ] }
+        })
+      })
+    })
+
+    describe('Submit Operator Certificates', () => {
+      it('Allows Admin Role', async () => {
+        const certs = [
+          { f: FINGERPRINT_A, a: ALICE_ADDRESS },
+          { f: FINGERPRINT_B, a: BOB_ADDRESS },
+          { f: FINGERPRINT_C, a: CHARLS_ADDRESS },
+          { f: FINGERPRINT_D, a: ALICE_ADDRESS },
+          { f: FINGERPRINT_E, a: BOB_ADDRESS },
+          { f: FINGERPRINT_F, a: CHARLS_ADDRESS }
+        ]
+  
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [{
+            name: 'Action',
+            value: 'Admin-Submit-Operator-Certificates'
+          }],
+          Data: JSON.stringify(certs)
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Allows Admin-Submit-Operator-Certificates Role', async () => {
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Update-Roles' }],
+          Data: JSON.stringify({
+            Grant: { [BOB_ADDRESS]: [ 'Admin-Submit-Operator-Certificates' ] }
+          })
+        })
+
+        const certs = [
+          { f: FINGERPRINT_A, a: ALICE_ADDRESS },
+          { f: FINGERPRINT_B, a: BOB_ADDRESS },
+          { f: FINGERPRINT_C, a: CHARLS_ADDRESS },
+          { f: FINGERPRINT_D, a: ALICE_ADDRESS },
+          { f: FINGERPRINT_E, a: BOB_ADDRESS },
+          { f: FINGERPRINT_F, a: CHARLS_ADDRESS }
+        ]
+  
+        const result = await handle({
+          From: BOB_ADDRESS,
+          Tags: [{
+            name: 'Action',
+            value: 'Admin-Submit-Operator-Certificates'
+          }],
+          Data: JSON.stringify(certs)
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+    })
+
+    describe('Removing Fingerprint Certificates', () => {
+      it('Allows Admin Role', async () => {
+        await setupFingerprintCertificates(handle)
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+  
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Allows Remove-Fingerprint-Certificate Role', async () => {
+        await setupFingerprintCertificates(handle)
+
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Update-Roles' }],
+          Data: JSON.stringify({
+            Grant: { [BOB_ADDRESS]: [ 'Remove-Fingerprint-Certificate' ] }
+          })
+        })
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Remove-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+  
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+    })
+
+    describe('Blocking Operator Addresses', () => {
+      it('Allows Admin Role', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Block-Operator-Address' },
+            { name: 'Address', value: CHARLS_ADDRESS }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Allows Block-Operator-Address Role', async () => {
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Update-Roles' }],
+          Data: JSON.stringify({
+            Grant: { [BOB_ADDRESS]: [ 'Block-Operator-Address' ] }
+          })
+        })
+
+        const result = await handle({
+          From: BOB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Block-Operator-Address' },
+            { name: 'Address', value: CHARLS_ADDRESS }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+    })
+
+    describe('Registration Credits', () => {
+      it('Allows Admin Role', async () => {
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: CHARLS_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Allows Add-Registration-Credit Role', async () => {
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Update-Roles' }],
+          Data: JSON.stringify({
+            Grant: { [BOB_ADDRESS]: [ 'Add-Registration-Credit' ] }
+          })
+        })
+
+        const result = await handle({
+          From: BOB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Registration-Credit' },
+            { name: 'Address', value: CHARLS_ADDRESS },
+            {
+              name: 'Fingerprint',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+    })
+
+    describe('Verified Hardware', () => {
+      it('Allows Admin Role', async () => {
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C,
+          FINGERPRINT_D
+        ]
+
+        const result = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' }
+          ],
+          Data: fingerprints.join(',')
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Allows Add-Verified-Hardware Role', async () => {
+        await handle({
+          From: OWNER_ADDRESS,
+          Tags: [{ name: 'Action', value: 'Update-Roles' }],
+          Data: JSON.stringify({
+            Grant: { [BOB_ADDRESS]: [ 'Add-Verified-Hardware' ] }
+          })
+        })
+
+        const fingerprints = [
+          FINGERPRINT_A,
+          FINGERPRINT_B,
+          FINGERPRINT_C,
+          FINGERPRINT_D
+        ]
+
+        const result = await handle({
+          From: BOB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Add-Verified-Hardware' }
+          ],
+          Data: fingerprints.join(',')
+        })
+
+        expect(result.Messages).to.have.lengthOf(1)
+        expect(result.Messages[0].Data).to.equal('OK')
+      })
     })
   })
 })

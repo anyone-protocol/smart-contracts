@@ -1,5 +1,3 @@
-
-
 local function initUtils()
   local ErrorMessages = require('.common.errors')
 
