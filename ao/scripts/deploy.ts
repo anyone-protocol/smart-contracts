@@ -54,7 +54,8 @@ async function deploy() {
         { name: 'App-Version', value: '0.0.1' },
         { name: 'Content-Type', value: 'text/x-lua' },
         { name: 'Author', value: 'Anyone Protocol' },
-        { name: 'Contract-Name', value: contractName }
+        { name: 'Contract-Name', value: contractName },
+        { name: 'Deploy-Nonce', value: new Date().getTime().toString() }
       ]
     }
   })
