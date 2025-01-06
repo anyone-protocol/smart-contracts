@@ -7,7 +7,8 @@ import { spawn } from '@permaweb/aoconnect'
 
 import {
   createEthereumDataItemSigner,
-  sendAosMessage
+  sendAosDryRun,
+  sendAosMessage  
 } from './send-aos-message'
 import HardhatKeys from './test-keys/hardhat.json'
 
@@ -25,6 +26,8 @@ const aosModuleId = process.env.AOS_MODULE_ID
 const consulToken = process.env.CONSUL_TOKEN || 'no-token'
 const callInitHandler = process.env.CALL_INIT_HANDLER === 'true'
 const initData = process.env.INIT_DATA
+const isMigrationDeployment = process.env.IS_MIGRATION_DEPLOYMENT === 'true'
+const migrationSourceProcessId = process.env.MIGRATION_SOURCE_PROCESS_ID
 
 if (!contractName) {
   throw new Error('CONTRACT_NAME is not set!')
@@ -32,6 +35,20 @@ if (!contractName) {
 
 if (!deployerPrivateKey) {
   throw new Error('DEPLOYER_PRIVATE_KEY is not set!')
+}
+
+if (isMigrationDeployment && !migrationSourceProcessId) {
+  throw new Error(
+    'IS_MIGRATION_DEPLOYMENT is "true"' +
+    ' but MIGRATION_SOURCE_PROCESS_ID is not set!'
+  )
+}
+
+if (callInitHandler && isMigrationDeployment) {
+  throw new Error(
+    'Both CALL_INIT_HANDLER & IS_MIGRATION_DEPLOYMENT are "true".' +
+    '  Only one can be set to true at a time!'
+  )
 }
 
 const signer = new EthereumSigner(deployerPrivateKey)
@@ -97,26 +114,48 @@ async function deploy() {
 
   console.log(`Process Published and Evaluated at: ${processId}`)
 
+  const callInitAction = async (initData: string) => {
+    const { messageId, result } = await sendAosMessage({
+      processId,
+      data: initData,
+      signer: ethereumDataItemSigner as any,
+      tags: [{ name: 'Action', value: 'Init' }]
+    })
+
+    if (result.Error) {
+      console.error('Init Action resulted in an error', result.Error)
+    } else {
+      console.log(`Init Action successful with message id ${messageId}`)
+    }
+  }
+
+  if (callInitHandler || isMigrationDeployment) {
+    console.log('Sleeping 10s to allow EVAL action to settle')
+    await new Promise(resolve => setTimeout(resolve, 10_000))
+  }
+
   if (callInitHandler) {
     console.log('Initializing with INIT action')
     
     if (!initData) {
       console.error('INIT_DATA is not present, could not initialize')
     } else {
-      console.log('Sleeping 10s to allow EVAL action to settle')
-      await new Promise(resolve => setTimeout(resolve, 10_000))
-      const { messageId, result } = await sendAosMessage({
-        processId,
-        data: initData,
-        signer: ethereumDataItemSigner as any,
-        tags: [{ name: 'Action', value: 'Init' }]
-      })
+      await callInitAction(initData)
+    }
+  } else if (isMigrationDeployment) {
+    const { result: migrationReadResult } = await sendAosDryRun({
+      processId: migrationSourceProcessId!,
+      tags: [{ name: 'Action', value: 'View-State' }]
+    })
 
-      if (result.Error) {
-        console.error('Init Action resulted in an error', result.Error)
-      } else {
-        console.log(`Init Action successful with message id ${messageId}`)
-      }
+    const previousState = migrationReadResult.Messages[0].Data
+
+    if (!previousState) {
+      console.error(
+        'Error getting previous state from migration source AO process'
+      )
+    } else {
+      await callInitAction(previousState)
     }
   } else {
     console.log('CALL_INIT_HANDLER is not set to "true", skipping INIT')
