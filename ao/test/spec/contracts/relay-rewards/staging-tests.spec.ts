@@ -51,7 +51,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '12345' }
+          { name: 'Timestamp', value: '123456789000' }
       ],
       Data: JSON.stringify(scores)
     })
@@ -62,7 +62,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '12345' }
+          { name: 'Timestamp', value: '123456789000' }
       ]
     })
     console.log(secondCompleteResult.Error)
