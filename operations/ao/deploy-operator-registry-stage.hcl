@@ -19,13 +19,20 @@ job "deploy-operator-registry-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:e65a0c0e473f8cec1bd2fed53a35c0e41a6f395b"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:15b35de1d7e990f9721b8048c0750b38996fd53e"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
       volumes = [
         "local/operator-registry-init-state.json:/usr/src/app/ao/dist/operator-registry-init-state.json"
       ]
+      logging {
+        type = "loki"
+        config {
+          loki-url = "http://10.1.244.1:3100/loki/api/v1/push"
+          loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
+        }
+      }
     }
 
     vault { policies = [ "relay-registry-stage" ] }

@@ -19,10 +19,17 @@ job "deploy-relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:stage"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:15b35de1d7e990f9721b8048c0750b38996fd53e"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
+      logging {
+        type = "loki"
+        config {
+          loki-url = "http://10.1.244.1:3100/loki/api/v1/push"
+          loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
+        }
+      }
     }
 
     vault { policies = [ "distribution-stage" ] }

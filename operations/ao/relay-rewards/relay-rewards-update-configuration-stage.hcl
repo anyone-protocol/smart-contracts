@@ -25,6 +25,13 @@ job "relay-rewards-update-configuration-stage" {
       entrypoint = ["npx"]
       command = "tsx"
       args = ["scripts/relay-rewards/update-configuration.ts"]
+      logging {
+        type = "loki"
+        config {
+          loki-url = "http://10.1.244.1:3100/loki/api/v1/push"
+          loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
+        }
+      }
     }
 
     env {
@@ -42,7 +49,7 @@ job "relay-rewards-update-configuration-stage" {
       env         = true
       data = <<EOH
       {{with secret "kv/distribution/stage"}}
-        ETH_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+        ETH_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OPERATOR_KEY}}"
       {{end}}
       EOH
     }

@@ -25,6 +25,13 @@ job "operator-registry-update-roles-stage" {
       entrypoint = ["npx"]
       command = "tsx"
       args = ["scripts/acl/update-roles.ts"]
+      logging {
+        type = "loki"
+        config {
+          loki-url = "http://10.1.244.1:3100/loki/api/v1/push"
+          loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
+        }
+      }
     }
 
     env {

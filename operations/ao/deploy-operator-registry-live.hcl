@@ -26,6 +26,13 @@ job "deploy-operator-registry-live" {
       volumes = [
         "local/operator-registry-init-state.json:/usr/src/app/ao/dist/operator-registry-init-state.json"
       ]
+      logging {
+        type = "loki"
+        config {
+          loki-url = "http://10.1.244.1:3100/loki/api/v1/push"
+          loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
+        }
+      }
     }
 
     vault { policies = [ "relay-registry-live" ] }
