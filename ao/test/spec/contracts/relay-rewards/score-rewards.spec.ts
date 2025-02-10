@@ -267,18 +267,18 @@ describe('Scoring relay rewards based on ratings', () => {
     expect(cData.Timestamp).to.equal(11000)
     expect(cData.Period).to.equal(10)
 
-    expect(aData.Details.Reward.Total).to.equal(Math.floor(5600 * aData.Details.Rating.Network/summary2data.Summary.Ratings.Network))
+    expect(aData.Details.Reward.Total).to.equal(Math.floor(5600 * aData.Details.Rating.Network/summary2data.Summary.Ratings.Network).toString())
     expect(bData.Details.Reward.Total).to.equal(
-      Math.floor(5600 * bData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
+      (Math.floor(5600 * bData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
       Math.floor(1400 * bData.Details.Rating.Uptime/summary2data.Summary.Ratings.Uptime) + 
       Math.floor(bData.Details.Reward.Hardware) + 
-      Math.floor(1000 * bData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)
+      Math.floor(1000 * bData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)).toString()
     )
     expect(cData.Details.Reward.Total).to.equal(
-      Math.floor(5600 * cData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
+      (Math.floor(5600 * cData.Details.Rating.Network/summary2data.Summary.Ratings.Network) +
       Math.floor(1400 * cData.Details.Rating.Uptime/summary2data.Summary.Ratings.Uptime) + 
       Math.floor(cData.Details.Reward.Hardware) + 
-      Math.floor(1000 * cData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)
+      Math.floor(1000 * cData.Details.Rating.ExitBonus/summary2data.Summary.Ratings.ExitBonus)).toString()
     ) 
   })
 
@@ -387,9 +387,9 @@ describe('Scoring relay rewards based on ratings', () => {
     const aData = JSON.parse(aResult.Messages[0].Data)
     expect(aData.Timestamp).to.equal(11000)
     expect(aData.Period).to.equal(10)
-    expect(aData.Details.Reward.Total).to.equal(5600)
-    expect(aData.Details.Reward.DelegateTotal).to.equal(5600 * 0.4)
-    expect(aData.Details.Reward.OperatorTotal).to.equal(5600 * (1 - 0.4))
+    expect(aData.Details.Reward.Total).to.equal('5600')
+    expect(aData.Details.Reward.DelegateTotal).to.equal((5600 * 0.4).toString())
+    expect(aData.Details.Reward.OperatorTotal).to.equal((5600 * (1 - 0.4)).toString())
   })
 
   it('Accumulates the rewards by address and also fingerprint', async () => {
@@ -539,12 +539,12 @@ describe('Scoring relay rewards based on ratings', () => {
     })
     expect(cFingerprintResult.Messages).to.have.lengthOf(1)
 
-    expect(aResult.Messages[0].Data).to.equal('0.000000000000000558')
-    expect(aFingerprintResult.Messages[0].Data).to.equal('0.000000000000000930')
-    expect(bResult.Messages[0].Data).to.equal('0.000000000000003691')
-    expect(bFingerprintResult.Messages[0].Data).to.equal('0.000000000000003319')
-    expect(cResult.Messages[0].Data).to.equal('0.000000000000005748')
-    expect(cFingerprintResult.Messages[0].Data).to.equal('0.000000000000005748')
+    expect(aResult.Messages[0].Data).to.equal('558')
+    expect(aFingerprintResult.Messages[0].Data).to.equal('930')
+    expect(bResult.Messages[0].Data).to.equal('3690')
+    expect(bFingerprintResult.Messages[0].Data).to.equal('3318')
+    expect(cResult.Messages[0].Data).to.equal('5748')
+    expect(cFingerprintResult.Messages[0].Data).to.equal('5748')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -605,10 +605,10 @@ describe('Scoring relay rewards based on ratings', () => {
       ]
     })
     expect(b2FingerprintResult.Messages).to.have.lengthOf(1)
-    expect(a2Result.Messages[0].Data).to.equal('0.000000000000003918')
-    expect(a2FingerprintResult.Messages[0].Data).to.equal('0.000000000000006530')
-    expect(b2Result.Messages[0].Data).to.equal('0.000000000000005931')
-    expect(b2FingerprintResult.Messages[0].Data).to.equal('0.000000000000003319')
+    expect(a2Result.Messages[0].Data).to.equal('3918')
+    expect(a2FingerprintResult.Messages[0].Data).to.equal('6530')
+    expect(b2Result.Messages[0].Data).to.equal('5930')
+    expect(b2FingerprintResult.Messages[0].Data).to.equal('3318')
   })
 
 })

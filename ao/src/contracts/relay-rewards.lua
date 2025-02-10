@@ -2,10 +2,10 @@ local RelayRewards = {
   _initialized = false,
 
   TotalAddressReward = {
--- [Address] = { High: 0, Low: 0 }
+-- [Address] = '0'
   },
   TotalFingerprintReward = {
--- [Fingerprint] = { High: 0, Low: 0 }
+-- [Fingerprint] = '0'
   },
 
   Configuration = {
@@ -44,8 +44,8 @@ local RelayRewards = {
 --   Variables = { FamilyMultiplier = 0, LocationMultiplier = 0 }
 --   Rating = { Network = 0, Uptime = 0, ExitBonus = 0 }
 --   Reward = {
---     Total = 0, OperatorTotal = 0, DelegateTotal = 0,
---     Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 
+--     Total = '0', OperatorTotal = '0', DelegateTotal = '0',
+--     Network = '0', Hardware = '0', Uptime = '0', ExitBonus = '0' 
 --   }
 -- }
     }
@@ -183,7 +183,8 @@ function RelayRewards._updateConfiguration(config, request)
 end
 
 function RelayRewards.init()
-  local json = require("json")
+  local bint = require('.bint')(256)
+  local json = require('json')
 
   local ErrorMessages = require('.common.errors')
   local AnyoneUtils = require('.common.utils')
@@ -325,8 +326,8 @@ function RelayRewards.init()
       local roundData = {}
       
       local summary = {
-        Ratings = { Network = 0, Uptime = 0, ExitBonus = 0 },
-        Rewards = { Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0 }
+        Ratings = { Network = bint(0), Uptime = 0.0, ExitBonus = bint(0) },
+        Rewards = { Total = bint(0), Network = bint(0), Hardware = bint(0), Uptime = bint(0), ExitBonus = bint(0) }
       }
       
       for fingerprint, scoreData in pairs(RelayRewards.PendingRounds[timestamp]) do
@@ -378,87 +379,97 @@ function RelayRewards.init()
           LocationMultiplier = locationMultiplier
         }
 
-        summary.Ratings.Network = summary.Ratings.Network + roundData[fingerprint].Rating.Network
+        summary.Ratings.Network = summary.Ratings.Network + bint(roundData[fingerprint].Rating.Network)
         summary.Ratings.Uptime = summary.Ratings.Uptime + roundData[fingerprint].Rating.Uptime
-        summary.Ratings.ExitBonus = summary.Ratings.ExitBonus + roundData[fingerprint].Rating.ExitBonus
+        summary.Ratings.ExitBonus = summary.Ratings.ExitBonus + bint(roundData[fingerprint].Rating.ExitBonus)
       end
 
-      local roundLength = 0
+      local roundLength = bint(0)
       if RelayRewards.PreviousRound.Timestamp > 0 then
-        roundLength = (timestamp - RelayRewards.PreviousRound.Timestamp) // 1000
+        local msInSec = 1000
+        roundLength = bint((timestamp - RelayRewards.PreviousRound.Timestamp) // msInSec)
       end
 
-      local totalRewardsPerRound = RelayRewards.Configuration.TokensPerSecond * roundLength
+      local tokensPerSecond = bint(RelayRewards.Configuration.TokensPerSecond)
+      local totalRewardsPerRound = tokensPerSecond * roundLength
+
+      local sharePrecision = bint(1000)
       
-      local networkRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Network.Share)
+      local networkRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Network.Share * sharePrecision)) // sharePrecision
       local networkRewards = networkRewardsPerSec * roundLength
 
-      local hardwareRewards = 0
-      local hardwareRewardsPerSec = 0
+      local hardwareRewards = bint(0)
+      local hardwareRewardsPerSec = bint(0)
       if RelayRewards.Configuration.Modifiers.Hardware.Enabled then
-        hardwareRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Hardware.Share)
+        hardwareRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Hardware.Share * sharePrecision)) // sharePrecision
         hardwareRewards = hardwareRewardsPerSec * roundLength
       end
 
-      local uptimeRewards = 0
-      local uptimeRewardsPerSec = 0
+      local uptimeRewards = bint(0)
+      local uptimeRewardsPerSec = bint(0)
       if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
-        uptimeRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.Uptime.Share)
+        uptimeRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Uptime.Share * sharePrecision)) // sharePrecision
         uptimeRewards = uptimeRewardsPerSec * roundLength
       end
 
-      local exitBonusRewards = 0
-      local exitBonusRewardsPerSec = 0
+      local exitBonusRewards = bint(0)
+      local exitBonusRewardsPerSec = bint(0)
       if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled then
-        exitBonusRewardsPerSec = math.floor(RelayRewards.Configuration.TokensPerSecond * RelayRewards.Configuration.Modifiers.ExitBonus.Share)
+        exitBonusRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.ExitBonus.Share * sharePrecision)) // sharePrecision
         exitBonusRewards = exitBonusRewardsPerSec * roundLength
       end
 
       local fingerprintRewardsPerSec = networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewardsPerSec
-      assert(totalRewardsPerRound >= fingerprintRewardsPerSec * roundLength, 'Failed rewards share calculation')
+
+      local fingerprintRewards = fingerprintRewardsPerSec * roundLength
+      assert(bint.ule(fingerprintRewards, totalRewardsPerRound), 'Failed rewards share calculation')
       
-      local uptimeInfluenceOnHw = 0
+      local uptimeInfluenceOnHw = 0.0
       if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
         uptimeInfluenceOnHw = RelayRewards.Configuration.Modifiers.Hardware.UptimeInfluence
       end
       local networkInfluenceOnHw = 1 - uptimeInfluenceOnHw
-      local totalHwNetworkRewards = 0
+      local totalHwNetworkRewards = bint(0)
       for fingerprint, ratedData in pairs(roundData) do
         roundData[fingerprint].Reward = {
-          Total = 0,
-          OperatorTotal = 0,
-          DelegateTotal = 0,
-          Network = 0,
-          Hardware = 0,
-          Uptime = 0,
-          ExitBonus = 0
+          Total = bint(0),
+          OperatorTotal = bint(0),
+          DelegateTotal = bint(0),
+          Network = bint(0),
+          Hardware = bint(0),
+          Uptime = bint(0),
+          ExitBonus = bint(0)
         }
-        if summary.Ratings.Network > 0 then
-          local networkWeight = ratedData.Rating.Network / summary.Ratings.Network
-          roundData[fingerprint].Reward.Network = math.floor(networkRewards * networkWeight)
+        if not bint.iszero(summary.Ratings.Network) then
+          roundData[fingerprint].Reward.Network = (networkRewards * ratedData.Rating.Network) // summary.Ratings.Network
           summary.Rewards.Network = summary.Rewards.Network + roundData[fingerprint].Reward.Network
         end
         if ratedData.Rating.IsHardware then
           totalHwNetworkRewards = totalHwNetworkRewards + roundData[fingerprint].Reward.Network
-          if summary.Ratings.Uptime > 0 then
+          if not bint.iszero(summary.Ratings.Uptime) then
+            local uptimePrecision = bint(100000)
             local uptimeWeight = ratedData.Rating.Uptime / summary.Ratings.Uptime
-            roundData[fingerprint].Reward.Uptime = math.floor(uptimeRewards * uptimeWeight)
+            roundData[fingerprint].Reward.Uptime = (uptimeRewards * bint(uptimeWeight * uptimePrecision)) // uptimePrecision
             summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
           end
         end
       end
-
-      local weighedHwTotalWeight = networkInfluenceOnHw * totalHwNetworkRewards + uptimeInfluenceOnHw * summary.Rewards.Uptime
+      local delegatePrecision = bint(1000)
+      local influencePrecision = bint(1000)
+      local networkTotalPart = (totalHwNetworkRewards * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
+      local uptimeTotalPart = (summary.Rewards.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
+      local hwTotalWeight = networkTotalPart + uptimeTotalPart
 
       for fingerprint, ratedData in pairs(roundData) do
         if ratedData.Rating.IsHardware then
-          local weigedHwWeight = networkInfluenceOnHw * roundData[fingerprint].Reward.Network + uptimeInfluenceOnHw * roundData[fingerprint].Reward.Uptime
-          local hardwareWeight = weigedHwWeight / weighedHwTotalWeight
-          roundData[fingerprint].Reward.Hardware = math.floor(hardwareRewards * hardwareWeight)
+          local networkUnitPart = (roundData[fingerprint].Reward.Network * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
+          local uptimeUnitPart = (roundData[fingerprint].Reward.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
+          local hwUnitWeight = networkUnitPart + uptimeUnitPart
+
+          roundData[fingerprint].Reward.Hardware = (hardwareRewards * hwUnitWeight) // hwTotalWeight
         end
-        if summary.Ratings.ExitBonus > 0 then
-          local exitBonusWeight = ratedData.Rating.ExitBonus / summary.Ratings.ExitBonus
-          roundData[fingerprint].Reward.ExitBonus = math.floor(exitBonusRewards * exitBonusWeight)
+        if not bint.iszero(summary.Ratings.ExitBonus) then
+          roundData[fingerprint].Reward.ExitBonus = (exitBonusRewards * ratedData.Rating.ExitBonus) // summary.Ratings.ExitBonus
         end
         
         roundData[fingerprint].Reward.Total = roundData[fingerprint].Reward.Network +
@@ -468,40 +479,75 @@ function RelayRewards.init()
         local operatorAddress = roundData[fingerprint].Address
         local delegate = RelayRewards.Configuration.Delegates[operatorAddress]
         if delegate and delegate.Share > 0 then
-          local delegateTotal = math.floor(delegate.Share * roundData[fingerprint].Reward.Total)
+          local delegateTotal = (roundData[fingerprint].Reward.Total * bint(delegate.Share * delegatePrecision)) // delegatePrecision
+
           local operatorTotal = roundData[fingerprint].Reward.Total - delegateTotal
           roundData[fingerprint].Reward.OperatorTotal = operatorTotal
           roundData[fingerprint].Reward.DelegateTotal = delegateTotal
           local normalizedDelegateAddress = AnyoneUtils.normalizeEvmAddress(delegate.Address)
 
-          RelayRewards.TotalAddressReward[normalizedDelegateAddress] = AnyoneUtils.bigAddScalar(
-            RelayRewards.TotalAddressReward[normalizedDelegateAddress],
-            roundData[fingerprint].Reward.DelegateTotal
-          )
+          if RelayRewards.TotalAddressReward[normalizedDelegateAddress] == nil then
+            RelayRewards.TotalAddressReward[normalizedDelegateAddress] = '0'
+          end
+          RelayRewards.TotalAddressReward[normalizedDelegateAddress] = tostring(bint(RelayRewards.TotalAddressReward[normalizedDelegateAddress]) + roundData[fingerprint].Reward.DelegateTotal)
         else
-          roundData[fingerprint].Reward.OperatorTotal = roundData[fingerprint].Reward.Total
-          roundData[fingerprint].Reward.DelegateTotal = 0
+          roundData[fingerprint].Reward.OperatorTotal = tostring(roundData[fingerprint].Reward.Total)
+          roundData[fingerprint].Reward.DelegateTotal = '0'
         end
         local normalizedOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
-        RelayRewards.TotalAddressReward[normalizedOperatorAddress] = AnyoneUtils.bigAddScalar(
-            RelayRewards.TotalAddressReward[normalizedOperatorAddress],
-            roundData[fingerprint].Reward.OperatorTotal
-          )
+        if RelayRewards.TotalAddressReward[normalizedOperatorAddress] == nil then
+          RelayRewards.TotalAddressReward[normalizedOperatorAddress] = '0'
+        end
+        RelayRewards.TotalAddressReward[normalizedOperatorAddress] = tostring(bint(RelayRewards.TotalAddressReward[normalizedOperatorAddress]) + roundData[fingerprint].Reward.OperatorTotal)
 
-        RelayRewards.TotalFingerprintReward[fingerprint] = AnyoneUtils.bigAddScalar(
-            RelayRewards.TotalFingerprintReward[fingerprint], roundData[fingerprint].Reward.Total)
+        if RelayRewards.TotalFingerprintReward[fingerprint] == nil then
+          RelayRewards.TotalFingerprintReward[fingerprint] = '0'
+        end
+        RelayRewards.TotalFingerprintReward[fingerprint] = tostring(bint(RelayRewards.TotalFingerprintReward[fingerprint]) + roundData[fingerprint].Reward.Total)
 
         summary.Rewards.Total = summary.Rewards.Total + roundData[fingerprint].Reward.Total
         summary.Rewards.Hardware = summary.Rewards.Hardware + roundData[fingerprint].Reward.Hardware
         summary.Rewards.ExitBonus = summary.Rewards.ExitBonus + roundData[fingerprint].Reward.ExitBonus
       end
 
+      local roundDataWithStringRewards = {}
+
+      for fingerprint, ratedData in pairs(roundData) do
+        roundDataWithStringRewards[fingerprint] = {}
+        roundDataWithStringRewards[fingerprint].Address = ratedData.Address
+        roundDataWithStringRewards[fingerprint].Variables = ratedData.Variables
+        roundDataWithStringRewards[fingerprint].Score = ratedData.Score
+        roundDataWithStringRewards[fingerprint].Rating = ratedData.Rating
+        roundDataWithStringRewards[fingerprint].Reward = {
+          Total = tostring(ratedData.Reward.Total),
+          OperatorTotal = tostring(ratedData.Reward.OperatorTotal),
+          DelegateTotal = tostring(ratedData.Reward.DelegateTotal),
+          Network = tostring(ratedData.Reward.Network),
+          Hardware = tostring(ratedData.Reward.Hardware),
+          Uptime = tostring(ratedData.Reward.Uptime),
+          ExitBonus = tostring(ratedData.Reward.ExitBonus)
+        }
+      end
+
       RelayRewards.PreviousRound = {
         Timestamp = timestamp,
-        Period = roundLength,
-        Summary = summary,
+        Period = bint.tonumber(roundLength),
+        Summary = {
+          Ratings = {
+            Network = tostring(summary.Ratings.Network), 
+            Uptime = tostring(summary.Ratings.Uptime), 
+            ExitBonus = tostring(summary.Ratings.ExitBonus)
+          },
+          Rewards = {
+            Total = tostring(summary.Rewards.Total),
+            Network = tostring(summary.Rewards.Network),
+            Hardware = tostring(summary.Rewards.Hardware),
+            Uptime = tostring(summary.Rewards.Uptime),
+            ExitBonus = tostring(summary.Rewards.ExitBonus)
+          }
+        },
         Configuration = RelayRewards.Configuration,
-        Details = roundData
+        Details = roundDataWithStringRewards
       }
 
       for roundStamp, _ in pairs(RelayRewards.PendingRounds) do
@@ -619,9 +665,9 @@ function RelayRewards.init()
       local fingerprint = msg.Tags['Fingerprint']
       if fingerprint then
         AnyoneUtils.assertValidFingerprint(fingerprint, 'Fingerprint tag')
-        result = AnyoneUtils.bigString(RelayRewards.TotalFingerprintReward[fingerprint])
+        result = RelayRewards.TotalFingerprintReward[fingerprint]
       else
-        result = AnyoneUtils.bigString(RelayRewards.TotalAddressReward[address])
+        result = RelayRewards.TotalAddressReward[address]
       end
 
       ao.send({
