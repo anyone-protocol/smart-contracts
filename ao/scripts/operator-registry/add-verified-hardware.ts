@@ -1,6 +1,7 @@
 import { EthereumSigner } from '@ardrive/turbo-sdk'
 import dotenv from 'dotenv'
 
+import { logger } from '../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosMessage
@@ -29,11 +30,11 @@ if (!fingerprints) {
 const signer = new EthereumSigner(ethPrivateKey)
 
 async function updateRoles() {
-  console.log(
+  logger.info(
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
-  console.log(`Calling Add-Verified-Hardware on AO Process ${processId}`)
-  console.log(`With Data: `, fingerprints)
+  logger.info(`Calling Add-Verified-Hardware on AO Process ${processId}`)
+  logger.info(`With Data: `, fingerprints)
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
@@ -42,8 +43,8 @@ async function updateRoles() {
     data: fingerprints
   })
 
-  console.log(`Got reply with messageId: ${messageId}`)
-  console.log(`Add-Verified-Hardware Result:`, result)
+  logger.info(`Got reply with messageId: ${messageId}`)
+  logger.info(`Add-Verified-Hardware Result:`, JSON.stringify(result))
 }
 
-updateRoles().catch(e => { console.error(e); process.exit(1); })
+updateRoles().catch(e => { logger.error(e); process.exit(1); })

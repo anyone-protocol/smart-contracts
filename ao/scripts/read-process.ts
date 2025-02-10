@@ -1,3 +1,4 @@
+import { logger } from './util/logger'
 import { sendAosDryRun } from './send-aos-message';
 
 const processId = process.argv[2]
@@ -9,14 +10,14 @@ if (!processId) {
 }
 
 async function readProcess() {
-  console.log(`Calling dry-run ${action} on process ${processId}`)
+  logger.info(`Calling dry-run ${action} on process ${processId}`)
 
   const { result } = await sendAosDryRun({
     processId,
     tags: [{ name: 'Action', value: 'View-State' }]
   })
 
-  console.log(result)
+  logger.info(`Dry run result`, JSON.stringify(result))
 }
 
-readProcess().catch(e => { console.error(e); process.exit(1); })
+readProcess().catch(e => { logger.error(e); process.exit(1); })

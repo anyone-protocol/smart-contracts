@@ -1,6 +1,7 @@
 import { EthereumSigner } from '@ardrive/turbo-sdk'
 import dotenv from 'dotenv'
 
+import { logger } from '../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosMessage
@@ -27,11 +28,11 @@ if (!updateConfigData) {
 const signer = new EthereumSigner(ethPrivateKey)
 
 async function updateRoles() {
-  console.log(
+  logger.info(
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
-  console.log(`Calling Update-Configuration on Relay Rewards AO Process ${processId}`)
-  console.log(`With Data: `, updateConfigData)
+  logger.info(`Calling Update-Configuration on Relay Rewards AO Process ${processId}`)
+  logger.info(`With Data: `, JSON.stringify(updateConfigData))
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
@@ -40,8 +41,8 @@ async function updateRoles() {
     data: updateConfigData
   })
 
-  console.log(`Got reply with messageId: ${messageId}`)
-  console.log(`Update-Configuration Result:`, result)
+  logger.info(`Got reply with messageId: ${messageId}`)
+  logger.info(`Update-Configuration Result:`, JSON.stringify(result))
 }
 
-updateRoles().catch(e => { console.error(e); process.exit(1); })
+updateRoles().catch(e => { logger.error(e); process.exit(1); })

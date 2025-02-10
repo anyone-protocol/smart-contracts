@@ -5,6 +5,7 @@ import { join, resolve } from 'path'
 import { EthereumSigner, TurboFactory } from '@ardrive/turbo-sdk'
 import { spawn } from '@permaweb/aoconnect'
 
+import { logger } from './util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosDryRun,
@@ -52,13 +53,13 @@ if (callInitHandler && isMigrationDeployment) {
 }
 
 const signer = new EthereumSigner(deployerPrivateKey)
-console.log(
+logger.info(
   `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
 )
 const turbo = TurboFactory.authenticated({ signer })
 
 async function deploy() {
-  console.log(`Deploying AO contract: ${contractName}`)
+  logger.info(`Deploying AO contract: ${contractName}`)
 
   const bundledLuaPath = `./dist/${contractName}.lua`
   const bundledLuaSize = statSync(bundledLuaPath).size
@@ -77,11 +78,11 @@ async function deploy() {
     }
   })
 
-  console.log(`Publish ${contractName} source result:`, uploadResult)
+  logger.info(`Publish ${contractName} source result:`, uploadResult)
 
   const ethereumDataItemSigner = await createEthereumDataItemSigner(signer)
 
-  console.log(`Spawning new AO Process for ${contractName}...`)
+  logger.info(`Spawning new AO Process for ${contractName}...`)
   const processId = await spawn({
     module: aosModuleId,
     scheduler: schedulerUnitAddress,
@@ -98,7 +99,7 @@ async function deploy() {
     ]
   })
 
-  console.log(`Sending EVAL of ${contractName} to AO Process ${processId}`)
+  logger.info(`Sending EVAL of ${contractName} to AO Process ${processId}`)
   await sendAosMessage({
     processId,
     data: readFileSync(join(resolve(), `./dist/${contractName}.lua`), 'utf8'),
@@ -113,7 +114,7 @@ async function deploy() {
     ]
   })
 
-  console.log(`Process Published and Evaluated at: ${processId}`)
+  logger.info(`Process Published and Evaluated at: ${processId}`)
 
   const callInitAction = async (initData: string) => {
     const { messageId, result } = await sendAosMessage({
@@ -124,22 +125,22 @@ async function deploy() {
     })
 
     if (result.Error) {
-      console.error('Init Action resulted in an error', result.Error)
+      logger.error('Init Action resulted in an error', result.Error)
     } else {
-      console.log(`Init Action successful with message id ${messageId}`)
+      logger.info(`Init Action successful with message id ${messageId}`)
     }
   }
 
   if (callInitHandler || isMigrationDeployment) {
-    console.log('Sleeping 10s to allow EVAL action to settle')
+    logger.info('Sleeping 10s to allow EVAL action to settle')
     await new Promise(resolve => setTimeout(resolve, 10_000))
   }
 
   if (callInitHandler) {
-    console.log('Initializing with INIT action')
+    logger.info('Initializing with INIT action')
     
     if (!initData) {
-      console.error('INIT_DATA is not present, could not initialize')
+      logger.error('INIT_DATA is not present, could not initialize')
     } else {
       await callInitAction(initData)
     }
@@ -152,18 +153,18 @@ async function deploy() {
     const previousState = migrationReadResult.Messages[0].Data
 
     if (!previousState) {
-      console.error(
+      logger.error(
         'Error getting previous state from migration source AO process'
       )
     } else {
       await callInitAction(previousState)
     }
   } else {
-    console.log('CALL_INIT_HANDLER is not set to "true", skipping INIT')
+    logger.info('CALL_INIT_HANDLER is not set to "true", skipping INIT')
   }
 
   if (process.env.PHASE && process.env.CONSUL_IP) {
-    console.log(
+    logger.info(
       `Connecting to Consul at` +
         ` ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}...`
     )
@@ -173,21 +174,21 @@ async function deploy() {
     })
     const sourceKey = process.env.CONTRACT_SOURCE_CONSUL_KEY || 'dummy-path'
     const consulKey = process.env.CONTRACT_CONSUL_KEY || 'dummy-path'
-    console.log(`Using consul keys ${consulKey} / ${sourceKey}`)
+    logger.info(`Using consul keys ${consulKey} / ${sourceKey}`)
 
     const contractResult = await consul.kv.set({
       key: consulKey,
       value: processId,
       token: consulToken
     })
-    console.log(`Contract address updated: ${contractResult}`)
+    logger.info(`Contract address updated: ${contractResult}`)
 
     const sourceResult = await consul.kv.set({
       key: sourceKey,
       value: uploadResult.id,
       token: consulToken
     })
-    console.log(`Contract source updated: ${sourceResult}`)
+    logger.info(`Contract source updated: ${sourceResult}`)
   } else {
     console.warn(
       'Deployment env var PHASE not defined,' +
@@ -196,4 +197,4 @@ async function deploy() {
   }
 }
 
-deploy().catch(e => { console.error(e); process.exit(1); })
+deploy().catch(e => { logger.error(e); process.exit(1); })

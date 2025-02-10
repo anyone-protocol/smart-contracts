@@ -1,17 +1,18 @@
 import path from 'path'
 import fs from 'fs'
 
+import { logger } from './util/logger'
 import { bundle } from './lua-bundler'
 
 async function main() {
   const contractNames = [ 'operator-registry', 'relay-rewards', 'acl-test' ]
 
-  console.log(
+  logger.info(
     `Bundling ${contractNames.length} contracts: ${contractNames.join(',')}`
   )
 
   for (const contractName of contractNames) {
-    console.log(`Bundling Lua for ${contractName}...`)
+    logger.info(`Bundling Lua for ${contractName}...`)
 
     const luaEntryPath = path.join(
       path.resolve(),
@@ -30,10 +31,10 @@ async function main() {
       bundledLua
     )
 
-    console.log(`Done Bundling Lua for ${contractName}!`)
+    logger.info(`Done Bundling Lua for ${contractName}!`)
   }
 }
 
 main()
   .then()
-  .catch(err => console.error(err))
+  .catch(err => logger.error(err))

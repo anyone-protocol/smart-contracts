@@ -6,6 +6,8 @@ import {
 } from '@permaweb/aoconnect'
 import { createData, Signer } from 'arbundles'
 
+import { logger } from './util/logger'
+
 export type SendAosBaseOptions = {
   processId: string
   data?: string
@@ -43,7 +45,7 @@ export async function sendAosDryRun(
 
   while (attempts < retries) {
     try {
-      console.debug(`Sending AO DryRun to process ${processId}`)
+      logger.debug(`Sending AO DryRun to process ${processId}`)
 
       return {
         result: await aoDryRun({
@@ -53,10 +55,10 @@ export async function sendAosDryRun(
         })
       }
     } catch (error) {
-      console.error(`Error sending AO DryRun to process ${processId}`, error)
+      logger.error(`Error sending AO DryRun to process ${processId}`, error)
 
       if (error.message.includes('500')) {
-        console.debug(
+        logger.debug(
           `Retrying sending AO DryRun to process ${processId}`,
           JSON.stringify(
             { attempts, retries, error: error.message },
@@ -90,7 +92,7 @@ export async function sendAosMessage(
 
   while (attempts < retries) {
     try {
-      console.debug(`Sending AO Message to process ${processId}`)
+      logger.debug(`Sending AO Message to process ${processId}`)
       const messageId = await aoMessage({
         process: processId,
         tags,
@@ -98,25 +100,25 @@ export async function sendAosMessage(
         signer
       })
   
-      console.debug(
+      logger.debug(
         `Fetching AO Message result ${messageId} from process ${processId}`
       )
       const result = await aoResult({
         message: messageId,
         process: processId
       })
-      console.debug(`Got AO Message result ${messageId} from process ${processId}`)
+      logger.debug(`Got AO Message result ${messageId} from process ${processId}`)
       console.dir(result, { depth: null })
 
       return { messageId, result }
     } catch (error) {
-      console.error(
+      logger.error(
         `Error sending AO Message to process ${processId}`,
         error
       )
 
       if (error.message.includes('500')) {
-        console.debug(
+        logger.debug(
           `Retrying sending AO message to process ${processId}`,
           JSON.stringify(
             { attempts, retries, error: error.message },
