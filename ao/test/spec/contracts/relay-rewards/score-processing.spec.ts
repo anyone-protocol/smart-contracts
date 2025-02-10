@@ -102,7 +102,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0.000000000000000000')
+    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0')
     
     const rewardsForBobResult = await handle({
       From: BOB_ADDRESS,
@@ -111,7 +111,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(rewardsForBobResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForBobResult.Messages[0].Data).to.equal('0.000000000000000123')
+    expect(rewardsForBobResult.Messages[0].Data).to.equal('123')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -141,7 +141,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(aliceResult.Messages).to.have.lengthOf(1)
-    expect(aliceResult.Messages[0].Data).to.equal('0.000000000000000000')
+    expect(aliceResult.Messages[0].Data).to.equal('0')
     
     const bobResult = await handle({
       From: BOB_ADDRESS,
@@ -150,7 +150,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(bobResult.Messages).to.have.lengthOf(1)
-    expect(bobResult.Messages[0].Data).to.equal('0.000000000000000246')
+    expect(bobResult.Messages[0].Data).to.equal('246')
 
 
     const aResult = await handle({
@@ -161,7 +161,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(aResult.Messages).to.have.lengthOf(1)
-    expect(aResult.Messages[0].Data).to.equal('0.000000000000000000')
+    expect(aResult.Messages[0].Data).to.equal('0')
     
     const bResult = await handle({
       From: BOB_ADDRESS,
@@ -171,7 +171,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(bResult.Messages).to.have.lengthOf(1)
-    expect(bResult.Messages[0].Data).to.equal('0.000000000000000246')
+    expect(bResult.Messages[0].Data).to.equal('246')
   })
 
   it('Validate reference family multiplier formula', async () => {
@@ -248,7 +248,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0.000000000000000000')
+    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0')
     
     const rewardsForBobResult = await handle({
       From: BOB_ADDRESS,
@@ -257,7 +257,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(rewardsForBobResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForBobResult.Messages[0].Data).to.equal('0.000000000000000100')
+    expect(rewardsForBobResult.Messages[0].Data).to.equal('100')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -367,7 +367,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0.000000000000000000')
+    expect(rewardsForAliceResult.Messages[0].Data).to.equal('0')
     
     const rewardsForBobResult = await handle({
       From: BOB_ADDRESS,
@@ -376,7 +376,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(rewardsForBobResult.Messages).to.have.lengthOf(1)
-    expect(rewardsForBobResult.Messages[0].Data).to.equal('0.000000000000000100')
+    expect(rewardsForBobResult.Messages[0].Data).to.equal('100')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,

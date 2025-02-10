@@ -214,7 +214,7 @@ describe('Round Completion of relay rewards', () => {
     
     expect(roundDataResult.Messages).to.have.lengthOf(1)
     const data = JSON.parse(roundDataResult.Messages[0].Data)
-    expect(data.Details.Reward.OperatorTotal).to.equal(123)
+    expect(data.Details.Reward.OperatorTotal).to.equal('123')
 
     const roundMetadataResult = await handle({
       From: BOB_ADDRESS,
@@ -229,9 +229,9 @@ describe('Round Completion of relay rewards', () => {
     expect(metadata.Timestamp).to.equal(2000)
     expect(metadata.Period).to.equal(1)
     expect(metadata.Configuration.TokensPerSecond).to.equal(123)
-    expect(metadata.Summary.Ratings.Network).to.equal(100)
-    expect(metadata.Summary.Rewards.Total).to.equal(123)
-    expect(metadata.Summary.Rewards.Network).to.equal(123)
+    expect(metadata.Summary.Ratings.Network).to.equal('100')
+    expect(metadata.Summary.Rewards.Total).to.equal('123')
+    expect(metadata.Summary.Rewards.Network).to.equal('123')
 
     
     const snapshotResult = await handle({
