@@ -11,20 +11,20 @@ local RelayRewards = {
   Configuration = {
     TokensPerSecond = 28935184200000000,
     Modifiers = {
-      Network = { Share = 1 },
-      Hardware = { Enabled = false, Share = 0.2, UptimeInfluence = 0.35 },
-      Uptime = { Enabled = false, Share = 0.14,
+      Network = { Share = 0.56 },
+      Hardware = { Enabled = true, Share = 0.2, UptimeInfluence = 0.35 },
+      Uptime = { Enabled = true, Share = 0.14,
         Tiers = {
           ['0'] = 0,
           ['3'] = 1,
           ['14'] = 3,
         }
       },
-      ExitBonus = { Enabled = false, Share = 0.1 }
+      ExitBonus = { Enabled = true, Share = 0.1 }
     },
     Multipliers = {
-      Family = { Enabled = false, Offset = 0.01, Power = 1 },
-      Location = { Enabled = false, Offset = 0.003, Power = 2 }
+      Family = { Enabled = true, Offset = 0.01, Power = 1 },
+      Location = { Enabled = true, Offset = 0.003, Power = 2 }
     },
     Delegates = {
 --      [Address] = { Address: '', Share = 0 }
