@@ -34,14 +34,15 @@ local RelayRewards = {
     Timestamp = 0,
     Period = 0,
     Summary = {
-      Total = 0, Network = 0, Hardware = 0, Uptime = 0, ExitBonus = 0
+      Ratings = { Network = '0', Uptime = '0', ExitBonus = '0' },
+      Rewards = { Total = '0', Network = '0', Hardware = '0', Uptime = '0', ExitBonus = '0' }
     },
     Configuration = {},
     Details = {
 -- [Fingerprint] = { 
 --   Address = ''
 --   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 }
---   Variables = { FamilyMultiplier = 0, LocationMultiplier = 0 }
+--   Variables = { FamilyMultiplier = 0.0, LocationMultiplier = 0.0 }
 --   Rating = { Network = 0, Uptime = 0, ExitBonus = 0 }
 --   Reward = {
 --     Total = '0', OperatorTotal = '0', DelegateTotal = '0',
