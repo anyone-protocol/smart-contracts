@@ -19,7 +19,7 @@ job "deploy-relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:ecfa6f76ecf966df2c7ee07add4fe66abc9c9cd8"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:1d9079f8ac5e507092d68f0cfea6a9ef313cbd5a"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]

@@ -466,8 +466,9 @@ function RelayRewards.init()
           local networkUnitPart = (roundData[fingerprint].Reward.Network * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
           local uptimeUnitPart = (roundData[fingerprint].Reward.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
           local hwUnitWeight = networkUnitPart + uptimeUnitPart
-
-          roundData[fingerprint].Reward.Hardware = (hardwareRewards * hwUnitWeight) // hwTotalWeight
+          if not bint.iszero(hwTotalWeight) then
+            roundData[fingerprint].Reward.Hardware = (hardwareRewards * hwUnitWeight) // hwTotalWeight
+          end
         end
         if not bint.iszero(summary.Ratings.ExitBonus) then
           roundData[fingerprint].Reward.ExitBonus = (exitBonusRewards * ratedData.Rating.ExitBonus) // summary.Ratings.ExitBonus

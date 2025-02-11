@@ -1,6 +1,7 @@
 import { expect } from 'chai'
 import { scores } from './staging1-scores.js'
 import { config } from './staging1-config.js'
+import { scores as scores2 } from './staging2-scores.js'
 
 import {
   AOTestHandle,
@@ -34,6 +35,7 @@ describe('Staging tests of relay rewards', () => {
           { name: 'Timestamp', value: '100' }
       ]
     })
+    console.log(firstCompleteResult.Error)
     expect(firstCompleteResult.Messages).to.have.lengthOf(1)
     expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
 
@@ -68,5 +70,28 @@ describe('Staging tests of relay rewards', () => {
     console.log(secondCompleteResult.Error)
     expect(secondCompleteResult.Messages).to.have.lengthOf(1)
     expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+  })
+
+  it('passes vs staging2 data', async () => {
+    const firstScoresResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Add-Scores' },
+          { name: 'Timestamp', value: '1739283636342' }
+      ],
+      Data: JSON.stringify(scores2)
+    })
+    expect(firstScoresResult.Messages).to.have.lengthOf(1)
+    expect(firstScoresResult.Messages[0].Data).to.equal('OK')
+    
+    const firstCompleteResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Complete-Round' },
+          { name: 'Timestamp', value: '1739283636342' }
+      ]
+    })
+    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
+    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
   })
 })
