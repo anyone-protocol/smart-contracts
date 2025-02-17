@@ -125,8 +125,9 @@ function OperatorRegistry.init()
 
       OperatorRegistry
         .VerifiedFingerprintsToOperatorAddresses[fingerprint] = address
-      OperatorRegistry
-        .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
+      -- NB: Don't remove registration credits on claim
+      -- OperatorRegistry
+      --   .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
       OperatorRegistry
         .ClaimableFingerprintsToOperatorAddresses[fingerprint] = nil
 

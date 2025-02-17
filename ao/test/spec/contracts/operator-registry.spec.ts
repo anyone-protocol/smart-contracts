@@ -881,45 +881,6 @@ describe('Operator Registry', () => {
         expect(resultWithCredit.Messages).to.have.lengthOf(1)
         expect(resultWithCredit.Messages[0].Data).to.equal('OK')
       })
-
-      it('Consumes RC when submitting Fingerprint Certificates', async () => {
-        const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
-        await setupAdminAddOperatorCertificates(
-          handle,
-          ALICE_ADDRESS,
-          fingerprint
-        )
-        const credits = {
-          [FINGERPRINT_A]: ALICE_ADDRESS,
-          [FINGERPRINT_B]: BOB_ADDRESS,
-          [FINGERPRINT_C]: CHARLS_ADDRESS
-        }
-        for (const fingerprint of Object.keys(credits)) {
-          await addRegistrationCredit(handle, credits[fingerprint], fingerprint)
-        }
-        await addRegistrationCredit(handle, ALICE_ADDRESS, fingerprint)
-
-        await handle({
-          From: ALICE_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
-            {
-              name: 'Fingerprint-Certificate',
-              value: fingerprint
-            }
-          ]
-        })
-
-        const listResult = await handle({
-          From: OWNER_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'List-Registration-Credits' }
-          ]
-        })
-
-        expect(listResult.Messages).to.have.lengthOf(1)
-        expect(JSON.parse(listResult.Messages[0].Data)).to.deep.equal(credits)
-      })
     })
 
     describe('Listing', () => {
@@ -1508,7 +1469,11 @@ describe('Operator Registry', () => {
           [FINGERPRINT_C]: CHARLS_ADDRESS
         },
         BlockedOperatorAddresses: [],
-        RegistrationCreditsFingerprintsToOperatorAddresses: [],
+        RegistrationCreditsFingerprintsToOperatorAddresses: {
+          [FINGERPRINT_A]: ALICE_ADDRESS,
+          [FINGERPRINT_B]: BOB_ADDRESS,
+          [FINGERPRINT_C]: CHARLS_ADDRESS
+        },
         VerifiedHardwareFingerprints: {
           [FINGERPRINT_B]: true,
           [FINGERPRINT_E]: true
