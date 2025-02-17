@@ -95,7 +95,10 @@ describe('Round Completion of relay rewards', () => {
         Modifiers: {
           Network: {
             Share: 1
-          }
+          },
+          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+          Uptime: { Enabled: false, Share: 0 },
+          ExitBonus: { Enabled: false, Share: 0 }
         }
       })
     })
@@ -155,7 +158,10 @@ describe('Round Completion of relay rewards', () => {
         Modifiers: {
           Network: {
             Share: 1
-          }
+          },
+          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+          Uptime: { Enabled: false, Share: 0 },
+          ExitBonus: { Enabled: false, Share: 0 }
         }
       })
     })

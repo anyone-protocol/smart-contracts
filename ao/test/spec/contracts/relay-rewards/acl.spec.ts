@@ -62,7 +62,14 @@ describe('ACL enforcement of relay rewards', () => {
           Modifiers: {
             Network: {
               Share: 1
-            }
+            },
+            Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+            Uptime: { Enabled: false, Share: 0 },
+            ExitBonus: { Enabled: false, Share: 0 }
+          },
+          Multipliers: {
+            Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
+            Family: { Enabled: false, Offset: 1, Power: 1 }
           }
         })
       })
@@ -90,7 +97,14 @@ describe('ACL enforcement of relay rewards', () => {
           Modifiers: {
             Network: {
               Share: 1
-            }
+            },
+            Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+            Uptime: { Enabled: false, Share: 0 },
+            ExitBonus: { Enabled: false, Share: 0 }
+          },
+          Multipliers: {
+            Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
+            Family: { Enabled: false, Offset: 1, Power: 1 }
           }
         })
       })

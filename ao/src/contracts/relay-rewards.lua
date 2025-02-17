@@ -23,8 +23,8 @@ local RelayRewards = {
       ExitBonus = { Enabled = true, Share = 0.1 }
     },
     Multipliers = {
-      Family = { Enabled = true, Offset = 0.01, Power = 1 },
-      Location = { Enabled = true, Offset = 0.003, Power = 2 }
+      Family = { Enabled = true, Offset = 0.01, Power = 1.0 },
+      Location = { Enabled = true, Offset = 0.001, Power = 2.0, Divider = 20.0 }
     },
     Delegates = {
 --      [Address] = { Address: '', Share = 0 }
@@ -160,9 +160,12 @@ function RelayRewards._updateConfiguration(config, request)
       assert(request.Multipliers.Location.Offset <= 1, 'Multipliers.Location.Offset has to be <= 1')
       AnyoneUtils.assertNumber(request.Multipliers.Location.Power, 'Multipliers.Location.Power')
       assert(request.Multipliers.Location.Power >= 0, 'Multipliers.Location.Power has to be >= 0')
+      AnyoneUtils.assertNumber(request.Multipliers.Location.Divider, 'Multipliers.Location.Divider')
+      assert(request.Multipliers.Location.Divider >= 1, 'Multipliers.Location.Divider has to be >= 1')
       config.Multipliers.Location.Enabled = request.Multipliers.Location.Enabled
       config.Multipliers.Location.Offset = request.Multipliers.Location.Offset
       config.Multipliers.Location.Power = request.Multipliers.Location.Power
+      config.Multipliers.Location.Divider = request.Multipliers.Location.Divider
     end
   end
   if request.Delegates then
@@ -348,7 +351,7 @@ function RelayRewards.init()
         end
         local locationMultiplier = 1
         if RelayRewards.Configuration.Multipliers.Location.Enabled then
-          locationMultiplier = 1 - RelayRewards.Configuration.Multipliers.Location.Offset * (scoreData.Score.LocationSize^RelayRewards.Configuration.Multipliers.Location.Power)
+          locationMultiplier = 1 - RelayRewards.Configuration.Multipliers.Location.Offset * ((scoreData.Score.LocationSize / RelayRewards.Configuration.Multipliers.Location.Divider)^RelayRewards.Configuration.Multipliers.Location.Power)
           if locationMultiplier < 0 then
             locationMultiplier = 0
           end

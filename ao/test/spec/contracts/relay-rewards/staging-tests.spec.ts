@@ -35,7 +35,6 @@ describe('Staging tests of relay rewards', () => {
           { name: 'Timestamp', value: '100' }
       ]
     })
-    console.log(firstCompleteResult.Error)
     expect(firstCompleteResult.Messages).to.have.lengthOf(1)
     expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
 
@@ -67,7 +66,6 @@ describe('Staging tests of relay rewards', () => {
           { name: 'Timestamp', value: '123456789000' }
       ]
     })
-    console.log(secondCompleteResult.Error)
     expect(secondCompleteResult.Messages).to.have.lengthOf(1)
     expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
   })

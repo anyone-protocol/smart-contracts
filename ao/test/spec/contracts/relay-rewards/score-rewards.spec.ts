@@ -163,7 +163,7 @@ describe('Scoring relay rewards based on ratings', () => {
         },
         Multipliers: {
           Family: { Enabled: true, Offset: 0.01, Power: 1 },
-          Location: { Enabled: true, Offset: 0.003, Power: 2 }
+          Location: { Enabled: true, Offset: 0.003, Power: 2, Divider: 1 }
         }
       })
     })
@@ -304,7 +304,7 @@ describe('Scoring relay rewards based on ratings', () => {
         },
         Multipliers: {
           Family: { Enabled: true, Offset: 0.01, Power: 1 },
-          Location: { Enabled: true, Offset: 0.003, Power: 2 }
+          Location: { Enabled: true, Offset: 0.003, Power: 2, Divider: 1 }
         },
         Delegates: {
           [ALICE_ADDRESS]: {
@@ -414,7 +414,7 @@ describe('Scoring relay rewards based on ratings', () => {
         },
         Multipliers: {
           Family: { Enabled: true, Offset: 0.01, Power: 1 },
-          Location: { Enabled: true, Offset: 0.003, Power: 2 }
+          Location: { Enabled: true, Offset: 0.003, Power: 2, Divider: 1 }
         },
         Delegates: {
           [ALICE_ADDRESS]: {

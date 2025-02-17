@@ -65,6 +65,10 @@ describe('Score ratings of relay rewards', () => {
               '3': 1,
               '14': 3
             }
+          },
+          ExitBonus: {
+            Enabled: false,
+            Share: 0
           }
         }
       })
@@ -251,6 +255,10 @@ describe('Score ratings of relay rewards', () => {
           Hardware: {
             Enabled: true,
             Share: 0.3
+          },
+          ExitBonus: {
+            Enabled: false,
+            Share: 0
           }
         }
       })
