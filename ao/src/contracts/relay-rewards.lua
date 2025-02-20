@@ -790,16 +790,12 @@ function RelayRewards.init()
         for address, claimable in pairs(initState.Claimable) do
           AnyoneUtils.assertValidEvmAddress(address)
           local normalizedAddress = AnyoneUtils.normalizeEvmAddress(address)
-          local claimableNumber = tonumber(claimable)
-          assert(
-            type(claimableNumber) == 'number',
-            'Claimable value must be a number'
-          )
-          assert(claimableNumber > 0, 'Claimable value must be positive')
-          RelayRewards
-            .TotalAddressReward[normalizedAddress] = AnyoneUtils.bigInt(
-              claimableNumber
-            )
+          
+          assert(type(claimable) == 'string', 'Claimable for ' .. address .. ' must be a string number')
+          local safeClaimable = bint.tobint(claimable)
+          assert(safeClaimable ~= nil, 'Claimable for ' .. address .. ' must be an integer')
+          assert(bint.ispos(safeClaimable), 'Claimable for ' .. address .. ' must be a positive value')
+          RelayRewards.TotalAddressReward[normalizedAddress] = tostring(safeClaimable)
         end
       end
 
