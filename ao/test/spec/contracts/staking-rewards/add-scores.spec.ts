@@ -2,25 +2,26 @@ import { expect } from 'chai'
 
 import {
   ALICE_ADDRESS,
+  BOB_ADDRESS,
   AOTestHandle,
   createLoader,
   FINGERPRINT_A,
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
-describe('Add-Scores action of relay rewards', () => {
+describe('Add-Scores action of staking rewards', () => {
   let handle: AOTestHandle
 
-  let score0 = { Address: ALICE_ADDRESS, 
-    Network: 0, IsHardware: false, UptimeStreak: 0, ExitBonus: false, 
-    FamilySize: 0, LocationSize: 0
-  }
+  let score0 = { [BOB_ADDRESS]: {
+    Staked: '1', Running: 0.0, Share: 0.0
+  } }
+
   let refRound1 = JSON.stringify({
-    Scores: { [FINGERPRINT_A]: score0 }
+    Scores: { [ALICE_ADDRESS]: score0 }
   })
 
   beforeEach(async () => {
-    handle = (await createLoader('relay-rewards')).handle
+    handle = (await createLoader('staking-rewards')).handle
   })
 
   it('Blocks non-owners from doing updates', async () => {
@@ -112,14 +113,9 @@ describe('Add-Scores action of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 100,
-        Modifiers: {
-          Network: {
-            Share: 1
-          },
-          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
-          Uptime: { Enabled: false, Share: 0 },
-          ExitBonus: { Enabled: false, Share: 0 }
+        TokensPerSecond: '100',
+        Requirements: {
+          Running: 0.5
         }
       })
     })
@@ -182,7 +178,7 @@ describe('Add-Scores action of relay rewards', () => {
     expect(outdatedStampResult.Error).to.be.a('string').that.includes('Scores have to be a table')
   })
 
-  it('Each score - Fingerprint has valid format', async () => {
+  it('Each score - Hodler address has valid format', async () => {
     const scoresResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -190,24 +186,22 @@ describe('Add-Scores action of relay rewards', () => {
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: score0, 
+        [BOB_ADDRESS]: score0, 
           'asd': score0
         }
       })
     })
-    expect(scoresResult.Error).to.be.a('string').that.includes('Invalid Fingerprint')
+    expect(scoresResult.Error).to.be.a('string').that.includes('Invalid Hodler Address')
   })
 
-  it('Each score - Fingerprint score was not set during the round', async () => {
+  it('Each score - score was not duplicated during round scoring', async () => {
     const sameRoundTrueResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: score0 
-      }})
+      Data: refRound1
     })
     expect(sameRoundTrueResult.Messages).to.have.lengthOf(1)
     expect(sameRoundTrueResult.Messages[0].Data).to.equal('OK')
@@ -218,76 +212,72 @@ describe('Add-Scores action of relay rewards', () => {
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: score0 
-      }})
+      Data: refRound1
     })
-    expect(sameRoundFalseResult.Error).to.be.a('string').that.includes('Duplicated score for ' + FINGERPRINT_A)
+    expect(sameRoundFalseResult.Error).to.be.a('string').that.includes('Duplicated score')
   })
 
-  it('Each score - Address Must be valid EVM address format', async () => {
-    const emptyAddressResult = await handle({
+  it('Each score - Operator address Must be valid EVM address format', async () => {
+    const badOperatorResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, Address: '' }
+        [ALICE_ADDRESS]: { 
+          'asd': {
+            'Staked': '1', 'Running': 0.0, 'Share': 0.0
+          }
+        }
       }})
     })
-    expect(emptyAddressResult.Error).to.be.a('string').that.includes('Invalid Scores[' + FINGERPRINT_A +'].Addres')
-
-    const wrongAddressResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, Address: 'some-wrong-address' }
-      }})
-    })
-    expect(wrongAddressResult.Error).to.be.a('string').that.includes('Invalid Scores[' + FINGERPRINT_A +'].Addres')
+    expect(badOperatorResult.Error).to.be.a('string').that.includes('Invalid Operator address: Scores[0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA][asd]')
   })
 
-  it('Each score - Network score must be integer and >= 0', async () => {
-    const emptyNetworkResult = await handle({
+  it('Each score - Staked score must be string with integer and >= 0', async () => {
+    const emptyStakedResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, Network: '' }
+        [ALICE_ADDRESS]: { 
+          [BOB_ADDRESS]: { 'Staked': '', 'Running': 0.0, 'Share': 0.0 }
+        }
       }})
     })
-    expect(emptyNetworkResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].Network')
+    expect(emptyStakedResult.Error).to.be.a('string').that.includes('failed parsing to bint')
 
-    const wrongNetworkResult = await handle({
+    const wrongStakedResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, Network: -100 }
+        [ALICE_ADDRESS]: { 
+          [BOB_ADDRESS]: { 'Staked': '-1', 'Running': 0.0, 'Share': 0.0 }
+        }
       }})
     })
-    expect(wrongNetworkResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].Network')
+    expect(wrongStakedResult.Error).to.be.a('string').that.includes('must be positive value')
     
-    const boolNetworkResult = await handle({
+    const zeroStakedResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, Network: true }
+        [ALICE_ADDRESS]: { 
+          [BOB_ADDRESS]: { 'Staked': '0', 'Running': 0.0, 'Share': 0.0 }
+        }
       }})
     })
-    expect(boolNetworkResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].Network')
-    
+    expect(zeroStakedResult.Error).to.be.a('string').that.includes('must be positive value')
+
     const nullNetworkResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -295,237 +285,127 @@ describe('Add-Scores action of relay rewards', () => {
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, Network: null }
+        [ALICE_ADDRESS]: { 
+          [BOB_ADDRESS]: { 'Running': 0.0, 'Share': 0.0 }
+        }
       }})
     })
-    expect(nullNetworkResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].Network')
+    expect(nullNetworkResult.Error).to.be.a('string').that.includes('must be a string number')
   })
 
-  it('Each score - IsHardware must be boolean', async () => {
-    const emptyHardwareResult = await handle({
+  it('Each score - Running score must be a float 0..1', async () => {
+    const emptyRunningResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, IsHardware: '' }
+        [ALICE_ADDRESS]: { 
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': '', 'Share': 0.0 }
+        }
       }})
     })
-    expect(emptyHardwareResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].IsHardware')
+    expect(emptyRunningResult.Error).to.be.a('string').that.includes('Number value required')
 
-    const numberHardwareResult = await handle({
+    const nullRunningResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, IsHardware: 12 }
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { 'Staked': '1', 'Share': 0.0 }
+        }
       }})
     })
-    expect(numberHardwareResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].IsHardware')
+    expect(nullRunningResult.Error).to.be.a('string').that.includes('Number value required')
 
-    const nullHardwareResult = await handle({
+    const largeRunningResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, IsHardware: null }
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 1.1, 'Share': 0.0 }
+        }
       }})
-   })
-    expect(nullHardwareResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].IsHardware')
+    })
+    expect(largeRunningResult.Error).to.be.a('string').that.includes('has to be <= 1')
+
+    const smallRunningResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Add-Scores' },
+          { name: 'Timestamp', value: '5' }
+      ],
+      Data: JSON.stringify({ Scores: {
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': -0.1, 'Share': 0.0 }
+        }
+      }})
+    })
+    expect(smallRunningResult.Error).to.be.a('string').that.includes('has to be >= 0')
+  })
   
-  })
+  it('Each score - Share info must be a float 0..1', async () => {
+    const emptyShareResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Add-Scores' },
+          { name: 'Timestamp', value: '5' }
+      ],
+      Data: JSON.stringify({ Scores: {
+        [ALICE_ADDRESS]: { 
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.4, 'Share': '' }
+        }
+      }})
+    })
+    expect(emptyShareResult.Error).to.be.a('string').that.includes('Number value required')
 
-  it('Each score - UptimeStreak must be integer and >= 0', async () => {
-    const emptyUptimeResult = await handle({
+    const nullShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, UptimeStreak: '' }
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.9 }
+        }
       }})
     })
-    expect(emptyUptimeResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].UptimeStreak')
+    expect(nullShareResult.Error).to.be.a('string').that.includes('Number value required')
 
-    const wrongUptimeResult = await handle({
+    const largeShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, UptimeStreak: -100 }
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.1, 'Share': 1.1 }
+        }
       }})
     })
-    expect(wrongUptimeResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].UptimeStreak')
-    
-    const boolUptimeResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, UptimeStreak: true }
-      }})
-    })
-    expect(boolUptimeResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].UptimeStreak')
-    
-    const nullUptimeResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, UptimeStreak: null }
-      }})
-    })
-    expect(nullUptimeResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].UptimeStreak')
-  })
+    expect(largeShareResult.Error).to.be.a('string').that.includes('has to be <= 1')
 
-  it('Each score - ExitBonus must be boolean', async () => {
-    const emptyBonusResult = await handle({
+    const smallShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
           { name: 'Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, ExitBonus: '' }
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.9, 'Share': -0.1 }
+        }
       }})
     })
-    expect(emptyBonusResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].ExitBonus')
-
-    const numberBonusResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, ExitBonus: 12 }
-      }})
-    })
-    expect(numberBonusResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].ExitBonus')
-
-    const nullBonusResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, ExitBonus: null }
-      }})
-   })
-    expect(nullBonusResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].ExitBonus')
-  
-  })
-
-  it('Each score - FamilySize must be integer and >= 0', async () => {
-    const emptyFamilyResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, FamilySize: '' }
-      }})
-    })
-    expect(emptyFamilyResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].FamilySize')
-
-    const wrongFamilyResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, FamilySize: -100 }
-      }})
-    })
-    expect(wrongFamilyResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].FamilySize')
-    
-    const boolFamilyResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, FamilySize: true }
-      }})
-    })
-    expect(boolFamilyResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].FamilySize')
-    
-    const nullFamilyResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, FamilySize: null }
-      }})
-    })
-    expect(nullFamilyResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].FamilySize')
-  })
-
-  it('Each score - LocationSize must be integer and >= 0', async () => {
-    const emptyLocationResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, LocationSize: '' }
-      }})
-    })
-    expect(emptyLocationResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].LocationSize')
-
-    const wrongLocationResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, LocationSize: -100 }
-      }})
-    })
-    expect(wrongLocationResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].LocationSize')
-    
-    const boolLocationResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, LocationSize: true }
-      }})
-    })
-    expect(boolLocationResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].LocationSize')
-    
-    const nullLocationResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
-      ],
-      Data: JSON.stringify({ Scores: {
-        [FINGERPRINT_A]: { ...score0, LocationSize: null }
-      }})
-    })
-    expect(nullLocationResult.Error).to.be.a('string').that.includes('Scores[' + FINGERPRINT_A +'].LocationSize')
+    expect(smallShareResult.Error).to.be.a('string').that.includes('has to be >= 0')
   })
 })
