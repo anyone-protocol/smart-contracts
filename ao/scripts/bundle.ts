@@ -5,7 +5,7 @@ import { logger } from './util/logger'
 import { bundle } from './lua-bundler'
 
 async function main() {
-  const contractNames = [ 'operator-registry', 'relay-rewards', 'acl-test' ]
+  const contractNames = [ 'operator-registry', 'relay-rewards', 'staking-rewards', 'acl-test' ]
 
   logger.info(
     `Bundling ${contractNames.length} contracts: ${contractNames.join(',')}`

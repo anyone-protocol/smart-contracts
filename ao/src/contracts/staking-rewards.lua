@@ -12,7 +12,7 @@ local StakingRewards = {
   },
 
   Configuration = {
-    TokensPerSecond = 100000000,
+    TokensPerSecond = '100000000',
     Requirements = {
       Running = 0.5
     }
@@ -28,11 +28,6 @@ local StakingRewards = {
     Configuration = {},
     Details = {
 -- [Address] = { // Hodler
---   Total = {
---     Reward = '0'
---     Staked = '0'
---     Restaked = '0'
---   }
 --   [Address] = { // Operator
 --     Score = {
 --       Staked = '0'
@@ -64,11 +59,14 @@ local StakingRewards = {
 
 function StakingRewards._updateConfiguration(config, request)
   local AnyoneUtils = require('.common.utils')
+  local bint = require('.bint')(256)
 
   if request.TokensPerSecond then
-    AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
-    assert(request.TokensPerSecond >= 0, 'TokensPerSecond has to be >= 0')
-    config.TokensPerSecond = request.TokensPerSecond
+    assert(type(request.TokensPerSecond) == 'string', 'TokensPerSecond must be a string number')
+    local safeTokens = bint.tobint(request.TokensPerSecond)
+    assert(safeTokens ~= nil, 'TokensPerSecond must be an integer')
+    assert(bint.ispos(safeTokens), 'TokensPerSecond must be a positive value')
+    config.TokensPerSecond = tostring(safeTokens)
   end
   if request.Requirements then
     if request.Requirements.Running then
@@ -156,33 +154,30 @@ function StakingRewards.init()
       assert(timestamp > StakingRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
 
       assert(type(request.Scores) == 'table', 'Scores have to be a table')
-
-      local function assertScore(score, hodlerAddress)
-        AnyoneUtils.assertValidEvmAddress(score.Address, 'Invalid Scores[' .. hodlerAddress .. '].Address')
-        local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(score.Address)
-        
-        assert(
-          StakingRewards.PendingRounds[timestamp] == nil or
-          StakingRewards.PendingRounds[timestamp][hodlerAddress] == nil or
-          StakingRewards.PendingRounds[timestamp][hodlerAddress][nOperatorAddress] == nil, 'Duplicated score for ' .. hodlerAddress .. ' : ' .. nOperatorAddress)
-
-        assert(type(score.Staked) == 'string', 'Scores[' .. hodlerAddress .. '].Staked must be a string number')
-        local staked = bint.tobint(score.Staked)
-        assert(staked ~= nil, 'Scores[' .. hodlerAddress .. '].Staked failed parsing to bint')
-        assert(not bint.iszero(staked), 'Scores[' .. hodlerAddress .. '].Staked must be a non zero value')
-
-        AnyoneUtils.assertNumber(score.Running, 'Scores[' .. hodlerAddress .. '].Running')
-        AnyoneUtils.assertNumber(score.Share, 'Scores[' .. hodlerAddress .. '].Share')
-        assert(score.Share >= 0, 'Scores[' .. hodlerAddress .. '].Share has to be >= 0')
-        assert(score.Share <= 1, 'Scores[' .. hodlerAddress .. '].Share has to be <= 1') 
-      end
-
-      for hodlerAddress, score in pairs(request.Scores) do
+      for hodlerAddress, scores in pairs(request.Scores) do
         AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Invalid Hodler Address:' .. hodlerAddress)
         local nHodlerAddress = AnyoneUtils.normalizeEvmAddress(hodlerAddress)
-        assertScore(score, nHodlerAddress)
         if StakingRewards.PendingRounds[timestamp] then
           assert(StakingRewards.PendingRounds[timestamp][nHodlerAddress] == nil, 'Duplicated score for ' .. nHodlerAddress)
+        end
+        for operatorAddress, score in pairs(scores) do
+          AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid Operator address: Scores[' .. hodlerAddress .. '][' .. operatorAddress .. ']')
+          local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+          
+          assert(
+            StakingRewards.PendingRounds[timestamp] == nil or
+            StakingRewards.PendingRounds[timestamp][hodlerAddress] == nil or
+            StakingRewards.PendingRounds[timestamp][hodlerAddress][nOperatorAddress] == nil, 'Duplicated score for ' .. hodlerAddress .. ' : ' .. nOperatorAddress)
+
+          assert(type(score.Staked) == 'string', 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Staked must be a string number')
+          local staked = bint.tobint(score.Staked)
+          assert(staked ~= nil, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Staked failed parsing to bint')
+          assert(not bint.iszero(staked), 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Staked must be a non zero value')
+
+          AnyoneUtils.assertNumber(score.Running, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Running')
+          AnyoneUtils.assertNumber(score.Share, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Share')
+          assert(score.Share >= 0, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Share has to be >= 0')
+          assert(score.Share <= 1, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Share has to be <= 1') 
         end
       end
 
@@ -190,14 +185,11 @@ function StakingRewards.init()
         StakingRewards.PendingRounds[timestamp] = {}
       end
 
-      for hodlerAddress, score in pairs(request.Scores) do
-        StakingRewards.PendingRounds[timestamp][hodlerAddress] = {
-          Total = { Reward = '0', Staked = '0', Restaked = '0' }
-        }
-
-        for operatorAddress, data in pairs(score) do          
+      for hodlerAddress, scores in pairs(request.Scores) do
+        StakingRewards.PendingRounds[timestamp][hodlerAddress] = {}
+        for operatorAddress, score in pairs(scores) do          
           StakingRewards.PendingRounds[timestamp][hodlerAddress][operatorAddress] = {
-            Staked = bint(data.Staked), Running = data.Running, Share = data.Share,
+            Staked = tostring(bint(score.Staked)), Running = score.Running, Share = score.Share,
           }
         end
       end
@@ -221,242 +213,126 @@ function StakingRewards.init()
         msg.From,
         { 'owner', 'admin', 'Complete-Round' }
       )
-      
+
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
-      assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
+      assert(StakingRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
+      
+      local summary = {
+        Rewards = bint(0), Ratings = bint(0), Stakes = bint(0)
+      }
 
       local roundData = {}
       
-      local summary = {
-        Ratings = { Network = bint(0), Uptime = 0.0, ExitBonus = bint(0) },
-        Rewards = { Total = bint(0), Network = bint(0), Hardware = bint(0), Uptime = bint(0), ExitBonus = bint(0) }
-      }
-      
-      for fingerprint, scoreData in pairs(RelayRewards.PendingRounds[timestamp]) do
-        roundData[fingerprint] = {}
-        roundData[fingerprint].Address = scoreData.Address
-        roundData[fingerprint].Score = scoreData.Score
-        
-        local networkScore = scoreData.Score.Network
-
-        local familyMultiplier = 1
-        if RelayRewards.Configuration.Multipliers.Family.Enabled then
-          familyMultiplier = 1 + RelayRewards.Configuration.Multipliers.Family.Offset * (scoreData.Score.FamilySize^RelayRewards.Configuration.Multipliers.Family.Power)
-          if familyMultiplier < 0 then
-            familyMultiplier = 0
-          end
-          networkScore = math.floor(networkScore * familyMultiplier)
-        end
-        local locationMultiplier = 1
-        if RelayRewards.Configuration.Multipliers.Location.Enabled then
-          locationMultiplier = 1 - RelayRewards.Configuration.Multipliers.Location.Offset * ((scoreData.Score.LocationSize / RelayRewards.Configuration.Multipliers.Location.Divider)^RelayRewards.Configuration.Multipliers.Location.Power)
-          if locationMultiplier < 0 then
-            locationMultiplier = 0
-          end
-          networkScore = math.floor(networkScore * locationMultiplier)
-        end
-
-        roundData[fingerprint].Rating = { Network = networkScore, IsHardware = false, Uptime = 0, ExitBonus = 0 }
-
-        local uptimeTierWeight = 0.0
-        if RelayRewards.Configuration.Modifiers.Hardware.Enabled and scoreData.Score.IsHardware then
-          for days, weight in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
-            local daysInt = tonumber(days)
-            local weightFloat = tonumber(weight)
-            assert(weightFloat, 'Multiplier must be a number')
-            if daysInt <= scoreData.Score.UptimeStreak and uptimeTierWeight < weightFloat then
-              uptimeTierWeight = weightFloat
+      for hodlerAddress, scores in pairs(StakingRewards.PendingRounds[timestamp]) do
+        roundData[hodlerAddress] = {}
+        for operatorAddress, score in pairs(scores) do
+          local restaked = bint(0)
+          if StakingRewards.Rewarded[hodlerAddress] ~= nil and 
+              StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
+            if StakingRewards.Claimed[hodlerAddress] ~= nil and 
+                StakingRewards.Claimed[hodlerAddress][operatorAddress] ~= nil then
+              restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress]) - bint(StakingRewards.Claimed[hodlerAddress][operatorAddress])
+            else
+              restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress])
             end
           end
-          roundData[fingerprint].Rating.Uptime = uptimeTierWeight
-          roundData[fingerprint].Rating.IsHardware = true
+          local staked = bint(score.Staked)
+          local rating = bint(0)
+          if score.Running > StakingRewards.Configuration.Requirements.Running then
+            rating = staked + restaked
+          end
+
+          summary.Stakes = summary.Stakes + bint(score.Staked) + restaked
+          summary.Ratings = summary.Ratings + rating
+
+          roundData[hodlerAddress][operatorAddress] = {
+            Score = {
+              Staked = bint(score.Staked),
+              Restaked = restaked,
+              Running = score.Running,
+              Share = score.Share
+            },
+            Rating = rating
+          }
         end
-
-        if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.Score.ExitBonus then
-          roundData[fingerprint].Rating.ExitBonus = networkScore
-        end
-
-        roundData[fingerprint].Variables = {
-          FamilyMultiplier = familyMultiplier,
-          LocationMultiplier = locationMultiplier
-        }
-
-        summary.Ratings.Network = summary.Ratings.Network + bint(roundData[fingerprint].Rating.Network)
-        summary.Ratings.Uptime = summary.Ratings.Uptime + roundData[fingerprint].Rating.Uptime
-        summary.Ratings.ExitBonus = summary.Ratings.ExitBonus + bint(roundData[fingerprint].Rating.ExitBonus)
       end
 
       local roundLength = bint(0)
-      if RelayRewards.PreviousRound.Timestamp > 0 then
+      if StakingRewards.PreviousRound.Timestamp > 0 then
         local msInSec = 1000
-        roundLength = bint((timestamp - RelayRewards.PreviousRound.Timestamp) // msInSec)
+        roundLength = bint((timestamp - StakingRewards.PreviousRound.Timestamp) // msInSec)
       end
 
-      local tokensPerSecond = bint(RelayRewards.Configuration.TokensPerSecond)
+      local tokensPerSecond = bint(StakingRewards.Configuration.TokensPerSecond)
       local totalRewardsPerRound = tokensPerSecond * roundLength
-
       local sharePrecision = bint(1000)
-      
-      local networkRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Network.Share * sharePrecision)) // sharePrecision
-      local networkRewards = networkRewardsPerSec * roundLength
-
-      local hardwareRewards = bint(0)
-      local hardwareRewardsPerSec = bint(0)
-      if RelayRewards.Configuration.Modifiers.Hardware.Enabled then
-        hardwareRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Hardware.Share * sharePrecision)) // sharePrecision
-        hardwareRewards = hardwareRewardsPerSec * roundLength
-      end
-
-      local uptimeRewards = bint(0)
-      local uptimeRewardsPerSec = bint(0)
-      if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
-        uptimeRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Uptime.Share * sharePrecision)) // sharePrecision
-        uptimeRewards = uptimeRewardsPerSec * roundLength
-      end
-
-      local exitBonusRewards = bint(0)
-      local exitBonusRewardsPerSec = bint(0)
-      if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled then
-        exitBonusRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.ExitBonus.Share * sharePrecision)) // sharePrecision
-        exitBonusRewards = exitBonusRewardsPerSec * roundLength
-      end
-
-      local fingerprintRewardsPerSec = networkRewardsPerSec + hardwareRewardsPerSec + uptimeRewardsPerSec + exitBonusRewardsPerSec
-
-      local fingerprintRewards = fingerprintRewardsPerSec * roundLength
-      assert(bint.ule(fingerprintRewards, totalRewardsPerRound), 'Failed rewards share calculation')
-      
-      local uptimeInfluenceOnHw = 0.0
-      if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
-        uptimeInfluenceOnHw = RelayRewards.Configuration.Modifiers.Hardware.UptimeInfluence
-      end
-      local networkInfluenceOnHw = 1 - uptimeInfluenceOnHw
-      local totalHwNetworkRewards = bint(0)
-      for fingerprint, ratedData in pairs(roundData) do
-        roundData[fingerprint].Reward = {
-          Total = bint(0),
-          OperatorTotal = bint(0),
-          DelegateTotal = bint(0),
-          Network = bint(0),
-          Hardware = bint(0),
-          Uptime = bint(0),
-          ExitBonus = bint(0)
-        }
-        if not bint.iszero(summary.Ratings.Network) then
-          roundData[fingerprint].Reward.Network = (networkRewards * ratedData.Rating.Network) // summary.Ratings.Network
-          summary.Rewards.Network = summary.Rewards.Network + roundData[fingerprint].Reward.Network
-        end
-        if ratedData.Rating.IsHardware then
-          totalHwNetworkRewards = totalHwNetworkRewards + roundData[fingerprint].Reward.Network
-          if not bint.iszero(summary.Ratings.Uptime) then
-            local uptimePrecision = bint(100000)
-            local uptimeWeight = ratedData.Rating.Uptime / summary.Ratings.Uptime
-            roundData[fingerprint].Reward.Uptime = (uptimeRewards * bint(uptimeWeight * uptimePrecision)) // uptimePrecision
-            summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
+      for holderAddress, ratedData in pairs(roundData) do
+        for operatorAddress, data in pairs(ratedData) do
+          local reward = bint(0)
+          if not bint.iszero(summary.Ratings) then
+            reward = (totalRewardsPerRound * data.Rating) // summary.Ratings
           end
+          local r = bint.trunc(data.Score.Share * bint.tonumber(sharePrecision)) * reward
+          local operatorReward = r // sharePrecision
+          
+          roundData[holderAddress][operatorAddress].Reward = {
+            Hodler = reward - operatorReward, Operator = operatorReward
+          }
+          
+          summary.Rewards = summary.Rewards + reward
         end
       end
-      local delegatePrecision = bint(1000)
-      local influencePrecision = bint(1000)
-      local networkTotalPart = (totalHwNetworkRewards * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
-      local uptimeTotalPart = (summary.Rewards.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
-      local hwTotalWeight = networkTotalPart + uptimeTotalPart
 
-      for fingerprint, ratedData in pairs(roundData) do
-        if ratedData.Rating.IsHardware then
-          local networkUnitPart = (roundData[fingerprint].Reward.Network * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
-          local uptimeUnitPart = (roundData[fingerprint].Reward.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
-          local hwUnitWeight = networkUnitPart + uptimeUnitPart
-          if not bint.iszero(hwTotalWeight) then
-            roundData[fingerprint].Reward.Hardware = (hardwareRewards * hwUnitWeight) // hwTotalWeight
+      local dataWithStrings = {}
+      for hodlerAddress, ratedData in pairs(roundData) do
+        dataWithStrings[hodlerAddress] = {}
+        for operatorAddress, data in pairs(ratedData) do
+          if StakingRewards.Rewarded[hodlerAddress] == nil then
+            StakingRewards.Rewarded[hodlerAddress] = {}
           end
-        end
-        if not bint.iszero(summary.Ratings.ExitBonus) then
-          roundData[fingerprint].Reward.ExitBonus = (exitBonusRewards * ratedData.Rating.ExitBonus) // summary.Ratings.ExitBonus
-        end
-        
-        roundData[fingerprint].Reward.Total = roundData[fingerprint].Reward.Network +
-            roundData[fingerprint].Reward.Hardware + roundData[fingerprint].Reward.Uptime +
-            roundData[fingerprint].Reward.ExitBonus
-        
-        local operatorAddress = roundData[fingerprint].Address
-        local delegate = RelayRewards.Configuration.Delegates[operatorAddress]
-        if delegate and delegate.Share > 0 then
-          local delegateTotal = (roundData[fingerprint].Reward.Total * bint(delegate.Share * delegatePrecision)) // delegatePrecision
-
-          local operatorTotal = roundData[fingerprint].Reward.Total - delegateTotal
-          roundData[fingerprint].Reward.OperatorTotal = operatorTotal
-          roundData[fingerprint].Reward.DelegateTotal = delegateTotal
-          local normalizedDelegateAddress = AnyoneUtils.normalizeEvmAddress(delegate.Address)
-
-          if RelayRewards.TotalAddressReward[normalizedDelegateAddress] == nil then
-            RelayRewards.TotalAddressReward[normalizedDelegateAddress] = '0'
+          local previous = bint(0)
+          if StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
+            previous = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress])
           end
-          RelayRewards.TotalAddressReward[normalizedDelegateAddress] = tostring(bint(RelayRewards.TotalAddressReward[normalizedDelegateAddress]) + roundData[fingerprint].Reward.DelegateTotal)
-        else
-          roundData[fingerprint].Reward.OperatorTotal = tostring(roundData[fingerprint].Reward.Total)
-          roundData[fingerprint].Reward.DelegateTotal = '0'
+          StakingRewards.Rewarded[hodlerAddress][operatorAddress] = tostring(data.Reward.Hodler + previous)
+          
+          if StakingRewards.Rewarded[operatorAddress] == nil then
+            StakingRewards.Rewarded[operatorAddress] = {}
+          end
+          if StakingRewards.Rewarded[operatorAddress][operatorAddress] ~= nil then
+            previous = bint(StakingRewards.Rewarded[operatorAddress][operatorAddress])
+          end
+          StakingRewards.Rewarded[operatorAddress][operatorAddress] = tostring(data.Reward.Operator + previous)
+          
+          dataWithStrings[hodlerAddress][operatorAddress] = {
+            Score = {
+              Staked = tostring(data.Score.Staked),
+              Restaked = tostring(data.Score.Restaked),
+              Running = data.Score.Running,
+              Share = data.Score.Share
+            },
+            Rating = tostring(data.Rating),
+            Reward = { Hodler = tostring(data.Reward.Hodler), Operator = tostring(data.Reward.Operator)}
+          }
         end
-        local normalizedOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
-        if RelayRewards.TotalAddressReward[normalizedOperatorAddress] == nil then
-          RelayRewards.TotalAddressReward[normalizedOperatorAddress] = '0'
-        end
-        RelayRewards.TotalAddressReward[normalizedOperatorAddress] = tostring(bint(RelayRewards.TotalAddressReward[normalizedOperatorAddress]) + roundData[fingerprint].Reward.OperatorTotal)
-
-        if RelayRewards.TotalFingerprintReward[fingerprint] == nil then
-          RelayRewards.TotalFingerprintReward[fingerprint] = '0'
-        end
-        RelayRewards.TotalFingerprintReward[fingerprint] = tostring(bint(RelayRewards.TotalFingerprintReward[fingerprint]) + roundData[fingerprint].Reward.Total)
-
-        summary.Rewards.Total = summary.Rewards.Total + roundData[fingerprint].Reward.Total
-        summary.Rewards.Hardware = summary.Rewards.Hardware + roundData[fingerprint].Reward.Hardware
-        summary.Rewards.ExitBonus = summary.Rewards.ExitBonus + roundData[fingerprint].Reward.ExitBonus
       end
 
-      local roundDataWithStringRewards = {}
-
-      for fingerprint, ratedData in pairs(roundData) do
-        roundDataWithStringRewards[fingerprint] = {}
-        roundDataWithStringRewards[fingerprint].Address = ratedData.Address
-        roundDataWithStringRewards[fingerprint].Variables = ratedData.Variables
-        roundDataWithStringRewards[fingerprint].Score = ratedData.Score
-        roundDataWithStringRewards[fingerprint].Rating = ratedData.Rating
-        roundDataWithStringRewards[fingerprint].Reward = {
-          Total = tostring(ratedData.Reward.Total),
-          OperatorTotal = tostring(ratedData.Reward.OperatorTotal),
-          DelegateTotal = tostring(ratedData.Reward.DelegateTotal),
-          Network = tostring(ratedData.Reward.Network),
-          Hardware = tostring(ratedData.Reward.Hardware),
-          Uptime = tostring(ratedData.Reward.Uptime),
-          ExitBonus = tostring(ratedData.Reward.ExitBonus)
-        }
-      end
-
-      RelayRewards.PreviousRound = {
+      StakingRewards.PreviousRound = {
         Timestamp = timestamp,
         Period = bint.tonumber(roundLength),
         Summary = {
-          Ratings = {
-            Network = tostring(summary.Ratings.Network), 
-            Uptime = tostring(summary.Ratings.Uptime), 
-            ExitBonus = tostring(summary.Ratings.ExitBonus)
-          },
-          Rewards = {
-            Total = tostring(summary.Rewards.Total),
-            Network = tostring(summary.Rewards.Network),
-            Hardware = tostring(summary.Rewards.Hardware),
-            Uptime = tostring(summary.Rewards.Uptime),
-            ExitBonus = tostring(summary.Rewards.ExitBonus)
-          }
+          Stakes = tostring(summary.Stakes),
+          Ratings = tostring(summary.Ratings),
+          Rewards = tostring(summary.Rewards)
         },
-        Configuration = RelayRewards.Configuration,
-        Details = roundDataWithStringRewards
+        Configuration = StakingRewards.Configuration,
+        Details = dataWithStrings
       }
 
-      for roundStamp, _ in pairs(RelayRewards.PendingRounds) do
+      for roundStamp, _ in pairs(StakingRewards.PendingRounds) do
         if roundStamp <= timestamp then
-          RelayRewards.PendingRounds[roundStamp] = nil
+          StakingRewards.PendingRounds[roundStamp] = nil
         end
       end
 
@@ -504,16 +380,22 @@ function StakingRewards.init()
     function (msg)
       local hodlerAddress = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
       AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Address tag')
-      local result = '{}'
-
+      local result = {}
       if StakingRewards.Rewarded[hodlerAddress] ~= nil then
-        result = json.encode(StakingRewards.Rewarded[hodlerAddress])
+        result['Rewarded'] = StakingRewards.Rewarded[hodlerAddress]
+      else
+        result['Rewarded'] = {}
+      end
+      if StakingRewards.Claimed[hodlerAddress] ~= nil then
+        result['Claimed'] = StakingRewards.Claimed[hodlerAddress]
+      else
+        result['Claimed'] = {}
       end
 
       ao.send({
         Target = msg.From,
         Action = 'Get-Rewards-Response',
-        Data = result
+        Data = json.encode(result)
       })
     end
   )
