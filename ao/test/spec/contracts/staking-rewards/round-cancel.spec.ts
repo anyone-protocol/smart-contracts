@@ -3,16 +3,17 @@ import { expect } from 'chai'
 import {
   ALICE_ADDRESS,
   AOTestHandle,
+  BOB_ADDRESS,
   createLoader,
   FINGERPRINT_A,
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
-describe('Cancel-Round action of relay rewards', () => {
+describe('Cancel-Round action of staking rewards', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
-    handle = (await createLoader('relay-rewards')).handle
+    handle = (await createLoader('staking-rewards')).handle
   })
 
   it('Blocks non-owners from doing updates', async () => {
@@ -73,13 +74,16 @@ describe('Cancel-Round action of relay rewards', () => {
       ],
       Data: JSON.stringify({
         Scores: {
-          [FINGERPRINT_A]: { Address: ALICE_ADDRESS, 
-            Network: 0, IsHardware: false, UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
+          [ALICE_ADDRESS]: {
+            [BOB_ADDRESS]: {
+              Staked: '1',
+              Running: 0.3,
+              Share: 0.1
+            }
           }
         }
       })
     })
-
     expect(newRoundResult.Messages).to.have.lengthOf(1)
     expect(newRoundResult.Messages[0].Data).to.equal('OK')
 

@@ -12,27 +12,25 @@ import {
     OWNER_ADDRESS
   } from '~/test/util/setup'
 
-describe('Round Completion of relay rewards', () => {
+describe('Round Completion of staking rewards', () => {
   let handle: AOTestHandle
 
-  let score0 = { Address: ALICE_ADDRESS, Network: 0, IsHardware: false, 
-    UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
-  }
-  let score1 = { Address: BOB_ADDRESS, Network: 100, IsHardware: false, 
-    UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
-  }
-  let score2 = { Address: CHARLS_ADDRESS, Network: 200, IsHardware: true, 
-    UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
-  }
-  let refRound0 = JSON.stringify({ Scores: { [FINGERPRINT_A]: score0 } })
-  let refRound1 = JSON.stringify({ Scores: { [FINGERPRINT_A]: score0, 
-    [FINGERPRINT_B]: score1 } })
-  let refRound2 = JSON.stringify({
-    Scores: { [FINGERPRINT_A]: score0, [FINGERPRINT_B]: score1, [FINGERPRINT_C]: score2 }
+  let score0 = { [BOB_ADDRESS]: { Staked: '1', Running: 0, Share: 0 } }
+  let score1 = { [BOB_ADDRESS]: { Staked: '100', Running: 0.8, Share: 0 } }
+  let score2 = { [CHARLS_ADDRESS]: { Staked: '200', Running: 0.7, Share: 0 } }
+  let refRound0 = JSON.stringify({ Scores: { [ALICE_ADDRESS]: score0 } })
+  let refRound1 = JSON.stringify({ Scores: { 
+    [ALICE_ADDRESS]: score0, 
+    [BOB_ADDRESS]: score1 
+  } })
+  let refRound2 = JSON.stringify({ Scores: { 
+    [ALICE_ADDRESS]: score0, 
+    [BOB_ADDRESS]: score1, 
+    [BOB_ADDRESS]: score2 }
   })
 
   beforeEach(async () => {
-    handle = (await createLoader('relay-rewards')).handle
+    handle = (await createLoader('staking-rewards')).handle
   })
 
   it('Blocks non-owners from doing updates', async () => {
@@ -91,14 +89,9 @@ describe('Round Completion of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 123,
-        Modifiers: {
-          Network: {
-            Share: 1
-          },
-          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
-          Uptime: { Enabled: false, Share: 0 },
-          ExitBonus: { Enabled: false, Share: 0 }
+        TokensPerSecond: '100000000',
+        Requirements: {
+          Running: 0.5
         }
       })
     })
@@ -154,14 +147,9 @@ describe('Round Completion of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 123,
-        Modifiers: {
-          Network: {
-            Share: 1
-          },
-          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
-          Uptime: { Enabled: false, Share: 0 },
-          ExitBonus: { Enabled: false, Share: 0 }
+        TokensPerSecond: '100000000',
+        Requirements: {
+          Running: 0.5
         }
       })
     })
@@ -214,13 +202,13 @@ describe('Round Completion of relay rewards', () => {
       From: BOB_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Last-Round-Data' },
-          { name: 'Fingerprint', value: FINGERPRINT_B }
+          { name: 'Address', value: BOB_ADDRESS }
       ]
     })
     
     expect(roundDataResult.Messages).to.have.lengthOf(1)
     const data = JSON.parse(roundDataResult.Messages[0].Data)
-    expect(data.Details.Reward.OperatorTotal).to.equal('123')
+    expect(data.Details[BOB_ADDRESS].Reward.Hodler).to.equal('100000000')
 
     const roundMetadataResult = await handle({
       From: BOB_ADDRESS,
@@ -234,10 +222,10 @@ describe('Round Completion of relay rewards', () => {
     const metadata = JSON.parse(roundMetadataResult.Messages[0].Data)
     expect(metadata.Timestamp).to.equal(2000)
     expect(metadata.Period).to.equal(1)
-    expect(metadata.Configuration.TokensPerSecond).to.equal(123)
-    expect(metadata.Summary.Ratings.Network).to.equal('100')
-    expect(metadata.Summary.Rewards.Total).to.equal('123')
-    expect(metadata.Summary.Rewards.Network).to.equal('123')
+    expect(metadata.Configuration.TokensPerSecond).to.equal('100000000')
+    expect(metadata.Summary.Stakes).to.equal('101')
+    expect(metadata.Summary.Ratings).to.equal('100')
+    expect(metadata.Summary.Rewards).to.equal('100000000')
 
     
     const snapshotResult = await handle({

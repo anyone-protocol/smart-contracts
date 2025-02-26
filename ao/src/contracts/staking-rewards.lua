@@ -229,19 +229,19 @@ function StakingRewards.init()
       for hodlerAddress, scores in pairs(StakingRewards.PendingRounds[timestamp]) do
         roundData[hodlerAddress] = {}
         for operatorAddress, score in pairs(scores) do
-          local restaked = bint(0)
-          if StakingRewards.Rewarded[hodlerAddress] ~= nil and 
-              StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
-            if StakingRewards.Claimed[hodlerAddress] ~= nil and 
-                StakingRewards.Claimed[hodlerAddress][operatorAddress] ~= nil then
-              restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress]) - bint(StakingRewards.Claimed[hodlerAddress][operatorAddress])
-            else
-              restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress])
-            end
-          end
           local staked = bint(score.Staked)
+          local restaked = bint(0)
           local rating = bint(0)
           if score.Running > StakingRewards.Configuration.Requirements.Running then
+            if StakingRewards.Rewarded[hodlerAddress] ~= nil and 
+                StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
+              if StakingRewards.Claimed[hodlerAddress] ~= nil and 
+                  StakingRewards.Claimed[hodlerAddress][operatorAddress] ~= nil then
+                restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress]) - bint(StakingRewards.Claimed[hodlerAddress][operatorAddress])
+              else
+                restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress])
+              end
+            end
             rating = staked + restaked
           end
 
@@ -384,20 +384,69 @@ function StakingRewards.init()
       AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Address tag')
       local result = {}
       if StakingRewards.Rewarded[hodlerAddress] ~= nil then
-        result['Rewarded'] = StakingRewards.Rewarded[hodlerAddress]
+        result.Rewarded = StakingRewards.Rewarded[hodlerAddress]
       else
-        result['Rewarded'] = {}
+        result.Rewarded = {}
       end
       if StakingRewards.Claimed[hodlerAddress] ~= nil then
-        result['Claimed'] = StakingRewards.Claimed[hodlerAddress]
+        result.Claimed = StakingRewards.Claimed[hodlerAddress]
       else
-        result['Claimed'] = {}
+        result.Claimed = {}
       end
 
       ao.send({
         Target = msg.From,
         Action = 'Get-Rewards-Response',
         Data = json.encode(result)
+      })
+    end
+  )
+
+
+  Handlers.add(
+    'Last-Round-Metadata',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Last-Round-Metadata'
+    ),
+    function (msg)
+      local encoded = json.encode({
+        Timestamp = StakingRewards.PreviousRound.Timestamp,
+        Period = StakingRewards.PreviousRound.Period,
+        Configuration = StakingRewards.PreviousRound.Configuration,
+        Summary = StakingRewards.PreviousRound.Summary
+      })
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Last-Round-Metadata-Response',
+        Data = encoded
+      })
+    end
+  )
+
+  Handlers.add(
+    'Last-Round-Data',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Last-Round-Data'
+    ),
+    function (msg)
+      local hodlerAddress =AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
+      AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Address tag')
+
+      assert(StakingRewards.PreviousRound.Details[hodlerAddress], 'Address not found in previous round')
+      
+      local encoded = json.encode({
+        Timestamp = StakingRewards.PreviousRound.Timestamp,
+        Period = StakingRewards.PreviousRound.Period,
+        Details = StakingRewards.PreviousRound.Details[hodlerAddress]
+      })
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Last-Round-Data-Response',
+        Data = encoded
       })
     end
   )

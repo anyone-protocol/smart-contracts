@@ -9,11 +9,11 @@ import {
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
-describe('Update-Configuration action of relay rewards', () => {
+describe('Update-Configuration action of staking rewards', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
-    handle = (await createLoader('relay-rewards')).handle
+    handle = (await createLoader('staking-rewards')).handle
   })
 
   it('Blocks non-owners from doing updates', async () => {
@@ -45,7 +45,7 @@ describe('Update-Configuration action of relay rewards', () => {
     expect(resultWithData.Error).to.be.a('string').that.includes('Data must be valid JSON')
   })
 
-  it('Ensures TokensPerSecond is an integer and >= 0', async () => {
+  it('Ensures TokensPerSecond is a string integer and >= 0', async () => {
     const emptyTokensResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -60,17 +60,55 @@ describe('Update-Configuration action of relay rewards', () => {
       Tags: [
         { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({ TokensPerSecond: -100 })
+      Data: JSON.stringify({ TokensPerSecond: '-100' })
     })
     expect(wrongTokensResult.Error).to.be.a('string').that.includes('TokensPerSecond')
     
-    const boolTolemsResult = await handle({
+    const numberTokensResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
         { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({ TokensPerSecond: true })
+      Data: JSON.stringify({ TokensPerSecond: 100 })
     })
-    expect(boolTolemsResult.Error).to.be.a('string').that.includes('TokensPerSecond')
+    expect(numberTokensResult.Error).to.be.a('string').that.includes('TokensPerSecond')
+  })
+
+  it('Ensures Requirements - Running is a float 0..1', async () => {
+    const emptyTokensResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({ Requirements: { Running: '' } })
+    })
+    expect(emptyTokensResult.Error).to.be.a('string').that.includes('Running')
+
+    const wrongTokensResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({ Requirements: { Running: 1.1 } })
+    })
+    expect(wrongTokensResult.Error).to.be.a('string').that.includes('Running')
+    
+    const smallTokensResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({ Requirements: { Running: -1.1 } })
+    })
+    expect(smallTokensResult.Error).to.be.a('string').that.includes('Running')
+
+    const numberTokensResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Update-Configuration' }
+      ],
+      Data: JSON.stringify({ Requirements: { Running: '10' } })
+    })
+    expect(numberTokensResult.Error).to.be.a('string').that.includes('Running')
   })
 })
