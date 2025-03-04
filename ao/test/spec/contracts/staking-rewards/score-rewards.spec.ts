@@ -16,15 +16,15 @@ describe('Calculating staking rewards based on ratings', () => {
   let handle: AOTestHandle
 
   let score1 = { [ALICE_ADDRESS]: { [BOB_ADDRESS]: {
-    Staked: '1000', Running: 0.6, Share: 0
+    Staked: '1000', Running: 0.6
   }}}
     
   let score2 = { [BOB_ADDRESS]: { [CHARLS_ADDRESS]: {
-    Staked: '2000', Running: 0.7, Share: 0.1
+    Staked: '2000', Running: 0.7
   }}}
 
   let score3 = { [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: {
-    Staked: '3000', Running: 0.8, Share: 0.1
+    Staked: '3000', Running: 0.8
   }}}
 
   beforeEach(async () => {
@@ -154,6 +154,14 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(1)
     expect(configResult.Messages[0].Data).to.equal('OK')
+
+    const shareResult = await handle({
+      From: CHARLS_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Set-Share' }
+      ],
+      Data: JSON.stringify({ Share: 0.1 })
+    })
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -289,6 +297,14 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(configResult.Messages).to.have.lengthOf(1)
     expect(configResult.Messages[0].Data).to.equal('OK')
 
+    const shareResult = await handle({
+      From: CHARLS_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Set-Share' }
+      ],
+      Data: JSON.stringify({ Share: 0.1 })
+    })
+    
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [

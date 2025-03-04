@@ -10,7 +10,9 @@ local StakingRewards = {
 --   [Address] = '0' // Operator -> Hodler's score per operator stake
 -- }
   },
-
+  Shares = {
+-- [Operator Address] = 0.0
+  },
   Configuration = {
     TokensPerSecond = '100000000',
     Requirements = {
@@ -124,6 +126,40 @@ function StakingRewards.init()
   )
 
   Handlers.add(
+    'Set-Share',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Set-Share'
+    ),
+    function (msg)
+      local operatorAddress = AnyoneUtils.normalizeEvmAddress(msg.From)
+      AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Address tag')
+
+      local request = nil
+      local function parseData()
+        request = json.decode(msg.Data)
+      end
+
+      local status, err = pcall(parseData)
+      assert(err == nil, 'Data must be valid JSON')
+      assert(status, 'Failed to parse input data')
+      assert(request, 'Failed to parse data')
+      
+      AnyoneUtils.assertNumber(request.Share, 'Share')
+      assert(request.Share >= 0, 'Share has to be >= 0')
+      assert(request.Share <= 1, 'Share has to be <= 1')
+
+      StakingRewards.Shares[operatorAddress] = request.Share
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Set-Share-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
     'Add-Scores',
     Handlers.utils.hasMatchingTag(
       'Action',
@@ -177,9 +213,6 @@ function StakingRewards.init()
           AnyoneUtils.assertNumber(score.Running, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Running')
           assert(score.Running >= 0, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Running has to be >= 0')
           assert(score.Running <= 1, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Running has to be <= 1')
-          AnyoneUtils.assertNumber(score.Share, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Share')
-          assert(score.Share >= 0, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Share has to be >= 0')
-          assert(score.Share <= 1, 'Scores[' .. hodlerAddress .. '][' .. operatorAddress .. '].Share has to be <= 1') 
         end
       end
 
@@ -189,9 +222,13 @@ function StakingRewards.init()
 
       for hodlerAddress, scores in pairs(request.Scores) do
         StakingRewards.PendingRounds[timestamp][hodlerAddress] = {}
-        for operatorAddress, score in pairs(scores) do          
+        for operatorAddress, score in pairs(scores) do
+          local share = 0.0
+          if StakingRewards.Shares[operatorAddress] ~= nil then
+            share = StakingRewards.Shares[operatorAddress]
+          end
           StakingRewards.PendingRounds[timestamp][hodlerAddress][operatorAddress] = {
-            Staked = tostring(bint(score.Staked)), Running = score.Running, Share = score.Share,
+            Staked = tostring(bint(score.Staked)), Running = score.Running, Share = share,
           }
         end
       end

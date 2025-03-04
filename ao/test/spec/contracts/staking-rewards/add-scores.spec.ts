@@ -351,60 +351,40 @@ describe('Add-Scores action of staking rewards', () => {
     expect(smallRunningResult.Error).to.be.a('string').that.includes('has to be >= 0')
   })
   
-  it('Each score - Share info must be a float 0..1', async () => {
+  it('Setting share - Share must be a float 0..1', async () => {
     const emptyShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Action', value: 'Set-Share' }
       ],
-      Data: JSON.stringify({ Scores: {
-        [ALICE_ADDRESS]: { 
-          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.4, 'Share': '' }
-        }
-      }})
+      Data: JSON.stringify({ Share: '' })
     })
     expect(emptyShareResult.Error).to.be.a('string').that.includes('Number value required')
 
     const nullShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Action', value: 'Set-Share' },
       ],
-      Data: JSON.stringify({ Scores: {
-        [ALICE_ADDRESS]: {
-          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.9 }
-        }
-      }})
+      Data: JSON.stringify({ Share: '1' })
     })
     expect(nullShareResult.Error).to.be.a('string').that.includes('Number value required')
 
     const largeShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+        { name: 'Action', value: 'Set-Share' }
       ],
-      Data: JSON.stringify({ Scores: {
-        [ALICE_ADDRESS]: {
-          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.1, 'Share': 1.1 }
-        }
-      }})
+      Data: JSON.stringify({ Share: 1.1 })
     })
     expect(largeShareResult.Error).to.be.a('string').that.includes('has to be <= 1')
 
     const smallShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
-          { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+        { name: 'Action', value: 'Set-Share' }
       ],
-      Data: JSON.stringify({ Scores: {
-        [ALICE_ADDRESS]: {
-          [BOB_ADDRESS]: { 'Staked': '1', 'Running': 0.9, 'Share': -0.1 }
-        }
-      }})
+      Data: JSON.stringify({ Share: -0.1 })
     })
     expect(smallShareResult.Error).to.be.a('string').that.includes('has to be >= 0')
   })
