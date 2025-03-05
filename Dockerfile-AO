@@ -3,12 +3,17 @@ FROM node:20.18-alpine As build
 
 WORKDIR /usr/src/app
 
-COPY --chown=node:node . .
+COPY --chown=node:node ./ao .
 
-WORKDIR /usr/src/app/ao
+WORKDIR /usr/src/app
 
 RUN npm install
 
 RUN npm run build
 
 USER node
+
+## TODO -> module build flow
+# FROM p3rmaw3b/ao:0.1.5 AS ao-build
+# WORKDIR /usr/src/app
+# COPY --from=build /usr/src/app/dist .
