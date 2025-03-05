@@ -19,7 +19,7 @@ job "deploy-operator-registry-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:15b35de1d7e990f9721b8048c0750b38996fd53e"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:2678ed128f488700d846bf8835c8def0290bb338"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -44,12 +44,14 @@ job "deploy-operator-registry-stage" {
       CONTRACT_NAME = "operator-registry"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/operator-registry-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/operator-registry-source"
+      IS_MIGRATION_DEPLOYMENT = "true"
+      MIGRATION_SOURCE_PROCESS_ID = "PPSK1GMSaeERTsmqeSMhgm4MqqvrDJ8sYJGc2Rg9wtU"
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
-      data = <<EOH
+      data = <<-EOH
       {{with secret "kv/relay-registry/stage"}}
         DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
@@ -60,17 +62,8 @@ job "deploy-operator-registry-stage" {
     template {
       destination = "local/operator-registry-init-state.json"
       env         = false
-      data = <<EOH
-      {{with secret "kv/relay-registry/stage"}}
-        {
-          "claimable":{},
-          "owner":"{{.Data.data.RELAY_REGISTRY_OWNER_ADDRESS}}",
-          "verified":{},
-          "registrationCredits":{},
-          "blockedAddresses":[],
-          "families":{}
-        }
-      {{end}}
+      data = <<-EOH
+      {}
       EOH
     }
   }
