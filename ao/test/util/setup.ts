@@ -114,6 +114,7 @@ export const DEFAULT_HANDLE_OPTIONS = {
 const contractNames = [
   'operator-registry',
   'relay-rewards',
+  'staking-rewards',
   'acl-test'
 ]
 const bundledContractSources = Object.fromEntries(contractNames.map(cn => [

@@ -1,10 +1,10 @@
-job "deploy-relay-rewards-stage" {
+job "deploy-staking-rewards-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
 
   reschedule { attempts = 0 }
 
-  task "deploy-relay-rewards-task" {
+  task "deploy-staking-rewards-task" {
     driver = "docker"
 
     restart {
@@ -19,7 +19,7 @@ job "deploy-relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:1d9079f8ac5e507092d68f0cfea6a9ef313cbd5a"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c27c3154bbd164ac51bc5209eb7e8b8c737ad1c7"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -32,22 +32,22 @@ job "deploy-relay-rewards-stage" {
       }
     }
 
-    vault { policies = [ "distribution-stage" ] }
+    vault { policies = [ "distribution-live" ] }
 
     env {
-      PHASE = "stage"
+      PHASE = "live"
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
-      CONTRACT_NAME = "relay-rewards"
-      CONTRACT_CONSUL_KEY = "smart-contracts/stage/relay-rewards-address"
-      CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/relay-rewards-source"
+      CONTRACT_NAME = "staking-rewards"
+      CONTRACT_CONSUL_KEY = "smart-contracts/live/staking-rewards-address"
+      CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/staking-rewards-source"
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/distribution/stage"}}
+      {{with secret "kv/distribution/live"}}
         DEPLOYER_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}

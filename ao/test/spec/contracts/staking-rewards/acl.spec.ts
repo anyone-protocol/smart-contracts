@@ -13,32 +13,21 @@ import {
 
 const MOCK_SCORES = {
   Scores: {
-    [FINGERPRINT_A]: {
-      Address: ALICE_ADDRESS,
-      Network: 0,
-      IsHardware: false, 
-      UptimeStreak: 0,
-      ExitBonus: false,
-      FamilySize: 0,
-      LocationSize: 0
-    },
-    [FINGERPRINT_B]: {
-      Address: BOB_ADDRESS,
-      Network: 100,
-      IsHardware: false, 
-      UptimeStreak: 0,
-      ExitBonus: false,
-      FamilySize: 0,
-      LocationSize: 0
+    [ALICE_ADDRESS]: {
+      [BOB_ADDRESS]: {
+        Staked: '1',
+        Running: 0.0,
+        Share: 0.0
+      }
     }
   }
 }
 
-describe('ACL enforcement of relay rewards', () => {
+describe('ACL enforcement of staking rewards', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
-    handle = (await createLoader('relay-rewards')).handle
+    handle = (await createLoader('staking-rewards')).handle
 
     // NB: Grant ALICE_ADDRESS 'admin' role for each of the admin tests below
     await handle({
@@ -58,22 +47,12 @@ describe('ACL enforcement of relay rewards', () => {
             { name: 'Action', value: 'Update-Configuration' }
         ],
         Data: JSON.stringify({
-          TokensPerSecond: 100,
-          Modifiers: {
-            Network: {
-              Share: 1
-            },
-            Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
-            Uptime: { Enabled: false, Share: 0 },
-            ExitBonus: { Enabled: false, Share: 0 }
-          },
-          Multipliers: {
-            Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
-            Family: { Enabled: false, Offset: 1, Power: 1 }
+          TokensPerSecond: '100',
+          Requirements: {
+            Running: 0.1
           }
         })
       })
-
       expect(configResult.Messages).to.have.lengthOf(1)
       expect(configResult.Messages[0].Data).to.equal('OK')
     })
@@ -93,18 +72,9 @@ describe('ACL enforcement of relay rewards', () => {
             { name: 'Action', value: 'Update-Configuration' }
         ],
         Data: JSON.stringify({
-          TokensPerSecond: 100,
-          Modifiers: {
-            Network: {
-              Share: 1
-            },
-            Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
-            Uptime: { Enabled: false, Share: 0 },
-            ExitBonus: { Enabled: false, Share: 0 }
-          },
-          Multipliers: {
-            Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
-            Family: { Enabled: false, Offset: 1, Power: 1 }
+          TokensPerSecond: '100',
+          Requirements: {
+            Running: 0.5
           }
         })
       })
@@ -124,7 +94,6 @@ describe('ACL enforcement of relay rewards', () => {
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
-
       expect(addScoresResult.Messages).to.have.lengthOf(1)
       expect(addScoresResult.Messages[0].Data).to.equal('OK')
     })
@@ -170,7 +139,6 @@ describe('ACL enforcement of relay rewards', () => {
             { name: 'Timestamp', value: '2000' }
         ]
       })
-
       expect(completeRoundResult.Messages).to.have.lengthOf(1)
       expect(completeRoundResult.Messages[0].Data).to.equal('OK')
     })

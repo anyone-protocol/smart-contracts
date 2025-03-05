@@ -15,7 +15,8 @@ const contractsWithACL = [
   // NB: This basically tests that these contracts have the ACL module and
   //     that it is wired-up through handlers
   'operator-registry',
-  'relay-rewards'
+  'relay-rewards',
+  'staking-rewards'
 ]
 
 for (const contractName of contractsWithACL) {

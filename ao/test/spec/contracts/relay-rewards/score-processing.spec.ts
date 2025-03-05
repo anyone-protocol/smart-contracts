@@ -46,7 +46,14 @@ describe('Score processing of relay rewards', () => {
         Modifiers: {
           Network: {
             Share: 1
-          }
+          },
+          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+          Uptime: { Enabled: false, Share: 0 },
+          ExitBonus: { Enabled: false, Share: 0 }
+        },
+        Multipliers: {
+          Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
+          
         }
       })
     })
@@ -152,7 +159,6 @@ describe('Score processing of relay rewards', () => {
     expect(bobResult.Messages).to.have.lengthOf(1)
     expect(bobResult.Messages[0].Data).to.equal('246')
 
-
     const aResult = await handle({
       From: ALICE_ADDRESS,
       Tags: [
@@ -185,13 +191,22 @@ describe('Score processing of relay rewards', () => {
         Modifiers: {
           Network: {
             Share: 1
-          }
+          },
+          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+          Uptime: { Enabled: false, Share: 0 },
+          ExitBonus: { Enabled: false, Share: 0 }
         },
         Multipliers: {
           Family: {
             Enabled: true,
             Offset: 0.01,
             Power: 1
+          },
+          Location: {
+            Enabled: false,
+            Offset: 1,
+            Power: 1,
+            Divider: 1
           }
         }
       })
@@ -304,14 +319,23 @@ describe('Score processing of relay rewards', () => {
         Modifiers: {
           Network: {
             Share: 1
-          }
+          },
+          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+          Uptime: { Enabled: false, Share: 0 },
+          ExitBonus: { Enabled: false, Share: 0 }
         },
         Multipliers: {
           Location: {
             Enabled: true,
             Offset: 0.003,
-            Power: 2
-          }
+            Power: 2,
+            Divider: 1
+          },
+          Family: {
+            Enabled: false,
+            Offset: 1,
+            Power: 1
+          },
         }
       })
     })

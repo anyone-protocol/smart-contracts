@@ -19,7 +19,7 @@ job "deploy-operator-registry-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:0.0.1"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c27c3154bbd164ac51bc5209eb7e8b8c737ad1c7"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
