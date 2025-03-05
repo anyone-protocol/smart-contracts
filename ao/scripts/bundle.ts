@@ -23,9 +23,12 @@ async function main() {
     }
 
     const bundledLua = bundle(luaEntryPath)
-    if (!fs.existsSync(path.join(path.resolve(), './dist'))) {
-      fs.mkdirSync(path.join(path.resolve(), './dist'))
-    }  
+    if (!fs.existsSync(path.join(path.resolve(), `./dist`))) {
+      fs.mkdirSync(
+        path.join(path.resolve(), `./dist`),
+        { recursive: true }
+      )
+    }
     fs.writeFileSync(
       path.join(path.resolve(), `./dist/${contractName}.lua`),
       bundledLua
