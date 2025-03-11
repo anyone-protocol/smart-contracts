@@ -49,7 +49,7 @@ job "relay-rewards-update-configuration-stage" {
       env         = true
       data = <<EOH
       {{with secret "kv/distribution/stage"}}
-        ETH_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OPERATOR_KEY}}"
+        ETH_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
       {{end}}
       EOH
     }
