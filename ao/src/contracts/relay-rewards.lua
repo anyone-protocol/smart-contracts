@@ -9,7 +9,7 @@ local RelayRewards = {
   },
 
   Configuration = {
-    TokensPerSecond = 28935184200000000,
+    TokensPerSecond = '28935184200000000',
     Modifiers = {
       Network = { Share = 0.56 },
       Hardware = { Enabled = true, Share = 0.2, UptimeInfluence = 0.35 },
@@ -70,10 +70,14 @@ local RelayRewards = {
 function RelayRewards._updateConfiguration(config, request)
   local ErrorMessages = require('.common.errors')
   local AnyoneUtils = require('.common.utils')
+  local bint = require('.bint')(256)
 
   if request.TokensPerSecond then
-    AnyoneUtils.assertInteger(request.TokensPerSecond, 'TokensPerSecond')
-    assert(request.TokensPerSecond >= 0, 'TokensPerSecond has to be >= 0')
+    assert(type(request.TokensPerSecond) == 'string', 'TokensPerSecond must be a string number')
+    local safeTokens = bint.tobint(request.TokensPerSecond)
+    assert(safeTokens ~= nil, 'TokensPerSecond must be an integer')
+    assert(bint.ispos(safeTokens), 'TokensPerSecond must be a positive value')
+
     config.TokensPerSecond = request.TokensPerSecond
   end
   if request.Modifiers then
@@ -775,6 +779,28 @@ function RelayRewards.init()
   )
 
   Handlers.add(
+    'View-State',
+    Handlers.utils.hasMatchingTag('Action', 'View-State'),
+    function (msg)
+      ACL.assertHasOneOfRole(msg.From, { 'owner', 'admin', 'View-State' })
+      local state = {
+        TotalAddressReward = RelayRewards.TotalAddressReward,
+        TotalFingerprintReward = RelayRewards.TotalFingerprintReward,
+        Configuration = RelayRewards.Configuration,
+        PreviousRound = {
+          Timestamp = RelayRewards.PreviousRound.Timestamp,
+          Period = RelayRewards.PreviousRound.Period
+        }
+      }
+      ao.send({
+        Target = msg.From,
+        Action = 'View-State-Response',
+        Data = json.encode(state)
+      })
+    end
+  )
+
+  Handlers.add(
     'Init',
     Handlers.utils.hasMatchingTag('Action', 'Init'),
     function (msg)
@@ -786,16 +812,35 @@ function RelayRewards.init()
 
       local initState = json.decode(msg.Data or '{}')
 
-      if initState.Claimable then
-        for address, claimable in pairs(initState.Claimable) do
+      if initState.TotalAddressReward then
+        for address, reward in pairs(initState.TotalAddressReward) do
           AnyoneUtils.assertValidEvmAddress(address)
           local normalizedAddress = AnyoneUtils.normalizeEvmAddress(address)
-          assert(type(claimable) == 'string', 'Claimable for ' .. address .. ' must be a string number')
-          local safeClaimable = bint.tobint(claimable)
-          assert(safeClaimable ~= nil, 'Claimable for ' .. address .. ' must be an integer')
-          assert(bint.ispos(safeClaimable), 'Claimable for ' .. address .. ' must be a positive value')
-          RelayRewards.TotalAddressReward[normalizedAddress] = tostring(safeClaimable)
+          assert(type(reward) == 'string', 'TotalAddressReward for ' .. address .. ' must be a string number')
+          local safeReward = bint.tobint(reward)
+          assert(safeReward ~= nil, 'TotalAddressReward for ' .. address .. ' must be an integer')
+          assert(bint.ispos(safeReward), 'TotalAddressReward for ' .. address .. ' must be a positive value')
+          RelayRewards.TotalAddressReward[normalizedAddress] = tostring(safeReward)
         end
+      end
+
+      if initState.TotalFingerprintReward then
+        for fingerprint, reward in pairs(initState.TotalFingerprintReward) do
+          AnyoneUtils.assertValidFingerprint(fingerprint)
+          assert(type(reward) == 'string', 'TotalFingerprintReward for ' .. fingerprint .. ' must be a string number')
+          local safeReward = bint.tobint(reward)
+          assert(safeReward ~= nil, 'TotalFingerprintReward for ' .. fingerprint .. ' must be an integer')
+          assert(bint.ispos(safeReward), 'TotalFingerprintReward for ' .. fingerprint .. ' must be a positive value')
+          RelayRewards.TotalFingerprintReward[fingerprint] = tostring(safeReward)
+        end
+      end
+
+      if initState.PreviousRound then
+        AnyoneUtils.assertInteger(initState.PreviousRound.Timestamp, 'PreviousRound.Timestamp')
+        AnyoneUtils.assertInteger(initState.PreviousRound.Period, 'PreviousRound.Period')
+
+        RelayRewards.PreviousRound.Timestamp = initState.PreviousRound.Timestamp
+        RelayRewards.PreviousRound.Period = initState.PreviousRound.Period
       end
 
       if initState.Configuration then

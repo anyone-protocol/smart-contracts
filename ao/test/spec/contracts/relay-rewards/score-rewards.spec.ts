@@ -36,7 +36,7 @@ describe('Scoring relay rewards based on ratings', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000
+        TokensPerSecond: '1000'
       })
     })
     expect(configResult.Messages).to.have.lengthOf(1)
@@ -148,7 +148,7 @@ describe('Scoring relay rewards based on ratings', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000,
+        TokensPerSecond: '1000',
         Modifiers: {
           Network: { Share: 0.56 },
           Uptime: { Enabled: true, Share: 0.14,
@@ -289,7 +289,7 @@ describe('Scoring relay rewards based on ratings', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000,
+        TokensPerSecond: '1000',
         Modifiers: {
           Network: { Share: 0.56 },
           Uptime: { Enabled: true, Share: 0.14,
@@ -399,7 +399,7 @@ describe('Scoring relay rewards based on ratings', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000,
+        TokensPerSecond: '1000',
         Modifiers: {
           Network: { Share: 0.56 },
           Uptime: { Enabled: true, Share: 0.14,

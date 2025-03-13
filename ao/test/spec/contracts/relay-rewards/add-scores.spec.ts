@@ -112,7 +112,7 @@ describe('Add-Scores action of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 100,
+        TokensPerSecond: '100',
         Modifiers: {
           Network: {
             Share: 1

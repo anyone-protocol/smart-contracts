@@ -48,7 +48,7 @@ describe('Score ratings of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000,
+        TokensPerSecond: '1000',
         Modifiers: {
           Network: {
             Share: 0.9
@@ -238,7 +238,7 @@ describe('Score ratings of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000,
+        TokensPerSecond: '1000',
         Modifiers: {
           Network: {
             Share: 0.56
@@ -473,7 +473,7 @@ describe('Score ratings of relay rewards', () => {
           { name: 'Action', value: 'Update-Configuration' }
       ],
       Data: JSON.stringify({
-        TokensPerSecond: 1000,
+        TokensPerSecond: '1000',
         Modifiers: {
           Network: {
             Share: 0.56
