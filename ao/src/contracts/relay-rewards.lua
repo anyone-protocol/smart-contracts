@@ -399,27 +399,27 @@ function RelayRewards.init()
 
       local sharePrecision = bint(1000)
       
-      local networkRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Network.Share * sharePrecision)) // sharePrecision
+      local networkRewardsPerSec = (tokensPerSecond * bint((RelayRewards.Configuration.Modifiers.Network.Share * sharePrecision) // 1)) // sharePrecision
       local networkRewards = networkRewardsPerSec * roundLength
 
       local hardwareRewards = bint(0)
       local hardwareRewardsPerSec = bint(0)
       if RelayRewards.Configuration.Modifiers.Hardware.Enabled then
-        hardwareRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Hardware.Share * sharePrecision)) // sharePrecision
+        hardwareRewardsPerSec = (tokensPerSecond * bint((RelayRewards.Configuration.Modifiers.Hardware.Share * sharePrecision)) // 1) // sharePrecision
         hardwareRewards = hardwareRewardsPerSec * roundLength
       end
 
       local uptimeRewards = bint(0)
       local uptimeRewardsPerSec = bint(0)
       if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
-        uptimeRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.Uptime.Share * sharePrecision)) // sharePrecision
+        uptimeRewardsPerSec = (tokensPerSecond * bint((RelayRewards.Configuration.Modifiers.Uptime.Share * sharePrecision)) // 1) // sharePrecision
         uptimeRewards = uptimeRewardsPerSec * roundLength
       end
 
       local exitBonusRewards = bint(0)
       local exitBonusRewardsPerSec = bint(0)
       if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled then
-        exitBonusRewardsPerSec = (tokensPerSecond * bint(RelayRewards.Configuration.Modifiers.ExitBonus.Share * sharePrecision)) // sharePrecision
+        exitBonusRewardsPerSec = (tokensPerSecond * bint((RelayRewards.Configuration.Modifiers.ExitBonus.Share * sharePrecision)) // 1) // sharePrecision
         exitBonusRewards = exitBonusRewardsPerSec * roundLength
       end
 
@@ -453,21 +453,21 @@ function RelayRewards.init()
           if not bint.iszero(summary.Ratings.Uptime) then
             local uptimePrecision = bint(100000)
             local uptimeWeight = ratedData.Rating.Uptime / summary.Ratings.Uptime
-            roundData[fingerprint].Reward.Uptime = (uptimeRewards * bint(uptimeWeight * uptimePrecision)) // uptimePrecision
+            roundData[fingerprint].Reward.Uptime = (uptimeRewards * bint((uptimeWeight * uptimePrecision) // 1)) // uptimePrecision
             summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
           end
         end
       end
+      
       local delegatePrecision = bint(1000)
       local influencePrecision = bint(1000)
-      local networkTotalPart = (totalHwNetworkRewards * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
-      local uptimeTotalPart = (summary.Rewards.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
+      local networkTotalPart = (totalHwNetworkRewards * bint((networkInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
+      local uptimeTotalPart = (summary.Rewards.Uptime * bint((uptimeInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
       local hwTotalWeight = networkTotalPart + uptimeTotalPart
-
       for fingerprint, ratedData in pairs(roundData) do
         if ratedData.Rating.IsHardware then
-          local networkUnitPart = (roundData[fingerprint].Reward.Network * bint(networkInfluenceOnHw * influencePrecision)) // influencePrecision
-          local uptimeUnitPart = (roundData[fingerprint].Reward.Uptime * bint(uptimeInfluenceOnHw * influencePrecision)) // influencePrecision
+          local networkUnitPart = (roundData[fingerprint].Reward.Network * bint((networkInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
+          local uptimeUnitPart = (roundData[fingerprint].Reward.Uptime * bint((uptimeInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
           local hwUnitWeight = networkUnitPart + uptimeUnitPart
           if not bint.iszero(hwTotalWeight) then
             roundData[fingerprint].Reward.Hardware = (hardwareRewards * hwUnitWeight) // hwTotalWeight
@@ -484,7 +484,7 @@ function RelayRewards.init()
         local operatorAddress = roundData[fingerprint].Address
         local delegate = RelayRewards.Configuration.Delegates[operatorAddress]
         if delegate and delegate.Share > 0 then
-          local delegateTotal = (roundData[fingerprint].Reward.Total * bint(delegate.Share * delegatePrecision)) // delegatePrecision
+          local delegateTotal = (roundData[fingerprint].Reward.Total * bint((delegate.Share * delegatePrecision) // 1)) // delegatePrecision
 
           local operatorTotal = roundData[fingerprint].Reward.Total - delegateTotal
           roundData[fingerprint].Reward.OperatorTotal = operatorTotal
