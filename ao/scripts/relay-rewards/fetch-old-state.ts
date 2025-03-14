@@ -88,7 +88,7 @@ async function doFlow() {
   console.log(`  "TotalFingerprintReward": {`)
   for(var i = 0; i < fingerprints.length; i++) {
     const rewardForFingerprint = await getForFingerprint(fingerprints[i])
-    if (rewardForFingerprint) {
+    if (rewardForFingerprint && rewardForFingerprint != '0') {
       console.log(`    "${fingerprints[i]}": "${rewardForFingerprint}",`)
     }
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -98,7 +98,7 @@ async function doFlow() {
   console.log(`  "TotalAddressReward": {`)
   for(var i = 0; i < addresses.length; i++) {
     const rewardForAddress = await getForAddress(addresses[i])
-    if (rewardForAddress) {
+    if (rewardForAddress && rewardForAddress != '0') {
       console.log(`    "${addresses[i]}": "${rewardForAddress}",`)
     }
     await new Promise(resolve => setTimeout(resolve, 100))
