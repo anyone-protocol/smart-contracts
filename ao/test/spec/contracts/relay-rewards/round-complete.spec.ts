@@ -234,7 +234,7 @@ describe('Round Completion of relay rewards', () => {
     const metadata = JSON.parse(roundMetadataResult.Messages[0].Data)
     expect(metadata.Timestamp).to.equal(2000)
     expect(metadata.Period).to.equal(1)
-    expect(metadata.Configuration.TokensPerSecond).to.equal(123)
+    expect(metadata.Configuration.TokensPerSecond).to.equal('123')
     expect(metadata.Summary.Ratings.Network).to.equal('100')
     expect(metadata.Summary.Rewards.Total).to.equal('123')
     expect(metadata.Summary.Rewards.Network).to.equal('123')

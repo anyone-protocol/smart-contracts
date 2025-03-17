@@ -477,8 +477,15 @@ function RelayRewards.init()
 
       for fingerprint, ratedData in pairs(roundData) do
         if ratedData.Rating.IsHardware then
-          local hwNetworkReward = (hwNetworkPool * roundData[fingerprint].Reward.Network) // totalHwNetworkRewards
-          local hwUptimeReward = (hwUptimePool * roundData[fingerprint].Reward.Uptime) // totalHwUptimeRewards
+          local hwNetworkReward = bint(0)
+          if not bint.iszero(totalHwNetworkRewards) then
+            hwNetworkReward = (hwNetworkPool * roundData[fingerprint].Reward.Network) // totalHwNetworkRewards
+          end
+          local hwUptimeReward = bint(0)
+          if not bint.iszero(totalHwUptimeRewards) then
+            hwUptimeReward = (hwUptimePool * roundData[fingerprint].Reward.Uptime) // totalHwUptimeRewards
+          end
+
           roundData[fingerprint].Reward.Hardware = hwNetworkReward + hwUptimeReward
         end
         if not bint.iszero(summary.Ratings.ExitBonus) then

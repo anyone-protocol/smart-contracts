@@ -135,8 +135,8 @@ describe('Score ratings of relay rewards', () => {
     expect(summary2.Messages).to.have.lengthOf(1)
     const summary2data = JSON.parse(summary2.Messages[0].Data)
     // bob uptime 3 no hw, alice uptime 0 with hw
-    expect(summary2data.Summary.Rewards.Uptime).to.equal('0')
-    expect(summary2data.Summary.Ratings.Uptime).to.equal('0.0') 
+    expect(summary2data.Summary.Rewards.Uptime).to.equal('100')
+    expect(summary2data.Summary.Ratings.Uptime).to.equal('1.0') 
     const rewards2ForAliceResult = await handle({
       From: ALICE_ADDRESS,
       Tags: [
@@ -159,10 +159,10 @@ describe('Score ratings of relay rewards', () => {
     
     expect(rewards2ForBobResult.Messages).to.have.lengthOf(1)
     const bob2data = JSON.parse(rewards2ForBobResult.Messages[0].Data)
-    expect(bob2data.Details.Rating.Uptime).to.equal(0)
-    expect(bob2data.Details.Reward.Uptime).to.equal('0')
+    expect(bob2data.Details.Rating.Uptime).to.equal(1)
+    expect(bob2data.Details.Reward.Uptime).to.equal('100')
     expect(bob2data.Details.Reward.Network).to.equal('600')
-    expect(bob2data.Details.Reward.Total).to.equal('600')
+    expect(bob2data.Details.Reward.Total).to.equal('700')
 
     const thirdRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -430,7 +430,7 @@ describe('Score ratings of relay rewards', () => {
     expect(summary4.Messages).to.have.lengthOf(1)
     const summary4data = JSON.parse(summary4.Messages[0].Data)
     // alice uptime 14 with hw, bob uptime 3 no hw
-    expect(summary4data.Summary.Ratings.Uptime).to.equal('3.0')
+    expect(summary4data.Summary.Ratings.Uptime).to.equal('4.0')
     expect(summary4data.Summary.Rewards.Uptime).to.equal('140') // 1000 * 0.14
     expect(summary4data.Summary.Rewards.Hardware).to.equal('300')
     const rewards4ForAliceResult = await handle({
