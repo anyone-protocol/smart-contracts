@@ -8,8 +8,6 @@ import {
   sendAosMessage
 } from '../send-aos-message'
 import { oldState } from './oldState'
-import { setMaxIdleHTTPParsers } from 'http'
-import { newState } from './newState'
 
 dotenv.config()
 
@@ -35,8 +33,8 @@ async function initState() {
   const result = await sendAosMessage({
     processId: processId!,
     signer: await createEthereumDataItemSigner(signer) as any,
-    tags: [{ name: 'Action', value: 'Init' }],
-    data: JSON.stringify(newState)
+    tags: [{ name: 'Action', value: 'Init' }, { name: 'Timestamp', value: '1742303003479'}],
+    data: JSON.stringify(oldState)
   })
   console.log(result)
   console.log(result.result.Messages[0].Data)
