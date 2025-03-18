@@ -7,6 +7,7 @@ import {
   createLoader,
   OWNER_ADDRESS
 } from '~/test/util/setup'
+import { testData } from './view-init-state-test-data.js'
 
 describe('relay-rewards-view-init-state', () => {
   let handle: AOTestHandle
@@ -64,6 +65,32 @@ describe('relay-rewards-view-init-state', () => {
     expect(initStateResult.Messages).to.have.lengthOf(1)
     const state2 = checkStateResult.Messages[0].Data
     const s = specInit
+    const s2 = JSON.parse(state2)
+    expect(s.PreviousRound.Period).to.be.equal(s2.PreviousRound.Period)
+    expect(s.PreviousRound.Timestamp).to.be.equal(s2.PreviousRound.Timestamp)
+    expect(s.Configuration.TokensPerSecond).to.be.equal(s2.Configuration.TokensPerSecond)
+  })
+
+  it('works with the test init data', async() => {
+    const initStateResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Init' }
+      ],
+      Data: JSON.stringify(testData)
+    })
+    expect(initStateResult.Messages).to.have.lengthOf(1)
+    expect(initStateResult.Messages[0].Data).to.equal('OK')
+
+    const checkStateResult = await handle({
+      Tags: [
+          { name: 'Action', value: 'View-State' }
+      ],
+      Data: ''
+    })
+    expect(initStateResult.Messages).to.have.lengthOf(1)
+    const state2 = checkStateResult.Messages[0].Data
+    const s = testData
     const s2 = JSON.parse(state2)
     expect(s.PreviousRound.Period).to.be.equal(s2.PreviousRound.Period)
     expect(s.PreviousRound.Timestamp).to.be.equal(s2.PreviousRound.Timestamp)
