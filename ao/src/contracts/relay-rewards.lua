@@ -793,7 +793,6 @@ function RelayRewards.init()
     'View-State',
     Handlers.utils.hasMatchingTag('Action', 'View-State'),
     function (msg)
-      ACL.assertHasOneOfRole(msg.From, { 'owner', 'admin', 'View-State' })
       local state = {
         TotalAddressReward = RelayRewards.TotalAddressReward,
         TotalFingerprintReward = RelayRewards.TotalFingerprintReward,
