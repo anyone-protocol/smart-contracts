@@ -199,7 +199,7 @@ describe('Score ratings of relay rewards', () => {
     
     expect(summary3.Messages).to.have.lengthOf(1)
     const summary3data = JSON.parse(summary3.Messages[0].Data)
-    expect(summary3data.Summary.Ratings.Uptime).to.equal('1.0') 
+    expect(summary3data.Summary.Ratings.Uptime).to.equal('4.0') 
     expect(summary3data.Summary.Rewards.Uptime).to.equal('100')
 
     // bob uptime 14 no hw, alice uptime 3 with hw
@@ -213,7 +213,7 @@ describe('Score ratings of relay rewards', () => {
     expect(rewards3ForAliceResult.Messages).to.have.lengthOf(1)
     const alice3data = JSON.parse(rewards3ForAliceResult.Messages[0].Data)
     expect(alice3data.Details.Rating.Uptime).to.equal(1)
-    expect(alice3data.Details.Reward.Uptime).to.equal('100')
+    expect(alice3data.Details.Reward.Uptime).to.equal('25')
     
     const rewards3ForBobResult = await handle({
       From: BOB_ADDRESS,
@@ -225,10 +225,10 @@ describe('Score ratings of relay rewards', () => {
     
     expect(rewards3ForBobResult.Messages).to.have.lengthOf(1)
     const bob3data = JSON.parse(rewards3ForBobResult.Messages[0].Data)
-    expect(bob3data.Details.Rating.Uptime).to.equal(0)
-    expect(bob3data.Details.Reward.Uptime).to.equal('0')
+    expect(bob3data.Details.Rating.Uptime).to.equal(3)
+    expect(bob3data.Details.Reward.Uptime).to.equal('75')
     expect(bob3data.Details.Reward.Network).to.equal('600')
-    expect(bob3data.Details.Reward.Total).to.equal('600')
+    expect(bob3data.Details.Reward.Total).to.equal('675')
   })
 
   it('Calculate hardware bonus (65% network + 35% uptime)', async () => {
@@ -445,10 +445,10 @@ describe('Score ratings of relay rewards', () => {
     const alice4data = JSON.parse(rewards4ForAliceResult.Messages[0].Data)
 
     expect(alice4data.Details.Rating.Uptime).to.equal(3)
-    expect(alice4data.Details.Reward.Uptime).to.equal('140')
+    expect(alice4data.Details.Reward.Uptime).to.equal('105')
     expect(alice4data.Details.Reward.Network).to.equal('186') // floor(560 * (100/300))
     expect(alice4data.Details.Reward.Hardware).to.equal('300') 
-    expect(alice4data.Details.Reward.Total).to.equal('626') // 140+300+186
+    expect(alice4data.Details.Reward.Total).to.equal('591') // 105+300+186
     const rewards4ForBobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -459,11 +459,11 @@ describe('Score ratings of relay rewards', () => {
     expect(rewards4ForBobResult.Messages).to.have.lengthOf(1)
     
     const bob4data = JSON.parse(rewards4ForBobResult.Messages[0].Data)
-    expect(bob4data.Details.Rating.Uptime).to.equal(0)
-    expect(bob4data.Details.Reward.Uptime).to.equal('0') // no hw
+    expect(bob4data.Details.Rating.Uptime).to.equal(1)
+    expect(bob4data.Details.Reward.Uptime).to.equal('35')
     expect(bob4data.Details.Reward.Hardware).to.equal('0')
     expect(bob4data.Details.Reward.Network).to.equal('373') // floor(560 * (200/300))
-    expect(bob4data.Details.Reward.Total).to.equal('373')
+    expect(bob4data.Details.Reward.Total).to.equal('408')
   })
   
   it('Calculate exit bonus', async () => {
