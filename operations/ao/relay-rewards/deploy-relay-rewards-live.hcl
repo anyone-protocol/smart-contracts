@@ -19,7 +19,7 @@ job "deploy-relay-rewards-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c27c3154bbd164ac51bc5209eb7e8b8c737ad1c7"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8fa98916f665df94e0182381aa98f674f49cc471"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -41,6 +41,7 @@ job "deploy-relay-rewards-live" {
       CONTRACT_NAME = "relay-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/relay-rewards-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/relay-rewards-source"
+      CU_URL="https://cu.ardrive.io"
     }
 
     template {

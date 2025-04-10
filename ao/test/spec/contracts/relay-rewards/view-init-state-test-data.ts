@@ -1,4 +1,4 @@
-export const oldState = {
+export const testData = {
   "Configuration": {
     "TokensPerSecond": "40509259200000000",
     "Delegates": [],

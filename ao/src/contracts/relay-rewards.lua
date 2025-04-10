@@ -364,8 +364,12 @@ function RelayRewards.init()
 
         roundData[fingerprint].Rating = { Network = networkScore, IsHardware = false, Uptime = 0, ExitBonus = 0 }
 
-        local uptimeTierWeight = 0.0
         if RelayRewards.Configuration.Modifiers.Hardware.Enabled and scoreData.Score.IsHardware then
+          roundData[fingerprint].Rating.IsHardware = true
+        end
+
+        local uptimeTierWeight = 0.0
+        if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
           for days, weight in pairs(RelayRewards.Configuration.Modifiers.Uptime.Tiers) do
             local daysInt = tonumber(days)
             local weightFloat = tonumber(weight)
@@ -375,7 +379,6 @@ function RelayRewards.init()
             end
           end
           roundData[fingerprint].Rating.Uptime = uptimeTierWeight
-          roundData[fingerprint].Rating.IsHardware = true
         end
 
         if RelayRewards.Configuration.Modifiers.ExitBonus.Enabled and scoreData.Score.ExitBonus then
@@ -432,12 +435,9 @@ function RelayRewards.init()
       local fingerprintRewards = fingerprintRewardsPerSec * roundLength
       assert(bint.ule(fingerprintRewards, totalRewardsPerRound), 'Failed rewards share calculation')
       
-      local uptimeInfluenceOnHw = 0.0
-      if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
-        uptimeInfluenceOnHw = RelayRewards.Configuration.Modifiers.Hardware.UptimeInfluence
-      end
-      local networkInfluenceOnHw = 1 - uptimeInfluenceOnHw
       local totalHwNetworkRewards = bint(0)
+      local totalHwUptimeRewards = bint(0)
+      local uptimePrecision = bint(100000)
       for fingerprint, ratedData in pairs(roundData) do
         roundData[fingerprint].Reward = {
           Total = bint(0),
@@ -454,28 +454,39 @@ function RelayRewards.init()
         end
         if ratedData.Rating.IsHardware then
           totalHwNetworkRewards = totalHwNetworkRewards + roundData[fingerprint].Reward.Network
-          if not bint.iszero(summary.Ratings.Uptime) then
-            local uptimePrecision = bint(100000)
-            local uptimeWeight = ratedData.Rating.Uptime / summary.Ratings.Uptime
-            roundData[fingerprint].Reward.Uptime = (uptimeRewards * bint((uptimeWeight * uptimePrecision) // 1)) // uptimePrecision
-            summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
+        end
+        if not bint.iszero(summary.Ratings.Uptime) then
+          local uptimeWeight = ratedData.Rating.Uptime / summary.Ratings.Uptime
+          roundData[fingerprint].Reward.Uptime = (uptimeRewards * bint((uptimeWeight * uptimePrecision) // 1)) // uptimePrecision
+          summary.Rewards.Uptime = summary.Rewards.Uptime + roundData[fingerprint].Reward.Uptime
+          if ratedData.Rating.IsHardware then
+            totalHwUptimeRewards = totalHwUptimeRewards + roundData[fingerprint].Reward.Uptime
           end
         end
       end
       
       local delegatePrecision = bint(1000)
       local influencePrecision = bint(1000)
-      local networkTotalPart = (totalHwNetworkRewards * bint((networkInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
-      local uptimeTotalPart = (summary.Rewards.Uptime * bint((uptimeInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
-      local hwTotalWeight = networkTotalPart + uptimeTotalPart
+      local uptimeInfluenceOnHw = 0.0
+      if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
+        uptimeInfluenceOnHw = RelayRewards.Configuration.Modifiers.Hardware.UptimeInfluence
+      end
+      
+      local hwUptimePool = (hardwareRewards * bint((uptimeInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
+      local hwNetworkPool = hardwareRewards - hwUptimePool
+
       for fingerprint, ratedData in pairs(roundData) do
         if ratedData.Rating.IsHardware then
-          local networkUnitPart = (roundData[fingerprint].Reward.Network * bint((networkInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
-          local uptimeUnitPart = (roundData[fingerprint].Reward.Uptime * bint((uptimeInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
-          local hwUnitWeight = networkUnitPart + uptimeUnitPart
-          if not bint.iszero(hwTotalWeight) then
-            roundData[fingerprint].Reward.Hardware = (hardwareRewards * hwUnitWeight) // hwTotalWeight
+          local hwNetworkReward = bint(0)
+          if not bint.iszero(totalHwNetworkRewards) then
+            hwNetworkReward = (hwNetworkPool * roundData[fingerprint].Reward.Network) // totalHwNetworkRewards
           end
+          local hwUptimeReward = bint(0)
+          if not bint.iszero(totalHwUptimeRewards) then
+            hwUptimeReward = (hwUptimePool * roundData[fingerprint].Reward.Uptime) // totalHwUptimeRewards
+          end
+
+          roundData[fingerprint].Reward.Hardware = hwNetworkReward + hwUptimeReward
         end
         if not bint.iszero(summary.Ratings.ExitBonus) then
           roundData[fingerprint].Reward.ExitBonus = (exitBonusRewards * ratedData.Rating.ExitBonus) // summary.Ratings.ExitBonus
@@ -782,7 +793,6 @@ function RelayRewards.init()
     'View-State',
     Handlers.utils.hasMatchingTag('Action', 'View-State'),
     function (msg)
-      ACL.assertHasOneOfRole(msg.From, { 'owner', 'admin', 'View-State' })
       local state = {
         TotalAddressReward = RelayRewards.TotalAddressReward,
         TotalFingerprintReward = RelayRewards.TotalFingerprintReward,

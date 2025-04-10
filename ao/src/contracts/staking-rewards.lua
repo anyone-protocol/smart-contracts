@@ -330,19 +330,26 @@ function StakingRewards.init()
           if StakingRewards.Rewarded[hodlerAddress] == nil then
             StakingRewards.Rewarded[hodlerAddress] = {}
           end
-          local previous = bint(0)
+          local previousHodlerReward = bint(0)
           if StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
-            previous = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress])
+            previousHodlerReward = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress])
           end
-          StakingRewards.Rewarded[hodlerAddress][operatorAddress] = tostring(data.Reward.Hodler + previous)
+          local hodlerReward = data.Reward.Hodler + previousHodlerReward
+          if bint.ispos(hodlerReward) then
+            StakingRewards.Rewarded[hodlerAddress][operatorAddress] = tostring(hodlerReward)
+          end
           
           if StakingRewards.Rewarded[operatorAddress] == nil then
             StakingRewards.Rewarded[operatorAddress] = {}
           end
+          local previousOperatorReward = bint(0)
           if StakingRewards.Rewarded[operatorAddress][operatorAddress] ~= nil then
-            previous = bint(StakingRewards.Rewarded[operatorAddress][operatorAddress])
+            previousOperatorReward = bint(StakingRewards.Rewarded[operatorAddress][operatorAddress])
           end
-          StakingRewards.Rewarded[operatorAddress][operatorAddress] = tostring(data.Reward.Operator + previous)
+          local operatorReward = data.Reward.Operator + previousOperatorReward
+          if bint.ispos(operatorReward) then
+            StakingRewards.Rewarded[operatorAddress][operatorAddress] = tostring(operatorReward)
+          end
           
           dataWithStrings[hodlerAddress][operatorAddress] = {
             Score = {
@@ -533,6 +540,29 @@ function StakingRewards.init()
   )
 
   Handlers.add(
+    'View-State',
+    Handlers.utils.hasMatchingTag('Action', 'View-State'),
+    function (msg)
+      local result = {
+        Claimed = StakingRewards.Claimed,
+        Rewarded = StakingRewards.Rewarded,
+        Shares = StakingRewards.Shares,
+        Configuration = StakingRewards.Configuration,
+        PreviousRound = {
+          Timestamp = StakingRewards.PreviousRound.Timestamp,
+          Period = StakingRewards.PreviousRound.Period,
+          Summary = StakingRewards.PreviousRound.Summary,
+        }
+      }
+      ao.send({
+        Target = msg.From,
+        Action = 'View-Roles-Response',
+        Data = json.encode(result)
+      })
+    end
+  )
+
+  Handlers.add(
     'Init',
     Handlers.utils.hasMatchingTag('Action', 'Init'),
     function (msg)
@@ -554,14 +584,51 @@ function StakingRewards.init()
             local safeReward = bint.tobint(reward)
             assert(safeReward ~= nil, 'Reward for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be an integer')
             assert(bint.ispos(safeReward), 'Reward for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be a positive value')
+            if StakingRewards.Rewarded[nHodlerAddress] == nil then
+              StakingRewards.Rewarded[nHodlerAddress] = {}
+            end
             StakingRewards.Rewarded[nHodlerAddress][nOperatorAddress] = tostring(safeReward)
           end
+        end
+      end
+
+      if initState.Claimed then
+        for hodlerAddress, rewards in pairs(initState.Claimed) do
+          AnyoneUtils.assertValidEvmAddress(hodlerAddress)
+          local nHodlerAddress = AnyoneUtils.normalizeEvmAddress(hodlerAddress)
+          for operatorAddress, claim in pairs(rewards) do
+            local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+            assert(type(claim) == 'string', 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be a string number')
+            local safeReward = bint.tobint(claim)
+            assert(safeReward ~= nil, 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be an integer')
+            assert(bint.ispos(safeReward), 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be a positive value')
+            if StakingRewards.Claimed[nHodlerAddress] == nil then
+              StakingRewards.Claimed[nHodlerAddress] = {}
+            end
+            StakingRewards.Claimed[nHodlerAddress][nOperatorAddress] = tostring(safeReward)
+          end
+        end
+      end
+
+      if initState.Shares then
+        for operatorAddress, share in pairs(initState.Shares) do
+          AnyoneUtils.assertValidEvmAddress(operatorAddress)
+          local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+          AnyoneUtils.assertNumber(share, 'Share for ' .. nOperatorAddress)
+          StakingRewards.Shares[nOperatorAddress] = share
         end
       end
 
       if initState.Configuration then
         local config = StakingRewards.Configuration
         StakingRewards._updateConfiguration(config, initState.Configuration)
+      end
+
+      if initState.PreviousRound then
+        AnyoneUtils.assertInteger(initState.PreviousRound.Timestamp, 'PreviousRound.Timestamp')
+        AnyoneUtils.assertInteger(initState.PreviousRound.Period, 'PreviousRound.Period')
+        assert(initState.PreviousRound.Summary, 'PreviousRound.Summary is required')
+        StakingRewards.PreviousRound = initState.PreviousRound
       end
 
       StakingRewards._initialized = true
