@@ -8,7 +8,7 @@ const arweave = Arweave.init({
   protocol: 'https'
 })
 
-async function genKeys(numberOfKeys: string = '10') {
+async function genKeysAr(numberOfKeys: string = '10') {
   const n = parseInt(numberOfKeys)
   if (isNaN(n)) {
     throw new Error(
@@ -31,5 +31,5 @@ async function genKeys(numberOfKeys: string = '10') {
   console.log(JSON.stringify(keys, null, 2))
 }
 
-genKeys(process.env.NUMBER_OF_KEYS_TO_GENERATE)
+genKeysAr(process.env.NUMBER_OF_KEYS_TO_GENERATE)
   .catch(e => { logger.error(e); process.exit(1); })

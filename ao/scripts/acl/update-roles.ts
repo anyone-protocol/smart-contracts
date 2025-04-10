@@ -9,25 +9,25 @@ import {
 
 dotenv.config()
 
-const ethPrivateKey = process.env.ETH_PRIVATE_KEY
-const processId = process.env.PROCESS_ID
-const updateRolesData = process.env.UPDATE_ROLES_DATA
+const _ethPrivateKey = process.env.ETH_PRIVATE_KEY
+const _processId = process.env.PROCESS_ID
+const _updateRolesData = process.env.UPDATE_ROLES_DATA
 
-if (!ethPrivateKey) {
+if (!_ethPrivateKey) {
   throw new Error('ETH_PRIVATE_KEY is not set!')
 }
 
-if (!processId) {
+if (!_processId) {
   throw new Error('PROCESS_ID is not set!')
 }
 
-if (!updateRolesData) {
+if (!_updateRolesData) {
   throw new Error('UPDATE_ROLES_DATA is not set!')
 }
 
-const signer = new EthereumSigner(ethPrivateKey)
+const _signer = new EthereumSigner(_ethPrivateKey)
 
-async function updateRoles() {
+export async function updateRoles(signer: EthereumSigner, processId: string, updateRolesData: string) {
   logger.info(
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
@@ -45,4 +45,5 @@ async function updateRoles() {
   logger.info(`Update-Roles Result:`, JSON.stringify(result))
 }
 
-updateRoles().catch(e => { logger.error(e); process.exit(1); })
+updateRoles(_signer, _processId, _updateRolesData)
+  .catch(e => { logger.error(e); process.exit(1); })
