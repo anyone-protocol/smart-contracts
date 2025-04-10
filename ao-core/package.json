@@ -1,0 +1,36 @@
+{
+  "name": "@anyone/smart-contracts-ao-core",
+  "version": "0.1.0",
+  "contributors": [
+    "Anyone Labs",
+    "Jim Toth <jim@memeticblock.com>",
+    "Andrzej Tuchołka <kanshi@memeticblock.com>"
+  ],
+  "license": "AGPL-3.0-only",
+  "description": "ANyONe Protocol AO Core Modules & Processes (Smart Contracts)",
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anyone-protocol/smart-contracts"
+  },
+  "scripts": {
+    "build": "rimraf [ dist ] && tsx scripts/build/bundle.ts && tsx scripts/build/build.ts",
+    "deploy": "tsx scripts/deploy.ts",
+    "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
+  },
+  "devDependencies": {
+    "@dha-team/arbundles": "^1.0.3",
+    "@permaweb/ao-loader": "^0.0.48",
+    "@types/chai": "^5.2.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.14.0",
+    "axios": "^1.8.4",
+    "chai": "^5.2.0",
+    "dotenv": "^16.4.7",
+    "mocha": "^11.1.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "winston": "^3.17.0"
+  }
+}
