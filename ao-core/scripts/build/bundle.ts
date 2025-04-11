@@ -6,7 +6,7 @@ import { bundleLua } from '../util/bundle-lua'
 
 const CONTRACT_NAMES = process.env.CONTRACT_NAMES
   ? process.env.CONTRACT_NAMES.split(',')
-  : ['ping-pong', 'relay-auth']
+  : ['ping-pong', 'relay-directory']
 
 export async function bundle(contractNames: string[] = []) {
   logger.info(
@@ -33,6 +33,7 @@ export async function bundle(contractNames: string[] = []) {
       path.join(path.resolve(), `./dist/${contractName}/process.lua`),
       bundledLua
     )
+    fs.copyFileSync('./src/ao.lua', `./dist/${contractName}/ao.lua`)
 
     logger.info(`Done Bundling Lua for ${contractName}`)
   }

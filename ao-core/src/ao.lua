@@ -153,16 +153,16 @@ function ao.send(msg)
         end
     end
 
-    -- If running in an environment without the AOS Handlers module, do not add
-    -- the onReply and receive functions to the message.
-    if not Handlers then return message end
-
     -- clone message info and add to outbox
     local extMessage = {}
     for k, v in pairs(message) do extMessage[k] = v end
 
     -- add message to outbox
     table.insert(ao.outbox.Messages, extMessage)
+
+    -- If running in an environment without the AOS Handlers module, do not add
+    -- the onReply and receive functions to the message.
+    if not Handlers then return message end
 
     -- add callback for onReply handler(s)
     message.onReply =

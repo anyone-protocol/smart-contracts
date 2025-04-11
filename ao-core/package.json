@@ -16,7 +16,8 @@
   "scripts": {
     "build": "rimraf [ dist ] && tsx scripts/build/bundle.ts && tsx scripts/build/build.ts",
     "publish": "tsx scripts/build/publish.ts",
-    "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
+    "test": "npm run build && mocha \"test/spec/**/*.spec.ts\"",
+    "test:nobuild": "mocha \"test/spec/**/*.spec.ts\""
   },
   "devDependencies": {
     "@dha-team/arbundles": "^1.0.3",
