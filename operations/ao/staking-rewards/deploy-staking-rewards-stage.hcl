@@ -19,7 +19,7 @@ job "deploy-staking-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:92a19ada789362a6b51c49b790504afe70235457"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:84c580b4a8c67a629821340b5c8fe663ae52e94b"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
