@@ -32,6 +32,14 @@ describe('Claiming staking rewards', () => {
   })
 
   it('Tracks Claimed, rewarded tokens', async () => {
+    const enableShareResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Toggle-Feature-Shares' }
+      ],
+      Data: JSON.stringify({ Enabled: true })
+    })
+    
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [

@@ -1,5 +1,6 @@
 local StakingRewards = {
   _initialized = false,
+  _sharesEnabled = false,
   Claimed = {
 -- [Address] = { // Hodler
 --   [Address] = '0' // Operator -> Hodler's score per operator stake
@@ -126,12 +127,48 @@ function StakingRewards.init()
   )
 
   Handlers.add(
+    'Toggle-Feature-Shares',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Toggle-Feature-Shares'
+    ),
+    function (msg)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Toggle-Feature-Shares' }
+      )
+
+      assert(msg.Data, ErrorMessages.MessageDataRequired)
+
+      local request = nil
+      local function parseData()
+        request = json.decode(msg.Data)
+      end
+
+      local status, err = pcall(parseData)
+      assert(err == nil, 'Data must be valid JSON')
+      assert(status, 'Failed to parse input data')
+      assert(request, 'Failed to parse data')
+      assert(type(request.Enabled) == 'boolean', 'Enabled must be a boolean')
+      
+      StakingRewards._sharesEnabled = request.Enabled
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Toggle-Feature-Shares-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
     'Set-Share',
     Handlers.utils.hasMatchingTag(
       'Action',
       'Set-Share'
     ),
     function (msg)
+      assert(StakingRewards._sharesEnabled, 'Shares feature is disabled')
       local operatorAddress = AnyoneUtils.normalizeEvmAddress(msg.From)
       AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Address tag')
 
@@ -224,7 +261,7 @@ function StakingRewards.init()
         StakingRewards.PendingRounds[timestamp][hodlerAddress] = {}
         for operatorAddress, score in pairs(scores) do
           local share = 0.0
-          if StakingRewards.Shares[operatorAddress] ~= nil then
+          if StakingRewards._sharesEnabled and StakingRewards.Shares[operatorAddress] ~= nil then
             share = StakingRewards.Shares[operatorAddress]
           end
           StakingRewards.PendingRounds[timestamp][hodlerAddress][operatorAddress] = {
@@ -597,6 +634,8 @@ function StakingRewards.init()
     Handlers.utils.hasMatchingTag('Action', 'View-State'),
     function (msg)
       local result = {
+        _initialized = StakingRewards._initialized,
+        _sharesEnabled = StakingRewards._sharesEnabled,
         Claimed = StakingRewards.Claimed,
         Rewarded = StakingRewards.Rewarded,
         Shares = StakingRewards.Shares,
@@ -626,6 +665,11 @@ function StakingRewards.init()
       )
 
       local initState = json.decode(msg.Data or '{}')
+
+      if initState._sharesEnabled ~= nil then
+        assert(type(initState._sharesEnabled) == 'boolean', '_sharesEnabled must be a boolean')
+        StakingRewards._sharesEnabled = initState._sharesEnabled
+      end
 
       if initState.Rewarded then
         for hodlerAddress, rewards in pairs(initState.Rewarded) do

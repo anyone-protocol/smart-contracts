@@ -140,6 +140,14 @@ describe('Calculating staking rewards based on ratings', () => {
   })
 
   it('Proportionally rewards hodlers based on their rating', async () => {
+    const enableShareResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Toggle-Feature-Shares' }
+      ],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -282,6 +290,14 @@ describe('Calculating staking rewards based on ratings', () => {
   })
 
   it('Accumulates rewards for hodlers and operators', async () => {
+    const enableShareResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Toggle-Feature-Shares' }
+      ],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [

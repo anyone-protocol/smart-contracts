@@ -352,6 +352,14 @@ describe('Add-Scores action of staking rewards', () => {
   })
   
   it('Setting share - Share must be a float 0..1', async () => {
+    const enableShareResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+          { name: 'Action', value: 'Toggle-Feature-Shares' }
+      ],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
     const emptyShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
