@@ -418,6 +418,59 @@ function StakingRewards.init()
   )
 
   Handlers.add(
+    'Get-Claimed',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Get-Claimed'
+    ),
+    function (msg)
+      local address = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
+      AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
+
+      local claimed = StakingRewards.Claimed[address]
+      
+      ao.send({
+        Target = msg.From,
+        Action = 'Get-Claimed-Response',
+        Data = json.encode(claimed)
+      })
+    end
+  )
+
+  Handlers.add(
+    'Claim-Rewards',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Claim-Rewards'
+    ),
+    function (msg)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Claim-Rewards' }
+      )
+
+      local hodlerAddress = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'])
+      AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Address tag')
+
+      local rewarded = StakingRewards.Rewarded[hodlerAddress]
+      assert(rewarded, 'No rewards for ' .. hodlerAddress)
+
+      if (StakingRewards.Claimed[hodlerAddress] == nil) then
+        StakingRewards.Claimed[hodlerAddress] = {}
+      end
+      for operatorAddress, reward in pairs(rewarded) do
+        StakingRewards.Claimed[hodlerAddress][operatorAddress] = StakingRewards.Rewarded[hodlerAddress][operatorAddress]
+      end
+      
+      ao.send({
+        Target = msg.From,
+        Action = 'Claim-Rewards-Response',
+        Data = json.encode(rewarded)
+      })
+    end
+  )
+
+  Handlers.add(
     'Get-Rewards',
     Handlers.utils.hasMatchingTag(
       'Action',
@@ -596,10 +649,10 @@ function StakingRewards.init()
         for hodlerAddress, rewards in pairs(initState.Claimed) do
           AnyoneUtils.assertValidEvmAddress(hodlerAddress)
           local nHodlerAddress = AnyoneUtils.normalizeEvmAddress(hodlerAddress)
-          for operatorAddress, claim in pairs(rewards) do
+          for operatorAddress, Claim in pairs(rewards) do
             local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
-            assert(type(claim) == 'string', 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be a string number')
-            local safeReward = bint.tobint(claim)
+            assert(type(Claim) == 'string', 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be a string number')
+            local safeReward = bint.tobint(Claim)
             assert(safeReward ~= nil, 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be an integer')
             assert(bint.ispos(safeReward), 'Claim for ' .. nHodlerAddress .. ' of stake for ' .. nOperatorAddress .. ' must be a positive value')
             if StakingRewards.Claimed[nHodlerAddress] == nil then

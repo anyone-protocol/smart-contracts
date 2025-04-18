@@ -1,6 +1,9 @@
 local RelayRewards = {
   _initialized = false,
 
+  Claimed = {
+-- [Address] = '0'
+  },
   TotalAddressReward = {
 -- [Address] = '0'
   },
@@ -670,6 +673,53 @@ function RelayRewards.init()
       })
     end
   )
+
+  Handlers.add(
+    'Get-Claimed',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Get-Claimed'
+    ),
+    function (msg)
+      local address = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
+      AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
+
+      local claimed = RelayRewards.Claimed[address]
+      
+      ao.send({
+        Target = msg.From,
+        Action = 'Get-Claimed-Response',
+        Data = json.encode(claimed)
+      })
+    end
+  )
+
+  Handlers.add(
+    'Claim-Rewards',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Claim-Rewards'
+    ),
+    function (msg)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Claim-Rewards' }
+      )
+
+      local address = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'])
+      AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
+
+      local rewarded = bint.tobint(RelayRewards.TotalAddressReward[address])
+      assert(rewarded ~= nil, 'No rewards for ' .. address)
+      RelayRewards.Claimed[address] = tostring(rewarded)
+      
+      ao.send({
+        Target = msg.From,
+        Action = 'Claim-Rewards-Response',
+        Data = json.encode(RelayRewards.Claimed[address])
+      })
+    end
+  )
   
   Handlers.add(
     'Get-Rewards',
@@ -680,7 +730,6 @@ function RelayRewards.init()
     function (msg)
       local address = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
       AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
-      local result = '0'
       
       local fingerprint = msg.Tags['Fingerprint']
       if fingerprint then
@@ -794,6 +843,7 @@ function RelayRewards.init()
     Handlers.utils.hasMatchingTag('Action', 'View-State'),
     function (msg)
       local state = {
+        Claimed = RelayRewards.Claimed,
         TotalAddressReward = RelayRewards.TotalAddressReward,
         TotalFingerprintReward = RelayRewards.TotalFingerprintReward,
         Configuration = RelayRewards.Configuration,
@@ -821,6 +871,19 @@ function RelayRewards.init()
       )
 
       local initState = json.decode(msg.Data or '{}')
+
+      if initState.Claimed then
+        for operatorAddress, rewards in pairs(initState.Claimed) do
+          AnyoneUtils.assertValidEvmAddress(operatorAddress)
+          local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+          assert(type(rewards) == 'string', 'Claim for ' .. nOperatorAddress .. ' must be a string number')
+          local safeReward = bint.tobint(rewards)
+          assert(safeReward ~= nil, 'Claim for ' .. nOperatorAddress .. ' must be an integer')
+          assert(bint.ispos(safeReward), 'Claim for ' .. nOperatorAddress .. ' must be a positive value')
+
+          RelayRewards.Claimed[nOperatorAddress] = tostring(safeReward)
+        end
+      end
 
       if initState.TotalAddressReward then
         for address, reward in pairs(initState.TotalAddressReward) do
