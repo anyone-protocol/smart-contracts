@@ -17,13 +17,14 @@ job "relay-rewards-admin-live" {
       UPDATE_CONFIG_DATA="{\"Configuration\":{\"TokensPerSecond\":52083333300000000,\"Delegates\":[],\"Multipliers\":{\"Family\":{\"Enabled\":true,\"Offset\":0.03,\"Power\":0.5},\"Location\":{\"Offset\":0.001,\"Enabled\":true,\"Divider\":20,\"Power\":1.85}},\"Modifiers\":{\"ExitBonus\":{\"Share\":0.1,\"Enabled\":true},\"Hardware\":{\"Enabled\":true,\"Share\":0.25,\"UptimeInfluence\":0.45},\"Uptime\":{\"Enabled\":true,\"Share\":0.15,\"Tiers\":{\"0\":1,\"3\":2,\"14\":3}},\"Network\":{\"Share\":0.5}}}}"
       
       PHASE = "live"
+      CU_URL="https://cu.anyone.permaweb.services"
     }
 
     driver = "docker"
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:84c580b4a8c67a629821340b5c8fe663ae52e94b"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:1b9e9224921b71146c9a4bc756575f1f396bad97"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]

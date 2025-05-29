@@ -17,6 +17,7 @@ job "relay-rewards-admin-stage" {
       UPDATE_CONFIG_DATA=""
 
       PHASE = "stage"
+      CU_URL="https://cu.anyone.permaweb.services"
     }
 
     driver = "docker"
@@ -54,7 +55,7 @@ job "relay-rewards-admin-stage" {
       destination = "secrets/keys.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/live-protocol/relay-rewards-admin-live"}}
+      {{with secret "kv/stage-protocol/relay-rewards-admin-stage"}}
         ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       {{end}}
       EOH
