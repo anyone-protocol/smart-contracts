@@ -258,13 +258,15 @@ function StakingRewards.init()
       end
 
       for hodlerAddress, scores in pairs(request.Scores) do
-        StakingRewards.PendingRounds[timestamp][hodlerAddress] = {}
+        local nHodlerAddress = AnyoneUtils.normalizeEvmAddress(hodlerAddress)
+        StakingRewards.PendingRounds[timestamp][nHodlerAddress] = {}
         for operatorAddress, score in pairs(scores) do
           local share = 0.0
-          if StakingRewards._sharesEnabled and StakingRewards.Shares[operatorAddress] ~= nil then
-            share = StakingRewards.Shares[operatorAddress]
+          local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
+          if StakingRewards._sharesEnabled and StakingRewards.Shares[nOperatorAddress] ~= nil then
+            share = StakingRewards.Shares[nOperatorAddress]
           end
-          StakingRewards.PendingRounds[timestamp][hodlerAddress][operatorAddress] = {
+          StakingRewards.PendingRounds[timestamp][nHodlerAddress][nOperatorAddress] = {
             Staked = tostring(bint(score.Staked)), Running = score.Running, Share = share,
           }
         end
