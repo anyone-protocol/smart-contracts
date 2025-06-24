@@ -37,7 +37,9 @@ async function updateRoles() {
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
     signer: await createEthereumDataItemSigner(signer) as any,
-    tags: [{ name: 'Action', value: 'Update-Configuration' }],
+    tags: [{ name: 'Action', value: 'Update-Configuration' },
+      { name: 'Timestamp', value: new Date().toISOString() }
+    ],
     data: updateConfigData
   })
 
