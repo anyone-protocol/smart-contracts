@@ -1,6 +1,12 @@
 job "deploy-operator-registry-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
+  namespace = "stage-protocol"
+
+  constraint {
+    attribute = "${meta.pool}"
+    value = "stage"
+  }
 
   reschedule { attempts = 0 }
 
@@ -19,7 +25,7 @@ job "deploy-operator-registry-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:2678ed128f488700d846bf8835c8def0290bb338"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:15b465924d84ab16658b8c319022489a2a2f9391"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -35,8 +41,6 @@ job "deploy-operator-registry-stage" {
       }
     }
 
-    vault { policies = [ "relay-registry-stage" ] }
-
     env {
       PHASE = "stage"
       CONSUL_IP = "127.0.0.1"
@@ -45,14 +49,25 @@ job "deploy-operator-registry-stage" {
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/operator-registry-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/operator-registry-source"
       IS_MIGRATION_DEPLOYMENT = "true"
-      MIGRATION_SOURCE_PROCESS_ID = "PPSK1GMSaeERTsmqeSMhgm4MqqvrDJ8sYJGc2Rg9wtU"
+      MIGRATION_SOURCE_PROCESS_ID = "cFTzntWbZFBfReuz9pAY7wRoRVlYuCW5TH90jiwN6hI"
+      CU_URL="https://cu.anyone.permaweb.services"
+    }
+
+    vault {
+      role = "any1-nomad-workloads-controller"
+    }
+
+    identity {
+      name = "vault_default"
+      aud  = ["any1-infra"]
+      ttl  = "1h"
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
       data = <<-EOH
-      {{ with secret "kv/relay-registry/stage" }}
+      {{ with secret "kv/stage-protocol/deploy-operator-registry-stage" }}
       DEPLOYER_PRIVATE_KEY="{{ .Data.data.RELAY_REGISTRY_OWNER_KEY }}"
       CONSUL_TOKEN="{{ .Data.data.CONSUL_TOKEN }}"
       {{ end }}

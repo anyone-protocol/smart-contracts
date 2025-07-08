@@ -78,7 +78,9 @@ async function deploy() {
     }
   })
 
-  logger.info(`Publish ${contractName} source result:`, uploadResult)
+  logger.info(
+    `Publish ${contractName} source result: ${JSON.stringify(uploadResult)}`
+  )
 
   const ethereumDataItemSigner = await createEthereumDataItemSigner(signer)
 
