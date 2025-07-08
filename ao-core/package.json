@@ -22,6 +22,7 @@
   "devDependencies": {
     "@dha-team/arbundles": "^1.0.3",
     "@permaweb/ao-loader": "^0.0.48",
+    "@permaweb/aoconnect": "^0.0.85",
     "@types/chai": "^5.2.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.14.0",
