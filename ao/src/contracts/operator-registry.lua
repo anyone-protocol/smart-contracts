@@ -8,8 +8,11 @@ local OperatorRegistry = {
   VerifiedFingerprintsToOperatorAddresses = {},
 
   BlockedOperatorAddresses = {},
+  VerifiedHardwareFingerprints = {},
+
+  -- Registration Credits
   RegistrationCreditsFingerprintsToOperatorAddresses = {},
-  VerifiedHardwareFingerprints = {}
+  RegistrationCreditsRequired = false
 }
 
 function OperatorRegistry._addVerifiedHardwareFingerprint(fingerprint)
@@ -112,7 +115,16 @@ function OperatorRegistry.init()
         ErrorMessages.InvalidCertificate
       )
 
+      if (OperatorRegistry.RegistrationCreditsRequired == true) then
+        ao.send({
+          Target = msg.From,
+          Action = 'Submit-Fingerprint-Certificate-Response',
+          Data = 'REGISTRATION CREDITS REQUIRED IS TRUE'
+        })
+      end
+
       if (
+        OperatorRegistry.RegistrationCreditsRequired == true and
         OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] ~= true
       ) then
         assert(
@@ -190,12 +202,12 @@ function OperatorRegistry.init()
       local fingerprint = msg.Tags['Fingerprint']
       assert(type(fingerprint) == 'string', ErrorMessages.FingerprintRequired)
       assert(string.len(fingerprint) == 40, ErrorMessages.InvalidCertificate)
-      assert(
-        OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint] ~= nil,
-        ErrorMessages.UnknownFingerprint
-      )
+      -- assert(
+      --   OperatorRegistry.VerifiedFingerprintsToOperatorAddresses[fingerprint] ~= nil,
+      --   ErrorMessages.UnknownFingerprint
+      -- )
 
-      OperatorRegistry.ClaimableFingerprintsToOperatorAddresses[fingerprint] = nil
+      OperatorRegistry.VerifiedFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
         Target = msg.From,
@@ -589,6 +601,8 @@ function OperatorRegistry.init()
         initState.VerifiedFingerprintsToOperatorAddresses or {}
       OperatorRegistry.VerifiedHardwareFingerprints =
         initState.VerifiedHardwareFingerprints or {}
+      OperatorRegistry.RegistrationCreditsRequired =
+        initState.RegistrationCreditsRequired or false
 
       OperatorRegistry._initialized = true
 

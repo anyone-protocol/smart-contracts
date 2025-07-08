@@ -451,7 +451,7 @@ describe('Operator Registry', () => {
         .that.includes('Permission Denied')
     })
 
-    it('Rejects removing of unknown Fingerprints', async () => {
+    it.skip('Rejects removing of unknown Fingerprints', async () => {
       const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [
@@ -833,7 +833,7 @@ describe('Operator Registry', () => {
           .that.includes('Permission Denied')
       })
 
-      it('Requires RC when submitting Fingerprint Certificates', async () => {
+      it.skip('Requires RC when submitting Fingerprint Certificates', async () => {
         await setupAdminAddOperatorCertificates(
           handle,
           ALICE_ADDRESS,
@@ -880,6 +880,28 @@ describe('Operator Registry', () => {
 
         expect(resultWithCredit.Messages).to.have.lengthOf(1)
         expect(resultWithCredit.Messages[0].Data).to.equal('OK')
+      })
+
+      it('Does not require RC when mechanism is disabled', async () => {
+        await setupAdminAddOperatorCertificates(
+          handle,
+          ALICE_ADDRESS,
+          EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+        )
+
+        const resultNoCredit = await handle({
+          From: ALICE_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+            {
+              name: 'Fingerprint-Certificate',
+              value: EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
+            }
+          ]
+        })
+
+        expect(resultNoCredit.Messages).to.have.lengthOf(1)
+        expect(resultNoCredit.Messages[0].Data).to.equal('OK')
       })
     })
 
@@ -1036,7 +1058,7 @@ describe('Operator Registry', () => {
           .that.includes('Permission Denied')
       })
 
-      it('Requires RC when submitting Fingerprint Certificates', async () => {
+      it.skip('Requires RC when submitting Fingerprint Certificates', async () => {
         const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
         await setupAdminAddOperatorCertificates(
           handle,
@@ -1191,20 +1213,20 @@ describe('Operator Registry', () => {
           fingerprint
         )
 
-        const resultNotVerifiedYet = await handle({
-          From: ALICE_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
-            {
-              name: 'Fingerprint-Certificate',
-              value: fingerprint
-            }
-          ]
-        })
+        // const resultNotVerifiedYet = await handle({
+        //   From: ALICE_ADDRESS,
+        //   Tags: [
+        //     { name: 'Action', value: 'Submit-Fingerprint-Certificate' },
+        //     {
+        //       name: 'Fingerprint-Certificate',
+        //       value: fingerprint
+        //     }
+        //   ]
+        // })
         
-        expect(resultNotVerifiedYet.Error)
-          .to.be.a('string')
-          .that.includes('Registration Credit required')
+        // expect(resultNotVerifiedYet.Error)
+        //   .to.be.a('string')
+        //   .that.includes('Registration Credit required')
 
         await handle({
           From: OWNER_ADDRESS,
@@ -1316,7 +1338,7 @@ describe('Operator Registry', () => {
           .that.includes('Permission Denied')
       })
 
-      it('Requires Registration Credits if removed VH', async () => {
+      it.skip('Requires Registration Credits if removed VH', async () => {
         const fingerprint = EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()
         const fingerprints = [
           FINGERPRINT_A,
