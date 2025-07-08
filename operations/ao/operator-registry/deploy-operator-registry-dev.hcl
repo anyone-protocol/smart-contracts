@@ -29,7 +29,7 @@ job "deploy-operator-registry-dev" {
       logging {
         type = "loki"
         config {
-          loki-url = "http://10.1.244.1:3100/loki/api/v1/push"
+          loki-url = "${LOKI_URL}"
           loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
         }
       }
@@ -50,10 +50,14 @@ job "deploy-operator-registry-dev" {
       destination = "secrets/file.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/relay-registry/dev"}}
-        DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REGISTRY_OWNER_KEY}}"
-        CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
-      {{end}}
+      {{ with secret "kv/relay-registry/dev" }}
+      DEPLOYER_PRIVATE_KEY="{{ .Data.data.RELAY_REGISTRY_OWNER_KEY }}"
+      CONSUL_TOKEN="{{ .Data.data.CONSUL_TOKEN }}"
+      {{ end }}
+
+      {{ range service "loki" }}
+      LOKI_URL="http://{{ .Address }}:{{ .Port }}/loki/api/v1/push"
+      {{ end }}
       EOH
     }
 
