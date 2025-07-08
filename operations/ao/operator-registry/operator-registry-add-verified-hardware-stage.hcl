@@ -1,10 +1,10 @@
-job "operator-registry-update-roles-stage" {
+job "operator-registry-add-verified-hardware-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
 
   reschedule { attempts = 0 }
 
-  task "operator-registry-update-roles-stage-task" {
+  task "operator-registry-add-verified-hardware-stage-task" {
     driver = "docker"
 
     restart {
