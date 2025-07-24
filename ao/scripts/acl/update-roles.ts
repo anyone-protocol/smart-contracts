@@ -32,7 +32,7 @@ export async function updateRoles(signer: EthereumSigner, processId: string, upd
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
   logger.info(`Calling Update-Roles on AO Process ${processId}`)
-  logger.info(`With Data: `, updateRolesData)
+  logger.info(`With Data:  ${JSON.stringify(updateRolesData)}`)
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
@@ -42,7 +42,7 @@ export async function updateRoles(signer: EthereumSigner, processId: string, upd
   })
 
   logger.info(`Got reply with messageId: ${messageId}`)
-  logger.info(`Update-Roles Result:`, JSON.stringify(result))
+  logger.info(`Update-Roles Result: ${JSON.stringify(result)}`)
 }
 
 updateRoles(_signer, _processId, _updateRolesData)
