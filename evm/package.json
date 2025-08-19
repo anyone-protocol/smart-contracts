@@ -26,12 +26,12 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "^18.15.11",
     "chai": "^4.3.7",
-    "ethers": "^5.7.2",
+    "ethers": "^5.8.0",
     "hardhat": "^2.13.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.3"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.8.2"
+    "@openzeppelin/contracts": "^4.9.6"
   }
 }

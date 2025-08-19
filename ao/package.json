@@ -21,7 +21,7 @@
     "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
   },
   "devDependencies": {
-    "@ardrive/turbo-sdk": "^1.19.1",
+    "@ardrive/turbo-sdk": "^1.30.0",
     "@permaweb/ao-loader": "0.0.43",
     "@permaweb/aoconnect": "0.0.62",
     "@types/chai": "^4.3.19",
