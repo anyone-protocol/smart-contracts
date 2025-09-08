@@ -14,7 +14,7 @@ job "relay-rewards-admin-live" {
     env {
       SCRIPT = "scripts/relay-rewards/update-configuration.ts"
       # Script data - stringified JSON
-      UPDATE_CONFIG_DATA="{\"Configuration\":{\"TokensPerSecond\":52083333300000000,\"Delegates\":[],\"Multipliers\":{\"Family\":{\"Enabled\":true,\"Offset\":0.03,\"Power\":0.5},\"Location\":{\"Offset\":0.001,\"Enabled\":true,\"Divider\":20,\"Power\":1.85}},\"Modifiers\":{\"ExitBonus\":{\"Share\":0.1,\"Enabled\":true},\"Hardware\":{\"Enabled\":true,\"Share\":0.25,\"UptimeInfluence\":0.45},\"Uptime\":{\"Enabled\":true,\"Share\":0.15,\"Tiers\":{\"0\":1,\"3\":2,\"14\":3}},\"Network\":{\"Share\":0.5}}}}"
+      UPDATE_CONFIG_DATA="{\"Configuration\":{\"TokensPerSecond\":52083333300000000,\"Delegates\":[],\"Multipliers\":{\"Family\":{\"Enabled\":true,\"Offset\":0.03,\"Power\":0.5},\"Location\":{\"Offset\":0.001,\"Enabled\":true,\"Divider\":20,\"Power\":1.85}},\"Modifiers\":{\"ExitBonus\":{\"Share\":0.1,\"Enabled\":true},\"Hardware\":{\"Enabled\":true,\"Share\":0.25,\"UptimeInfluence\":0.45},\"Uptime\":{\"Enabled\":true,\"Share\":0.15,\"Tiers\":{\"0\":1,\"3\":2,\"14\":3,\"45\":5}},\"Network\":{\"Share\":0.5}}}}"
       
       PHASE = "live"
       CU_URL="https://cu.anyone.permaweb.services"
@@ -46,6 +46,8 @@ job "relay-rewards-admin-live" {
       cpu    = 4096
       memory = 4096
     }
+    
+    consul {}
 
     vault {
       role = "any1-nomad-workloads-controller"

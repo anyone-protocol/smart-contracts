@@ -1,6 +1,12 @@
-job "deploy-relay-rewards-stage" {
+job "relay-rewards-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
+  namespace = "stage-protocol"
+
+  constraint {
+      attribute = "${meta.pool}"
+      value = "stage"
+  }
 
   reschedule { attempts = 0 }
 
@@ -32,7 +38,11 @@ job "deploy-relay-rewards-stage" {
       }
     }
 
-    vault { policies = [ "distribution-stage" ] }
+    vault {
+        role = "any1-nomad-workloads-controller"
+    }
+
+    consul {}
 
     env {
       PHASE = "stage"
@@ -48,8 +58,8 @@ job "deploy-relay-rewards-stage" {
       destination = "secrets/file.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/distribution/stage"}}
-        DEPLOYER_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+      {{with secret "kv/stage-protocol/relay-rewards-stage"}}
+        DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH

@@ -1,4 +1,4 @@
-job "deploy-operator-registry-stage" {
+job "operator-registry-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
   namespace = "stage-protocol"
@@ -41,6 +41,12 @@ job "deploy-operator-registry-stage" {
       }
     }
 
+    vault {
+        role = "any1-nomad-workloads-controller"
+    }
+
+    consul {}
+
     env {
       PHASE = "stage"
       CONSUL_IP = "127.0.0.1"
@@ -53,24 +59,14 @@ job "deploy-operator-registry-stage" {
       CU_URL="https://cu.anyone.permaweb.services"
     }
 
-    vault {
-      role = "any1-nomad-workloads-controller"
-    }
-
-    identity {
-      name = "vault_default"
-      aud  = ["any1-infra"]
-      ttl  = "1h"
-    }
-
     template {
       destination = "secrets/file.env"
       env         = true
       data = <<-EOH
-      {{ with secret "kv/stage-protocol/deploy-operator-registry-stage" }}
-      DEPLOYER_PRIVATE_KEY="{{ .Data.data.RELAY_REGISTRY_OWNER_KEY }}"
-      CONSUL_TOKEN="{{ .Data.data.CONSUL_TOKEN }}"
-      {{ end }}
+      {{with secret "kv/stage-protocol/operator-registry-stage"}}
+        DEPLOYER_PRIVATE_KEY="{{.Data.data.OPERATOR_REGISTRY_OWNER_KEY}}"
+        CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+      {{end}}
 
       {{ range service "loki" }}
       LOKI_URL="http://{{ .Address }}:{{ .Port }}/loki/api/v1/push"

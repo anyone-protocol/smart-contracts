@@ -10,7 +10,7 @@ job "relay-rewards-admin-stage" {
 
   reschedule { attempts = 0 }
 
-  task "relay-rewards-admin-stage-task" {
+  task "relay-rewards-stage" {
     env {
       SCRIPT = "scripts/relay-rewards/update-configuration.ts"
       # Script data - stringified JSON
@@ -47,15 +47,17 @@ job "relay-rewards-admin-stage" {
       memory = 4096
     }
 
+    consul {}
+
     vault {
-      role = "any1-nomad-workloads-controller"
+      role = "any1-nomad-workloads-owner"
     }
 
     template {
       destination = "secrets/keys.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/stage-protocol/relay-rewards-admin-stage"}}
+      {{with secret "kv/stage-protocol/relay-rewards-stage"}}
         ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       {{end}}
       EOH

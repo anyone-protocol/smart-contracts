@@ -3,9 +3,14 @@ job "staking-rewards-admin-stage" {
   namespace = "stage-protocol"
   type = "batch"
 
+  constraint {
+      attribute = "${meta.pool}"
+      value = "stage"
+  }
+
   reschedule { attempts = 0 }
 
-  task "staking-rewards-update-configuration-stage-task" {
+  task "staking-rewards-stage" {
 
     env {
       PHASE = "stage"
@@ -28,13 +33,15 @@ job "staking-rewards-admin-stage" {
       memory = 4096
     }
 
+    consul {}
+
     vault {
-      role = "any1-nomad-workloads-controller"
+      role = "any1-nomad-workloads-owner"
     }
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:84c580b4a8c67a629821340b5c8fe663ae52e94b"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:e2ce3e935da281951bba663512d29717cbbeb9df"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
@@ -59,7 +66,7 @@ job "staking-rewards-admin-stage" {
       destination = "secrets/file.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/stage-protocol/staking-rewards-admin-stage"}}
+      {{with secret "kv/stage-protocol/staking-rewards-stage"}}
         ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       {{end}}
       EOH
