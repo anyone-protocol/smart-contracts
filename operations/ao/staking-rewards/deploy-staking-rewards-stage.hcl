@@ -51,6 +51,7 @@ job "staking-rewards-stage" {
       CONTRACT_NAME = "staking-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/staking-rewards-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/staking-rewards-source"
+      CU_URL="https://cu.ardrive.io"
     }
 
     template {
