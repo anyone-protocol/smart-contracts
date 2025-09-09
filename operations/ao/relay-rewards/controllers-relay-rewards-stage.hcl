@@ -14,7 +14,7 @@ job "controllers-relay-rewards-stage" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"Add-Scores\":{\"0x79053CA2ED70c8831D42e1456e15271941787D32\":true},\"Complete-Round\":{\"0x79053CA2ED70c8831D42e1456e15271941787D32\": true},\"Claim-Rewards\":{\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":true}}}"
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x79053CA2ED70c8831D42e1456e15271941787D32\":[\"Add-Scores\",\"Complete-Round\"],\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":[\"Claim-Rewards\"]}}"
 
       PHASE = "stage"
       CU_URL="https://cu.anyone.permaweb.services"
