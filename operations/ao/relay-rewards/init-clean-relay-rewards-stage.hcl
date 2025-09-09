@@ -24,7 +24,7 @@ job "init-clean-relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:d35b61dcb47ef90cf2d7afd95af12e94aeb2dabd"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:03f9ae715e1b0ff0ada8ef75e46b356cd9d02933"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
