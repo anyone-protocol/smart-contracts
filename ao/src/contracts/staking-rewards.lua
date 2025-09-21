@@ -308,7 +308,7 @@ function StakingRewards.init()
           local staked = bint(score.Staked)
           local restaked = bint(0)
           local rating = bint(0)
-          if score.Running > StakingRewards.Configuration.Requirements.Running then
+          if score.Running >= StakingRewards.Configuration.Requirements.Running then
             if StakingRewards.Rewarded[hodlerAddress] ~= nil and 
                 StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
               if StakingRewards.Claimed[hodlerAddress] ~= nil and 
