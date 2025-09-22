@@ -1,22 +1,22 @@
-job "controllers-staking-rewards-stage" {
+job "init-clean-staking-rewards-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
-  namespace = "stage-protocol"
+  namespace = "live-protocol"
 
   constraint {
     attribute = "${meta.pool}"
-    value = "stage"
+    value = "live-protocol"
   }
 
   reschedule { attempts = 0 }
 
-  task "staking-rewards-stage" {
+  task "staking-rewards-live" {
     env {
-      SCRIPT = "scripts/acl/update-roles.ts"
+      SCRIPT = "scripts/init-clean.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x01B188F45bcde0D1E2dDD171279E1356782cDdE2\":[\"Add-Scores\",\"Complete-Round\"],\"0x999245c6ddc6E23F99844152e39045013C438d00\":[\"Claim-Rewards\"]}}"
+      INIT_CLEAN_DATA="{\"Configuration\":{\"TokensPerSecond\":\"28935185000000000\",\"Requirements\":{\"Running\":0.5}}}"
 
-      PHASE = "stage"
+      PHASE = "live"
       CU_URL="https://cu.anyone.permaweb.services"
     }
 
@@ -57,7 +57,7 @@ job "controllers-staking-rewards-stage" {
       destination = "secrets/keys.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/stage-protocol/staking-rewards-stage"}}
+      {{with secret "kv/live-protocol/staking-rewards-live"}}
         ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       {{end}}
       EOH
@@ -67,7 +67,7 @@ job "controllers-staking-rewards-stage" {
       destination = "local/config.env"
       env         = true
       data = <<EOH
-      PROCESS_ID="{{ key `smart-contracts/stage/staking-rewards-address` }}"
+      PROCESS_ID="{{ key `smart-contracts/live/staking-rewards-address` }}"
       EOH
     }
   }

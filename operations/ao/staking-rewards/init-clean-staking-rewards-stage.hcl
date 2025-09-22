@@ -24,7 +24,7 @@ job "init-clean-staking-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:03f9ae715e1b0ff0ada8ef75e46b356cd9d02933"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8cc6c8bd0ace216de6a3c0cf90baa8c39e42b276"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]

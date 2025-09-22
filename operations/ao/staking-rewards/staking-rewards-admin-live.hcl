@@ -1,7 +1,7 @@
-job "staking-rewards-live" {
+job "staking-rewards-admin-live" {
   datacenters = [ "ator-fin" ]
-  type = "batch"
   namespace = "live-protocol"
+  type = "batch"
 
   constraint {
       attribute = "${meta.pool}"
@@ -10,7 +10,17 @@ job "staking-rewards-live" {
 
   reschedule { attempts = 0 }
 
-  task "deploy-staking-rewards-task" {
+  task "staking-rewards-live" {
+
+    env {
+      PHASE = "live"
+      SCRIPT = "scripts/staking-rewards/update-configuration.ts"
+
+      # Stringified JSON
+      UPDATE_CONFIG_DATA="{\"TokensPerSecond\":\"28935185000000000\",\"Requirements\":{\"Running\":0.5}}"
+      CU_URL="https://cu.anyone.permaweb.services"
+    }
+
     driver = "docker"
 
     restart {
@@ -23,12 +33,18 @@ job "staking-rewards-live" {
       memory = 4096
     }
 
+    consul {}
+
+    vault {
+      role = "any1-nomad-workloads-owner"
+    }
+
     config {
       network_mode = "host"
       image = "ghcr.io/anyone-protocol/smart-contracts-ao:8cc6c8bd0ace216de6a3c0cf90baa8c39e42b276"
-      entrypoint = ["npm"]
-      command = "run"
-      args = ["deploy"]
+      entrypoint = ["npx"]
+      command = "tsx"
+      args = ["${SCRIPT}"]
       logging {
         type = "loki"
         config {
@@ -38,20 +54,12 @@ job "staking-rewards-live" {
       }
     }
 
-    vault {
-        role = "any1-nomad-workloads-controller"
-    }
-
-    consul {}
-
-    env {
-      PHASE = "live"
-      CONSUL_IP = "127.0.0.1"
-      CONSUL_PORT = "8500"
-      CONTRACT_NAME = "staking-rewards"
-      CONTRACT_CONSUL_KEY = "smart-contracts/live/staking-rewards-address"
-      CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/staking-rewards-source"
-      CU_URL="https://cu.ardrive.io"
+    template {
+      destination = "local/config.env"
+      env         = true
+      data = <<EOH
+      PROCESS_ID="{{ key `smart-contracts/live/staking-rewards-address` }}"
+      EOH
     }
 
     template {
@@ -59,8 +67,7 @@ job "staking-rewards-live" {
       env         = true
       data = <<EOH
       {{with secret "kv/live-protocol/staking-rewards-live"}}
-        DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
-        CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+        ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       {{end}}
       EOH
     }
