@@ -14,7 +14,7 @@ job "init-clean-relay-rewards-live" {
     env {
       SCRIPT = "scripts/init-clean.ts"
       # Script data - stringified JSON
-      INIT_CLEAN_DATA="{\"Configuration\":{\"TokensPerSecond\": \"28935184200000000\",\"Delegates\": [],\"Multipliers\": {\"Family\": {\"Enabled\": true,\"Offset\": 0.01,\"Power\": 1},\"Location\": {\"Offset\": 0.001,\"Enabled\": true,\"Divider\": 20,\"Power\": 2}},\"Modifiers\": {\"ExitBonus\": {\"Share\": 0.1,\"Enabled\": true},\"Hardware\": {\"Enabled\": true,\"Share\": 0.2,\"UptimeInfluence\": 0.35},\"Uptime\": {\"Enabled\": true,\"Share\": 0.14,\"Tiers\": {\"0\": 0,\"3\": 1,\"14\":3}},\"Network\":{\"Share\":0.56}}}}"
+      INIT_CLEAN_DATA="{\"Configuration\":{\"TokensPerSecond\": \"52083333300000000\",\"Delegates\": [],\"Multipliers\": {\"Family\": {\"Enabled\": true,\"Offset\": 0.03,\"Power\": 0.5},\"Location\": {\"Offset\": 0.001,\"Enabled\": true,\"Divider\": 20,\"Power\": 1.85}},\"Modifiers\": {\"ExitBonus\": {\"Share\": 0.1,\"Enabled\": true},\"Hardware\": {\"Enabled\": true,\"Share\": 0.25,\"UptimeInfluence\": 0.45},\"Uptime\": {\"Enabled\": true,\"Share\": 0.15,\"Tiers\": {\"0\": 0,\"3\": 1,\"14\":3,\"45\":5}},\"Network\":{\"Share\":0.5}}}}"
 
       PHASE = "live"
       CU_URL="https://cu.anyone.permaweb.services"
