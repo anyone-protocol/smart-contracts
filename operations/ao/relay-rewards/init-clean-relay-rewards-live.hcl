@@ -1,4 +1,4 @@
-job "relay-rewards-admin-live" {
+job "init-clean-relay-rewards-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
   namespace = "live-protocol"
@@ -12,9 +12,9 @@ job "relay-rewards-admin-live" {
 
   task "relay-rewards-live" {
     env {
-      SCRIPT = "scripts/relay-rewards/update-configuration.ts"
+      SCRIPT = "scripts/init-clean.ts"
       # Script data - stringified JSON
-      UPDATE_CONFIG_DATA=""
+      INIT_CLEAN_DATA="{\"Configuration\":{\"TokensPerSecond\": \"28935184200000000\",\"Delegates\": [],\"Multipliers\": {\"Family\": {\"Enabled\": true,\"Offset\": 0.01,\"Power\": 1},\"Location\": {\"Offset\": 0.001,\"Enabled\": true,\"Divider\": 20,\"Power\": 2}},\"Modifiers\": {\"ExitBonus\": {\"Share\": 0.1,\"Enabled\": true},\"Hardware\": {\"Enabled\": true,\"Share\": 0.2,\"UptimeInfluence\": 0.35},\"Uptime\": {\"Enabled\": true,\"Share\": 0.14,\"Tiers\": {\"0\": 0,\"3\": 1,\"14\":3}},\"Network\":{\"Share\":0.56}}}}"
 
       PHASE = "live"
       CU_URL="https://cu.anyone.permaweb.services"

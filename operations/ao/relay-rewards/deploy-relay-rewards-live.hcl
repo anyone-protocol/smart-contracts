@@ -1,6 +1,12 @@
-job "deploy-relay-rewards-live" {
+job "relay-rewards-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
+  namespace = "live-protocol"
+
+  constraint {
+      attribute = "${meta.pool}"
+      value = "live-protocol"
+  }
 
   reschedule { attempts = 0 }
 
@@ -19,7 +25,7 @@ job "deploy-relay-rewards-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8fa98916f665df94e0182381aa98f674f49cc471"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8cc6c8bd0ace216de6a3c0cf90baa8c39e42b276"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -32,7 +38,11 @@ job "deploy-relay-rewards-live" {
       }
     }
 
-    vault { policies = [ "distribution-live" ] }
+    vault {
+        role = "any1-nomad-workloads-controller"
+    }
+
+    consul {}
 
     env {
       PHASE = "live"
@@ -41,15 +51,15 @@ job "deploy-relay-rewards-live" {
       CONTRACT_NAME = "relay-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/relay-rewards-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/relay-rewards-source"
-        CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/distribution/live"}}
-        DEPLOYER_PRIVATE_KEY="{{.Data.data.DISTRIBUTION_OWNER_KEY}}"
+      {{with secret "kv/live-protocol/relay-rewards-live"}}
+        DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
         CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{end}}
       EOH
