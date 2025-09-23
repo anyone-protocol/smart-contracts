@@ -17,7 +17,7 @@ job "init-clean-staking-rewards-stage" {
       INIT_CLEAN_DATA="{\"Configuration\":{\"TokensPerSecond\":\"28935185000000000\",\"Requirements\":{\"Running\":0.5}}}"
 
       PHASE = "stage"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"

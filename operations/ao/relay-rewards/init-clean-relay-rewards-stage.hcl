@@ -17,7 +17,7 @@ job "init-clean-relay-rewards-stage" {
       INIT_CLEAN_DATA="{\"Configuration\":{\"TokensPerSecond\": \"28935184200000000\",\"Delegates\": [],\"Multipliers\": {\"Family\": {\"Enabled\": true,\"Offset\": 0.01,\"Power\": 1},\"Location\": {\"Offset\": 0.001,\"Enabled\": true,\"Divider\": 20,\"Power\": 2}},\"Modifiers\": {\"ExitBonus\": {\"Share\": 0.1,\"Enabled\": true},\"Hardware\": {\"Enabled\": true,\"Share\": 0.2,\"UptimeInfluence\": 0.35},\"Uptime\": {\"Enabled\": true,\"Share\": 0.14,\"Tiers\": {\"0\": 0,\"3\": 1,\"14\":3}},\"Network\":{\"Share\":0.56}}}}"
 
       PHASE = "stage"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"
