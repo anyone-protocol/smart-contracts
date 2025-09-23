@@ -14,10 +14,10 @@ job "controllers-relay-rewards-live" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x79053CA2ED70c8831D42e1456e15271941787D32\":[\"Add-Scores\",\"Complete-Round\"],\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":[\"Claim-Rewards\"]}}"
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x0F8d092fD0260e7476c9345C29Fde90B8aFCF86b\":[\"Add-Scores\",\"Complete-Round\"],\"0x9a89f7bf1f6AE7B48DdEB9019bF46f425B596BB8\":[\"Claim-Rewards\"]}}"
 
       PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"

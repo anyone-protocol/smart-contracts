@@ -14,10 +14,10 @@ job "controllers-staking-rewards-live" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x01B188F45bcde0D1E2dDD171279E1356782cDdE2\":[\"Add-Scores\",\"Complete-Round\"],\"0x999245c6ddc6E23F99844152e39045013C438d00\":[\"Claim-Rewards\"]}}"
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0xB45B7F679b7470b094dDf99ebCbee1bc8552fa1A\":[\"Add-Scores\",\"Complete-Round\"],\"0x14F7b53a09758aa257D8597cF992bDB61915f319\":[\"Claim-Rewards\"]}}"
 
       PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"
