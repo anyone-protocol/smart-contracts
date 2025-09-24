@@ -1,5 +1,5 @@
 // import { logger } from './util/logger'
-import { sendAosDryRun } from './send-aos-message';
+import { sendAosDryRun } from '../send-aos-message';
 const logger = console
 const processId = process.argv[2]
 
@@ -39,6 +39,7 @@ async function readProcess() {
   }
 
   console.log('OperatorRegistry.RegistrationCreditsRequired = false')
+  console.log('OperatorRegistry._initialized = true')
 }
 
 readProcess().catch(e => { logger.error(e); process.exit(1); })

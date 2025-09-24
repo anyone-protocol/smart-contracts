@@ -24685,3 +24685,4 @@ OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses = {
   ["E06C21F4026870104E9E24CE68636F9B9BE54720"] = "0x5792A315072DC6AC08D6844EF337628F0CEE88FC",
 }
 OperatorRegistry.RegistrationCreditsRequired = false
+OperatorRegistry._initialized = true
