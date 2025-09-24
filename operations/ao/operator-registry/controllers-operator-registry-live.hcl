@@ -14,7 +14,7 @@ job "controllers-operator-registry-live" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x79053CA2ED70c8831D42e1456e15271941787D32\":[\"Add-Scores\",\"Complete-Round\"],\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":[\"Claim-Rewards\"]}}"
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x420b76e6156a85A45125D61E1B5a8D567334F413\":[\"Admin-Submit-Operator-Certificates\"]}}"
 
       PHASE = "live"
       CU_URL="https://cu.ardrive.io"

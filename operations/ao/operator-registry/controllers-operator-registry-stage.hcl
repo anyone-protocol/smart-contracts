@@ -14,7 +14,7 @@ job "controllers-operator-registry-stage" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x79053CA2ED70c8831D42e1456e15271941787D32\":[\"Add-Scores\",\"Complete-Round\"],\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":[\"Claim-Rewards\"]}}"
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x343D35d47818dEAACb5B9A1ddb67A2c7C6BB5413\":[\"Admin-Submit-Operator-Certificates\"]}}"
 
       PHASE = "stage"
       CU_URL="https://cu.ardrive.io"
