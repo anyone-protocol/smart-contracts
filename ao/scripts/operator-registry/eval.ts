@@ -15,7 +15,7 @@ const processId = process.env.PROCESS_ID
 const evalCode = process.env.EVAL_CODE
 const evalCodePath = process.env.EVAL_CODE_PATH
 
-if (!evalCode || !evalCodePath) {
+if (!evalCode && !evalCodePath) {
   throw new Error('EVAL_CODE or EVAL_CODE_PATH is not set!')
 }
 
