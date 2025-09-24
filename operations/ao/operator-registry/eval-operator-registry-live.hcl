@@ -15,14 +15,14 @@ job "eval-operator-registry-live" {
       SCRIPT = "scripts/operator-registry/eval.ts"
       PHASE = "live"
       CU_URL="https://cu.ao-testnet.xyz"
-      EVAL_CODE_PATH="src/patches/patch-operator-registry-live.lua"
+      EVAL_CODE_PATH="src/patches/operator-registry-patch-live-2025-09-24.lua"
     }
 
     driver = "docker"
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:833756013ac7f67bc6eecd792b1e0f3bcd07c9b0"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c749aa63068a35ac8fc9326d9b083083384c6346"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
