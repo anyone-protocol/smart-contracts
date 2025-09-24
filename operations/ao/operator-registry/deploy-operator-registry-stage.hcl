@@ -54,9 +54,9 @@ job "operator-registry-stage" {
       CONTRACT_NAME = "operator-registry"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/operator-registry-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/operator-registry-source"
-      IS_MIGRATION_DEPLOYMENT = "true"
-      MIGRATION_SOURCE_PROCESS_ID = "cFTzntWbZFBfReuz9pAY7wRoRVlYuCW5TH90jiwN6hI"
-      CU_URL="https://cu.anyone.permaweb.services"
+      IS_MIGRATION_DEPLOYMENT = "false"
+      MIGRATION_SOURCE_PROCESS_ID = ""
+      CU_URL="https://cu.ardrive.io"
     }
 
     template {
