@@ -1,4 +1,4 @@
-local OperatorRegistry = {
+OperatorRegistry = {
   _initialized = false,
 
   -- Operator Certificates
