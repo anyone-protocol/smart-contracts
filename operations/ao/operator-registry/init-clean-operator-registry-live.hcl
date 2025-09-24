@@ -24,7 +24,7 @@ job "init-clean-operator-registry-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:03f9ae715e1b0ff0ada8ef75e46b356cd9d02933"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:f82f72fbb628351f4af8c7e36f9ab45d7fe188f1"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
