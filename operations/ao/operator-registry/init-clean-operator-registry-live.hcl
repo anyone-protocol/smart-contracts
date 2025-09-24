@@ -1,4 +1,4 @@
-job "operator-registry-admin-live" {
+job "init-clean-operator-registry-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
   namespace = "live-protocol"
@@ -12,11 +12,12 @@ job "operator-registry-admin-live" {
 
   task "operator-registry-live" {
     env {
-      SCRIPT = ""
+      SCRIPT = "scripts/init-clean.ts"
       # Script data - stringified JSON
+      INIT_CLEAN_DATA="{}"
 
       PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"

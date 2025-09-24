@@ -1,21 +1,21 @@
-job "operator-registry-admin-live" {
+job "operator-registry-admin-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
-  namespace = "live-protocol"
+  namespace = "stage-protocol"
 
   constraint {
     attribute = "${meta.pool}"
-    value = "live-protocol"
+    value = "stage"
   }
 
   reschedule { attempts = 0 }
 
-  task "operator-registry-live" {
+  task "operator-registry-stage" {
     env {
       SCRIPT = ""
       # Script data - stringified JSON
 
-      PHASE = "live"
+      PHASE = "stage"
       CU_URL="https://cu.anyone.permaweb.services"
     }
 
@@ -56,7 +56,7 @@ job "operator-registry-admin-live" {
       destination = "secrets/keys.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/live-protocol/operator-registry-live"}}
+      {{with secret "kv/stage-protocol/operator-registry-stage"}}
         ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       {{end}}
       EOH
@@ -66,7 +66,7 @@ job "operator-registry-admin-live" {
       destination = "local/config.env"
       env         = true
       data = <<EOH
-      PROCESS_ID="{{ key `smart-contracts/live/operator-registry-address` }}"
+      PROCESS_ID="{{ key `smart-contracts/stage/operator-registry-address` }}"
       EOH
     }
   }

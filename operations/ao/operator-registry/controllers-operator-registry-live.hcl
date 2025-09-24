@@ -1,4 +1,4 @@
-job "operator-registry-admin-live" {
+job "controllers-operator-registry-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
   namespace = "live-protocol"
@@ -12,11 +12,12 @@ job "operator-registry-admin-live" {
 
   task "operator-registry-live" {
     env {
-      SCRIPT = ""
+      SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x420b76e6156a85A45125D61E1B5a8D567334F413\":[\"Admin-Submit-Operator-Certificates\"]}}"
 
       PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"

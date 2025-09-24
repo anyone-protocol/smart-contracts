@@ -1,6 +1,12 @@
-job "deploy-operator-registry-live" {
+job "operator-registry-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
+  namespace = "live-protocol"
+
+  constraint {
+    attribute = "${meta.pool}"
+    value = "live-protocol"
+  }
 
   reschedule { attempts = 0 }
 
@@ -19,7 +25,7 @@ job "deploy-operator-registry-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c27c3154bbd164ac51bc5209eb7e8b8c737ad1c7"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:f82f72fbb628351f4af8c7e36f9ab45d7fe188f1"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -35,7 +41,11 @@ job "deploy-operator-registry-live" {
       }
     }
 
-    vault { policies = [ "relay-registry-live" ] }
+    vault {
+        role = "any1-nomad-workloads-controller"
+    }
+
+    consul {}
 
     env {
       PHASE = "live"
@@ -44,16 +54,19 @@ job "deploy-operator-registry-live" {
       CONTRACT_NAME = "operator-registry"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/operator-registry-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/operator-registry-source"
+      IS_MIGRATION_DEPLOYMENT = "false"
+      MIGRATION_SOURCE_PROCESS_ID = ""
+      CU_URL="https://cu.ardrive.io"
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
-      data = <<EOH
-      {{ with secret "kv/relay-registry/live" }}
-      DEPLOYER_PRIVATE_KEY="{{ .Data.data.RELAY_REGISTRY_OWNER_KEY }}"
-      CONSUL_TOKEN="{{ .Data.data.CONSUL_TOKEN }}"
-      {{ end }}
+      data = <<-EOH
+      {{with secret "kv/live-protocol/operator-registry-live"}}
+        DEPLOYER_PRIVATE_KEY="{{.Data.data.OPERATOR_REGISTRY_OWNER_KEY}}"
+        CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+      {{end}}
 
       {{ range service "loki" }}
       LOKI_URL="http://{{ .Address }}:{{ .Port }}/loki/api/v1/push"
@@ -64,17 +77,8 @@ job "deploy-operator-registry-live" {
     template {
       destination = "local/operator-registry-init-state.json"
       env         = false
-      data = <<EOH
-      {{with secret "kv/relay-registry/live"}}
-        {
-          "claimable":{},
-          "owner":"{{.Data.data.RELAY_REGISTRY_OWNER_ADDRESS}}",
-          "verified":{},
-          "registrationCredits":{},
-          "blockedAddresses":[],
-          "families":{}
-        }
-      {{end}}
+      data = <<-EOH
+      {}
       EOH
     }
   }

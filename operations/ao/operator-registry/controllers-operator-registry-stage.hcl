@@ -1,22 +1,23 @@
-job "operator-registry-admin-live" {
+job "controllers-operator-registry-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
-  namespace = "live-protocol"
+  namespace = "stage-protocol"
 
   constraint {
     attribute = "${meta.pool}"
-    value = "live-protocol"
+    value = "stage"
   }
 
   reschedule { attempts = 0 }
 
-  task "operator-registry-live" {
+  task "operator-registry-stage" {
     env {
-      SCRIPT = ""
+      SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x343D35d47818dEAACb5B9A1ddb67A2c7C6BB5413\":[\"Admin-Submit-Operator-Certificates\"]}}"
 
-      PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      PHASE = "stage"
+      CU_URL="https://cu.ardrive.io"
     }
 
     driver = "docker"
@@ -56,8 +57,8 @@ job "operator-registry-admin-live" {
       destination = "secrets/keys.env"
       env         = true
       data = <<EOH
-      {{with secret "kv/live-protocol/operator-registry-live"}}
-        ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      {{with secret "kv/stage-protocol/operator-registry-stage"}}
+        ETH_PRIVATE_KEY="{{.Data.data.OPERATOR_REGISTRY_OWNER_KEY}}"
       {{end}}
       EOH
     }
@@ -66,7 +67,7 @@ job "operator-registry-admin-live" {
       destination = "local/config.env"
       env         = true
       data = <<EOH
-      PROCESS_ID="{{ key `smart-contracts/live/operator-registry-address` }}"
+      PROCESS_ID="{{ key `smart-contracts/stage/operator-registry-address` }}"
       EOH
     }
   }

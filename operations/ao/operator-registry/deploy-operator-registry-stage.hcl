@@ -25,7 +25,7 @@ job "operator-registry-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:d35b61dcb47ef90cf2d7afd95af12e94aeb2dabd"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:f82f72fbb628351f4af8c7e36f9ab45d7fe188f1"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -54,9 +54,9 @@ job "operator-registry-stage" {
       CONTRACT_NAME = "operator-registry"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/operator-registry-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/operator-registry-source"
-      IS_MIGRATION_DEPLOYMENT = "true"
-      MIGRATION_SOURCE_PROCESS_ID = "cFTzntWbZFBfReuz9pAY7wRoRVlYuCW5TH90jiwN6hI"
-      CU_URL="https://cu.anyone.permaweb.services"
+      IS_MIGRATION_DEPLOYMENT = "false"
+      MIGRATION_SOURCE_PROCESS_ID = ""
+      CU_URL="https://cu.ardrive.io"
     }
 
     template {
