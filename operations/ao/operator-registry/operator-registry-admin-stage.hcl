@@ -57,7 +57,7 @@ job "operator-registry-admin-stage" {
       env         = true
       data = <<EOH
       {{with secret "kv/stage-protocol/operator-registry-stage"}}
-        ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+        ETH_PRIVATE_KEY="{{.Data.data.OPERATOR_REGISTRY_OWNER_KEY}}"
       {{end}}
       EOH
     }
