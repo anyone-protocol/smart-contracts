@@ -1,21 +1,21 @@
-job "eval-operator-registry-stage" {
+job "eval-operator-registry-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
-  namespace = "stage-protocol"
+  namespace = "live-protocol"
 
   constraint {
     attribute = "${meta.pool}"
-    value = "stage"
+    value = "live-protocol"
   }
 
   reschedule { attempts = 0 }
 
-  task "operator-registry-stage" {
+  task "operator-registry-live" {
     env {
       SCRIPT = "scripts/operator-registry/eval.ts"
-      PHASE = "stage"
+      PHASE = "live"
       CU_URL="https://cu.ao-testnet.xyz"
-      EVAL_CODE_PATH="src/patches/patch-operator-registry-stage.lua"
+      EVAL_CODE_PATH="src/patches/patch-operator-registry-live.lua"
     }
 
     driver = "docker"
@@ -55,7 +55,7 @@ job "eval-operator-registry-stage" {
       destination = "secrets/keys.env"
       env         = true
       data = <<-EOH
-      {{- with secret "kv/stage-protocol/operator-registry-stage" }}
+      {{- with secret "kv/live-protocol/operator-registry-live" }}
       ETH_PRIVATE_KEY="{{ .Data.data.OPERATOR_REGISTRY_OWNER_KEY }}"
       {{- end }}
       EOH
@@ -65,7 +65,7 @@ job "eval-operator-registry-stage" {
       destination = "local/config.env"
       env         = true
       data = <<EOH
-      PROCESS_ID="{{ key `smart-contracts/stage/operator-registry-address` }}"
+      PROCESS_ID="{{ key `smart-contracts/live/operator-registry-address` }}"
       EOH
     }
   }
