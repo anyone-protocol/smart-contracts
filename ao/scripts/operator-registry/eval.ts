@@ -1,5 +1,6 @@
 import { EthereumSigner } from '@ardrive/turbo-sdk'
 import dotenv from 'dotenv'
+import { readFileSync } from 'fs'
 
 import { logger } from '../util/logger'
 import {
@@ -12,9 +13,10 @@ dotenv.config()
 const ethPrivateKey = process.env.ETH_PRIVATE_KEY
 const processId = process.env.PROCESS_ID
 const evalCode = process.env.EVAL_CODE
+const evalCodePath = process.env.EVAL_CODE_PATH
 
-if (!evalCode) {
-  throw new Error('EVAL_CODE is not set!')
+if (!evalCode || !evalCodePath) {
+  throw new Error('EVAL_CODE or EVAL_CODE_PATH is not set!')
 }
 
 if (!ethPrivateKey) {
@@ -32,13 +34,19 @@ async function evalAction() {
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
   logger.info(`Calling Eval on AO Process ${processId}`)
-  logger.info(`With Data: `, evalCode)
+  const data = evalCodePath
+    ? readFileSync(evalCodePath, 'utf8')
+    : evalCode
+
+  if (!data) {
+    throw new Error('No eval code found!')
+  }
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
     signer: await createEthereumDataItemSigner(signer) as any,
     tags: [{ name: 'Action', value: 'Eval' }],
-    data: evalCode
+    data: data
   })
 
   logger.info(`Got reply with messageId: ${messageId}`)
