@@ -17,7 +17,7 @@ job "relay-rewards-admin-live" {
       UPDATE_CONFIG_DATA=""
 
       PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.anyone.tech"
     }
 
     driver = "docker"

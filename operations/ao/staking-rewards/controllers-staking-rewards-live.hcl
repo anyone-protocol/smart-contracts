@@ -17,7 +17,7 @@ job "controllers-staking-rewards-live" {
       UPDATE_ROLES_DATA="{\"Grant\":{\"0xB45B7F679b7470b094dDf99ebCbee1bc8552fa1A\":[\"Add-Scores\",\"Complete-Round\"],\"0x14F7b53a09758aa257D8597cF992bDB61915f319\":[\"Claim-Rewards\"]}}"
 
       PHASE = "live"
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu.anyone.tech"
     }
 
     driver = "docker"

@@ -17,7 +17,7 @@ job "relay-rewards-admin-stage" {
       UPDATE_CONFIG_DATA=""
 
       PHASE = "stage"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu-stage.anyone.tech"
     }
 
     driver = "docker"

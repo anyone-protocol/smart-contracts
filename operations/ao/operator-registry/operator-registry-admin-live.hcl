@@ -16,7 +16,7 @@ job "operator-registry-admin-live" {
       # Script data - stringified JSON
 
       PHASE = "live"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.anyone.tech"
     }
 
     driver = "docker"

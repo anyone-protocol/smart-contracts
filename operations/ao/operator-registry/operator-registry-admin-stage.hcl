@@ -16,7 +16,7 @@ job "operator-registry-admin-stage" {
       # Script data - stringified JSON
 
       PHASE = "stage"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu-stage.anyone.tech"
     }
 
     driver = "docker"

@@ -56,7 +56,7 @@ job "operator-registry-live" {
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/operator-registry-source"
       IS_MIGRATION_DEPLOYMENT = "false"
       MIGRATION_SOURCE_PROCESS_ID = ""
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu.anyone.tech"
     }
 
     template {

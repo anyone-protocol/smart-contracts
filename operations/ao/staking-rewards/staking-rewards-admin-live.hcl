@@ -18,7 +18,7 @@ job "staking-rewards-admin-live" {
 
       # Stringified JSON
       UPDATE_CONFIG_DATA="{\"TokensPerSecond\":\"28935185000000000\",\"Requirements\":{\"Running\":0.5}}"
-      CU_URL="https://cu.anyone.permaweb.services"
+      CU_URL="https://cu.anyone.tech"
     }
 
     driver = "docker"

@@ -51,7 +51,7 @@ job "staking-rewards-live" {
       CONTRACT_NAME = "staking-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/staking-rewards-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/live/staking-rewards-source"
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu.anyone.tech"
     }
 
     template {

@@ -17,7 +17,7 @@ job "controllers-relay-rewards-live" {
       UPDATE_ROLES_DATA="{\"Grant\":{\"0x0F8d092fD0260e7476c9345C29Fde90B8aFCF86b\":[\"Add-Scores\",\"Complete-Round\"],\"0x9a89f7bf1f6AE7B48DdEB9019bF46f425B596BB8\":[\"Claim-Rewards\"]}}"
 
       PHASE = "live"
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu.anyone.tech"
     }
 
     driver = "docker"

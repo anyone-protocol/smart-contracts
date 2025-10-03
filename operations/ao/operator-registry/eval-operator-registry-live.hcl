@@ -14,7 +14,7 @@ job "eval-operator-registry-live" {
     env {
       SCRIPT = "scripts/operator-registry/eval.ts"
       PHASE = "live"
-      CU_URL="https://cu.ao-testnet.xyz"
+      CU_URL="https://cu.anyone.tech"
       EVAL_CODE_PATH="src/patches/operator-registry-patch-live-2025-09-24.lua"
     }
 

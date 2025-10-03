@@ -17,7 +17,7 @@ job "init-clean-operator-registry-stage" {
       INIT_CLEAN_DATA="{}"
 
       PHASE = "stage"
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu-stage.anyone.tech"
     }
 
     driver = "docker"

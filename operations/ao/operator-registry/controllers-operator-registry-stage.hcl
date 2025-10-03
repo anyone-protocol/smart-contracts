@@ -17,7 +17,7 @@ job "controllers-operator-registry-stage" {
       UPDATE_ROLES_DATA="{\"Grant\":{\"0x343D35d47818dEAACb5B9A1ddb67A2c7C6BB5413\":[\"Admin-Submit-Operator-Certificates\"]}}"
 
       PHASE = "stage"
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu-stage.anyone.tech"
     }
 
     driver = "docker"

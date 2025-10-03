@@ -51,7 +51,7 @@ job "relay-rewards-stage" {
       CONTRACT_NAME = "relay-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/relay-rewards-address"
       CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/relay-rewards-source"
-      CU_URL="https://cu.ardrive.io"
+      CU_URL="https://cu-stage.anyone.tech"
     }
 
     template {
