@@ -23,7 +23,7 @@ job "operator-registry-admin-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:f82f72fbb628351f4af8c7e36f9ab45d7fe188f1"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:6f8b1d71117e40f343243655494f09cded2d620e"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
@@ -55,17 +55,17 @@ job "operator-registry-admin-stage" {
     template {
       destination = "secrets/keys.env"
       env         = true
-      data = <<EOH
-      {{with secret "kv/stage-protocol/operator-registry-stage"}}
-        ETH_PRIVATE_KEY="{{.Data.data.OPERATOR_REGISTRY_OWNER_KEY}}"
-      {{end}}
+      data = <<-EOH
+      {{- with secret "kv/stage-protocol/operator-registry-stage" }}
+      ETH_PRIVATE_KEY="{{ .Data.data.OPERATOR_REGISTRY_OWNER_KEY }}"
+      {{ end }}
       EOH
     }
 
     template {
       destination = "local/config.env"
       env         = true
-      data = <<EOH
+      data = <<-EOH
       PROCESS_ID="{{ key `smart-contracts/stage/operator-registry-address` }}"
       EOH
     }

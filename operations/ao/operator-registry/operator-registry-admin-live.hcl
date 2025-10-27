@@ -23,7 +23,7 @@ job "operator-registry-admin-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:f82f72fbb628351f4af8c7e36f9ab45d7fe188f1"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:6f8b1d71117e40f343243655494f09cded2d620e"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
