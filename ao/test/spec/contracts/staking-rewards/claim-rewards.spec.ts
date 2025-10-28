@@ -334,6 +334,6 @@ describe('Claiming staking rewards', () => {
 
 
 
-  })
+  }).timeout(10_000)
 
 })

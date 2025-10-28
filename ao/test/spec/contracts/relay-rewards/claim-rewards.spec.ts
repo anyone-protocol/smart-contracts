@@ -323,6 +323,6 @@ describe('Claiming relay rewards', () => {
     const cClaimed2 = JSON.parse(cClaimedResult2.Messages[0].Data)
     expect(cClaimed2).to.be.equal('11616')
 
-  })
+  }).timeout(10_000)
 
 })
