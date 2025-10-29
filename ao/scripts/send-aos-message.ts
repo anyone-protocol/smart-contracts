@@ -7,14 +7,11 @@ import { createData, Signer } from 'arbundles'
 import { logger } from './util/logger'
 
 export const CU_URL = process.env.CU_URL
-if (!CU_URL) {
-  throw new Error('CU_URL is not set!')
-}
 const {
   message: aoMessage,
   result: aoResult,
   dryrun: aoDryRun,
-} = aoConnect({ CU_URL })
+} = aoConnect({ MODE: 'legacy', CU_URL })
 
 export type SendAosBaseOptions = {
   processId: string
