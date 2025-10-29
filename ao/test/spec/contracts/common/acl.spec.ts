@@ -36,8 +36,19 @@ for (const contractName of contractsWithACL) {
             Grant: { [ALICE_ADDRESS]: [ 'new-mock-role', 'another-mock-role' ] }
           })
         })
-        expect(initialGrantResult.Messages).to.have.lengthOf(1)
-        expect(initialGrantResult.Messages[0].Data).to.equal('OK')
+        expect(initialGrantResult.Messages).to.have.lengthOf(2)
+        expect(initialGrantResult.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(initialGrantResult.Messages[0].Tags).to.deep.include({
+          name: 'acl',
+          value: {
+            'new-mock-role': { [ALICE_ADDRESS]: true },
+            'another-mock-role': { [ALICE_ADDRESS]: true }
+          }
+        })
+        expect(initialGrantResult.Messages[1].Data).to.equal('OK')
   
         const subsequentUpdateResult = await handle({
           From: OWNER_ADDRESS,
@@ -47,8 +58,19 @@ for (const contractName of contractsWithACL) {
             Revoke: { [ALICE_ADDRESS]: [ 'another-mock-role' ] }
           })
         })
-        expect(subsequentUpdateResult.Messages).to.have.lengthOf(1)
-        expect(subsequentUpdateResult.Messages[0].Data).to.equal('OK')
+        expect(subsequentUpdateResult.Messages).to.have.lengthOf(2)
+        expect(subsequentUpdateResult.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(subsequentUpdateResult.Messages[0].Tags).to.deep.include({
+          name: 'acl',
+          value: {
+            'new-mock-role': { [ALICE_ADDRESS]: true },
+            'another-mock-role': { [BOB_ADDRESS]: true }
+          }
+        })
+        expect(subsequentUpdateResult.Messages[1].Data).to.equal('OK')
       })
   
       it('Prevents anyone else from granting/revoking roles', async () => {
@@ -82,8 +104,20 @@ for (const contractName of contractsWithACL) {
           })
         })
   
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'acl',
+          value: {
+            'another-mock-role': { [ALICE_ADDRESS]: true },
+            'new-mock-role': { [ALICE_ADDRESS]: true },
+            'admin': { [ALICE_ADDRESS]: true }
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
   
       it('Allows address with Update-Roles role to grant/revoke roles', async () => {
@@ -102,8 +136,20 @@ for (const contractName of contractsWithACL) {
           })
         })
   
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'acl',
+          value: {
+            'another-mock-role': { [ALICE_ADDRESS]: true },
+            'new-mock-role': { [ALICE_ADDRESS]: true },
+            'Update-Roles': { [ALICE_ADDRESS]: true }
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
     })
   

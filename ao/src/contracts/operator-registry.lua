@@ -30,7 +30,6 @@ end
 
 function OperatorRegistry.init()
   local json = require('json')
-
   local ErrorMessages = require('.common.errors')
   local AnyoneUtils = require('.common.utils')
   local ACL = require('.common.acl')
@@ -50,6 +49,7 @@ function OperatorRegistry.init()
       assert(msg.Data, ErrorMessages.OperatorCertificatesRequired)
       local certs = json.decode(msg.Data)
 
+      local shouldPatchState = false
       for _, cert in ipairs(certs) do
         local fingerprint = cert['f']
         local address = cert['a']
@@ -64,8 +64,17 @@ function OperatorRegistry.init()
         if hw then
           OperatorRegistry._addVerifiedHardwareFingerprint(fingerprint)
         end
+
+        shouldPatchState = true
       end
 
+      if shouldPatchState then
+        ao.send({
+          device = 'patch@1.0',
+          claimable_fingerprints_to_operator_addresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
+          verified_hardware_fingerprints = OperatorRegistry.VerifiedHardwareFingerprints
+        })
+      end
       ao.send({
         Target = msg.From,
         Action = 'Admin-Submit-Operator-Certificates-Response',
@@ -144,6 +153,11 @@ function OperatorRegistry.init()
         .ClaimableFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
+        device = 'patch@1.0',
+        claimable_fingerprints_to_operator_addresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
+        verified_fingerprints_to_operator_addresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Submit-Fingerprint-Certificate-Response',
         Data = 'OK'
@@ -183,6 +197,10 @@ function OperatorRegistry.init()
         .VerifiedFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
+        device = 'patch@1.0',
+        verified_fingerprints_to_operator_addresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Renounce-Fingerprint-Certificate-Response',
         Data = 'OK'
@@ -210,6 +228,10 @@ function OperatorRegistry.init()
       OperatorRegistry.VerifiedFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
+        device = 'patch@1.0',
+        verified_fingerprints_to_operator_addresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Remove-Fingerprint-Certificate-Response',
         Data = 'OK'
@@ -232,6 +254,10 @@ function OperatorRegistry.init()
 
       OperatorRegistry.BlockedOperatorAddresses[address] = true
 
+      ao.send({
+        device = 'patch@1.0',
+        blocked_operator_addresses = OperatorRegistry.BlockedOperatorAddresses
+      })
       ao.send({
         Target = msg.From,
         Action = 'Block-Operator-Address-Response',
@@ -273,6 +299,10 @@ function OperatorRegistry.init()
       OperatorRegistry.BlockedOperatorAddresses[address] = nil
 
       ao.send({
+        device = 'patch@1.0',
+        blocked_operator_addresses = OperatorRegistry.BlockedOperatorAddresses
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Unblock-Operator-Address-Response',
         Data = 'OK'
@@ -308,6 +338,10 @@ function OperatorRegistry.init()
         .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint]
           = address
 
+      ao.send({
+        device = 'patch@1.0',
+        registration_credits_fingerprints_to_operator_addresses = OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses
+      })
       ao.send({
         Target = msg.From,
         Action = 'Add-Registration-Credit-Response',
@@ -358,6 +392,10 @@ function OperatorRegistry.init()
         .RegistrationCreditsFingerprintsToOperatorAddresses[fingerprint] = nil
 
       ao.send({
+        device = 'patch@1.0',
+        registration_credits_fingerprints_to_operator_addresses = OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Remove-Registration-Credit-Response',
         Data = 'OK'
@@ -381,6 +419,10 @@ function OperatorRegistry.init()
         OperatorRegistry._addVerifiedHardwareFingerprint(fingerprint)
       end
 
+      ao.send({
+        device = 'patch@1.0',
+        verified_hardware_fingerprints = OperatorRegistry.VerifiedHardwareFingerprints
+      })
       ao.send({
         Target = msg.From,
         Action = 'Add-Verified-Hardware-Response',
@@ -423,6 +465,10 @@ function OperatorRegistry.init()
         OperatorRegistry.VerifiedHardwareFingerprints[fingerprint] = nil
       end
 
+      ao.send({
+        device = 'patch@1.0',
+        verified_hardware_fingerprints = OperatorRegistry.VerifiedHardwareFingerprints
+      })
       ao.send({
         Target = msg.From,
         Action = 'Remove-Verified-Hardware-Response',
@@ -604,8 +650,17 @@ function OperatorRegistry.init()
       OperatorRegistry.RegistrationCreditsRequired =
         initState.RegistrationCreditsRequired or false
 
-      OperatorRegistry._initialized = true
+      ao.send({
+        device = 'patch@1.0',
+        blocked_operator_addresses = OperatorRegistry.BlockedOperatorAddresses,
+        claimable_fingerprints_to_operator_addresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
+        verified_fingerprints_to_operator_addresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses,
+        verified_hardware_fingerprints = OperatorRegistry.VerifiedHardwareFingerprints,
+        registration_credits_fingerprints_to_operator_addresses = OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses,
+        registration_credits_required = OperatorRegistry.RegistrationCreditsRequired
+      })
 
+      OperatorRegistry._initialized = true
       ao.send({
         Target = msg.From,
         Action = 'Init-Response',
