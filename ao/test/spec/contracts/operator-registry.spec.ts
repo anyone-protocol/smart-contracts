@@ -1723,6 +1723,10 @@ describe('Operator Registry', () => {
         name: 'registration_credits_fingerprints_to_operator_addresses',
         value: initState.RegistrationCreditsFingerprintsToOperatorAddresses
       })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'operator_registry_initialized',
+        value: true
+      })
       expect(result.Messages[0].Tags).to.not.deep.include({
         name: 'registration_credits_required',
         value: 'false'

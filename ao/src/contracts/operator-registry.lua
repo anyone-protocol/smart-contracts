@@ -649,9 +649,11 @@ function OperatorRegistry.init()
         initState.VerifiedHardwareFingerprints or {}
       OperatorRegistry.RegistrationCreditsRequired =
         initState.RegistrationCreditsRequired or false
+      OperatorRegistry._initialized = true
 
       ao.send({
         device = 'patch@1.0',
+        operator_registry_initialized = OperatorRegistry._initialized,
         blocked_operator_addresses = OperatorRegistry.BlockedOperatorAddresses,
         claimable_fingerprints_to_operator_addresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
         verified_fingerprints_to_operator_addresses = OperatorRegistry.VerifiedFingerprintsToOperatorAddresses,
@@ -659,8 +661,6 @@ function OperatorRegistry.init()
         registration_credits_fingerprints_to_operator_addresses = OperatorRegistry.RegistrationCreditsFingerprintsToOperatorAddresses,
         registration_credits_required = OperatorRegistry.RegistrationCreditsRequired
       })
-
-      OperatorRegistry._initialized = true
       ao.send({
         Target = msg.From,
         Action = 'Init-Response',
