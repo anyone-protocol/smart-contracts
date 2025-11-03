@@ -1,14 +1,14 @@
-local RelayRewards = {
+RelayRewards = {
   _initialized = false,
 
   Claimed = {
--- [Address] = '0'
+  -- [Address] = '0'
   },
   TotalAddressReward = {
--- [Address] = '0'
+  -- [Address] = '0'
   },
   TotalFingerprintReward = {
--- [Fingerprint] = '0'
+  -- [Fingerprint] = '0'
   },
 
   Configuration = {

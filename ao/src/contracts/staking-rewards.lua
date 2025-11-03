@@ -1,18 +1,18 @@
-local StakingRewards = {
+StakingRewards = {
   _initialized = false,
   _sharesEnabled = false,
   Claimed = {
--- [Address] = { // Hodler
---   [Address] = '0' // Operator -> Hodler's score per operator stake
--- }
+  -- [Address] = { // Hodler
+  --   [Address] = '0' // Operator -> Hodler's score per operator stake
+  -- }
   },
   Rewarded = {
--- [Address] = { // Hodler
---   [Address] = '0' // Operator -> Hodler's score per operator stake
--- }
+  -- [Address] = { // Hodler
+  --   [Address] = '0' // Operator -> Hodler's score per operator stake
+  -- }
   },
   Shares = {
--- [Operator Address] = 0.0
+  -- [Operator Address] = 0.0
   },
   Configuration = {
     TokensPerSecond = '100000000',
@@ -30,33 +30,33 @@ local StakingRewards = {
     },
     Configuration = {},
     Details = {
--- [Address] = { // Hodler
---   [Address] = { // Operator
---     Score = {
---       Staked = '0'
---       Restaked = '0'
---       Running = 0.0
---       Share = 0.0
---     }
---     Rating = '0'
---     Reward = {
---       Hodler = '0'
---       Operator = '0'
---     }
---   }
--- }
+    -- [Address] = { // Hodler
+    --   [Address] = { // Operator
+    --     Score = {
+    --       Staked = '0'
+    --       Restaked = '0'
+    --       Running = 0.0
+    --       Share = 0.0
+    --     }
+    --     Rating = '0'
+    --     Reward = {
+    --       Hodler = '0'
+    --       Operator = '0'
+    --     }
+    --   }
+    -- }
     }
   },
   PendingRounds = {
--- Timestamp = {
---   [Address] = { // Hodler
---     [Address] = { // Operator
---       Staked = '0'
---       Running = 0.0
---       Share = 0.05
---     }
---   }
--- }
+  -- Timestamp = {
+  --   [Address] = { // Hodler
+  --     [Address] = { // Operator
+  --       Staked = '0'
+  --       Running = 0.0
+  --       Share = 0.05
+  --     }
+  --   }
+  -- }
   }
 }
 
