@@ -75,11 +75,26 @@ describe('relay-rewards-view-init-state', () => {
       Data: JSON.stringify(specInit)
     })
     expect(initStateResult.Messages).to.have.lengthOf(2)
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'relay_rewards_initialized', value: true })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'claimed', value: [] })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'total_address_reward', value: specInit.TotalAddressReward })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'total_fingerprint_reward', value: specInit.TotalFingerprintReward })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'relay_rewards_initialized',
+      value: true
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: []
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'total_address_reward',
+      value: specInit.TotalAddressReward
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'total_fingerprint_reward',
+      value: specInit.TotalFingerprintReward
+    })
     expect(initStateResult.Messages[0].Tags).to.deep.include({
       name: 'previous_round',
       value: {
@@ -108,10 +123,6 @@ describe('relay-rewards-view-init-state', () => {
         ...specInit.Configuration,
         'Delegates': []
       }
-    })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({
-      name: 'pending_rounds',
-      value: []
     })
     expect(initStateResult.Messages[1].Data).to.equal('OK')
 
@@ -274,9 +285,18 @@ describe('relay-rewards-view-init-state', () => {
       Data: state
     })
     expect(initStateResult.Messages).to.have.lengthOf(2)
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'relay_rewards_initialized', value: true })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'claimed', value: [] })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'relay_rewards_initialized',
+      value: true
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: []
+    })
     expect(initStateResult.Messages[0].Tags).to.deep.include({
       name: 'previous_round',
       value: {

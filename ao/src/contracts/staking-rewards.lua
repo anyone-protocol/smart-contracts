@@ -114,10 +114,14 @@ function StakingRewards.init()
       assert(err == nil, 'Data must be valid JSON')
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
-      
+
       local config = StakingRewards.Configuration
       StakingRewards._updateConfiguration(config, request)
 
+      ao.send({
+        device = 'patch@1.0',
+        configuration = StakingRewards.Configuration
+      })
       ao.send({
         Target = msg.From,
         Action = 'Update-Configuration-Response',
@@ -150,9 +154,13 @@ function StakingRewards.init()
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
       assert(type(request.Enabled) == 'boolean', 'Enabled must be a boolean')
-      
+
       StakingRewards._sharesEnabled = request.Enabled
 
+      ao.send({
+        device = 'patch@1.0',
+        shares_enabled = StakingRewards._sharesEnabled
+      })
       ao.send({
         Target = msg.From,
         Action = 'Toggle-Feature-Shares-Response',
@@ -181,13 +189,17 @@ function StakingRewards.init()
       assert(err == nil, 'Data must be valid JSON')
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
-      
+
       AnyoneUtils.assertNumber(request.Share, 'Share')
       assert(request.Share >= 0, 'Share has to be >= 0')
       assert(request.Share <= 1, 'Share has to be <= 1')
 
       StakingRewards.Shares[operatorAddress] = request.Share
 
+      ao.send({
+        device = 'patch@1.0',
+        shares = StakingRewards.Shares
+      })
       ao.send({
         Target = msg.From,
         Action = 'Set-Share-Response',
@@ -236,7 +248,7 @@ function StakingRewards.init()
         for operatorAddress, score in pairs(scores) do
           AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Invalid Operator address: Scores[' .. hodlerAddress .. '][' .. operatorAddress .. ']')
           local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
-          
+
           assert(
             StakingRewards.PendingRounds[timestamp] == nil or
             StakingRewards.PendingRounds[timestamp][hodlerAddress] == nil or
@@ -295,13 +307,13 @@ function StakingRewards.init()
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       assert(StakingRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
-      
+
       local summary = {
         Rewards = bint(0), Ratings = bint(0), Stakes = bint(0)
       }
 
       local roundData = {}
-      
+
       for hodlerAddress, scores in pairs(StakingRewards.PendingRounds[timestamp]) do
         roundData[hodlerAddress] = {}
         for operatorAddress, score in pairs(scores) do
@@ -309,9 +321,9 @@ function StakingRewards.init()
           local restaked = bint(0)
           local rating = bint(0)
           if score.Running >= StakingRewards.Configuration.Requirements.Running then
-            if StakingRewards.Rewarded[hodlerAddress] ~= nil and 
+            if StakingRewards.Rewarded[hodlerAddress] ~= nil and
                 StakingRewards.Rewarded[hodlerAddress][operatorAddress] ~= nil then
-              if StakingRewards.Claimed[hodlerAddress] ~= nil and 
+              if StakingRewards.Claimed[hodlerAddress] ~= nil and
                   StakingRewards.Claimed[hodlerAddress][operatorAddress] ~= nil then
                 restaked = bint(StakingRewards.Rewarded[hodlerAddress][operatorAddress]) - bint(StakingRewards.Claimed[hodlerAddress][operatorAddress])
               else
@@ -353,11 +365,11 @@ function StakingRewards.init()
           end
           local r = bint.trunc(data.Score.Share * bint.tonumber(sharePrecision)) * reward
           local operatorReward = r // sharePrecision
-          
+
           roundData[holderAddress][operatorAddress].Reward = {
             Hodler = reward - operatorReward, Operator = operatorReward
           }
-          
+
           summary.Rewards = summary.Rewards + reward
         end
       end
@@ -377,7 +389,7 @@ function StakingRewards.init()
           if bint.ispos(hodlerReward) then
             StakingRewards.Rewarded[hodlerAddress][operatorAddress] = tostring(hodlerReward)
           end
-          
+
           if StakingRewards.Rewarded[operatorAddress] == nil then
             StakingRewards.Rewarded[operatorAddress] = {}
           end
@@ -389,7 +401,7 @@ function StakingRewards.init()
           if bint.ispos(operatorReward) then
             StakingRewards.Rewarded[operatorAddress][operatorAddress] = tostring(operatorReward)
           end
-          
+
           dataWithStrings[hodlerAddress][operatorAddress] = {
             Score = {
               Staked = tostring(data.Score.Staked),
@@ -421,6 +433,11 @@ function StakingRewards.init()
         end
       end
 
+      ao.send({
+        device = 'patch@1.0',
+        rewarded = StakingRewards.Rewarded,
+        previous_round = StakingRewards.PreviousRound
+      })
       ao.send({
         Target = msg.From,
         Action = 'Complete-Round-Response',
@@ -467,7 +484,7 @@ function StakingRewards.init()
       AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
 
       local claimed = StakingRewards.Claimed[address]
-      
+
       ao.send({
         Target = msg.From,
         Action = 'Get-Claimed-Response',
@@ -500,7 +517,11 @@ function StakingRewards.init()
       for operatorAddress, reward in pairs(rewarded) do
         StakingRewards.Claimed[hodlerAddress][operatorAddress] = StakingRewards.Rewarded[hodlerAddress][operatorAddress]
       end
-      
+
+      ao.send({
+        device = 'patch@1.0',
+        claimed = StakingRewards.Claimed
+      })
       ao.send({
         Target = msg.From,
         Action = 'Claim-Rewards-Response',
@@ -572,7 +593,7 @@ function StakingRewards.init()
       AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Address tag')
 
       assert(StakingRewards.PreviousRound.Details[hodlerAddress], 'Address not found in previous round')
-      
+
       local encoded = json.encode({
         Timestamp = StakingRewards.PreviousRound.Timestamp,
         Period = StakingRewards.PreviousRound.Period,
@@ -732,6 +753,16 @@ function StakingRewards.init()
 
       StakingRewards._initialized = true
 
+      ao.send({
+        device = 'patch@1.0',
+        staking_rewards_initialized = true,
+        shares_enabled = StakingRewards._sharesEnabled,
+        claimed = StakingRewards.Claimed,
+        rewarded = StakingRewards.Rewarded,
+        shares = StakingRewards.Shares,
+        configuration = StakingRewards.Configuration,
+        previous_round = StakingRewards.PreviousRound
+      })
       ao.send({
         Target = msg.From,
         Action = 'Init-Response',

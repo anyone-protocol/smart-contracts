@@ -948,8 +948,7 @@ function RelayRewards.init()
         total_address_reward = RelayRewards.TotalAddressReward,
         total_fingerprint_reward = RelayRewards.TotalFingerprintReward,
         configuration = RelayRewards.Configuration,
-        previous_round = RelayRewards.PreviousRound,
-        pending_rounds = RelayRewards.PendingRounds
+        previous_round = RelayRewards.PreviousRound
       })
       ao.send({
         Target = msg.From,

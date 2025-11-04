@@ -41,20 +41,23 @@ describe('ACL enforcement of staking rewards', () => {
 
   describe('Update-Configuration', () => {
     it('Allows Admin Role', async () => {
+      const config = {
+        TokensPerSecond: '100',
+        Requirements: {
+          Running: 0.1
+        }
+      }
       const configResult = await handle({
         From: ALICE_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Update-Configuration' }
         ],
-        Data: JSON.stringify({
-          TokensPerSecond: '100',
-          Requirements: {
-            Running: 0.1
-          }
-        })
+        Data: JSON.stringify(config)
       })
-      expect(configResult.Messages).to.have.lengthOf(1)
-      expect(configResult.Messages[0].Data).to.equal('OK')
+      expect(configResult.Messages).to.have.lengthOf(2)
+      expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+      expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+      expect(configResult.Messages[1].Data).to.equal('OK')
     })
 
     it('Allows Update-Configuration Role', async () => {
@@ -66,21 +69,24 @@ describe('ACL enforcement of staking rewards', () => {
         })
       })
 
+      const config = {
+        TokensPerSecond: '100',
+        Requirements: {
+          Running: 0.5
+        }
+      }
       const configResult = await handle({
         From: BOB_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Update-Configuration' }
         ],
-        Data: JSON.stringify({
-          TokensPerSecond: '100',
-          Requirements: {
-            Running: 0.5
-          }
-        })
+        Data: JSON.stringify(config)
       })
 
-      expect(configResult.Messages).to.have.lengthOf(1)
-      expect(configResult.Messages[0].Data).to.equal('OK')
+      expect(configResult.Messages).to.have.lengthOf(2)
+      expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+      expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+      expect(configResult.Messages[1].Data).to.equal('OK')
     })
   })
 
@@ -139,8 +145,9 @@ describe('ACL enforcement of staking rewards', () => {
             { name: 'Timestamp', value: '2000' }
         ]
       })
-      expect(completeRoundResult.Messages).to.have.lengthOf(1)
-      expect(completeRoundResult.Messages[0].Data).to.equal('OK')
+      expect(completeRoundResult.Messages).to.have.lengthOf(2)
+      expect(completeRoundResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+      expect(completeRoundResult.Messages[1].Data).to.equal('OK')
     })
 
     it('Allows Complete-Round Role', async () => {
@@ -168,8 +175,9 @@ describe('ACL enforcement of staking rewards', () => {
         ]
       })
 
-      expect(completeRoundResult.Messages).to.have.lengthOf(1)
-      expect(completeRoundResult.Messages[0].Data).to.equal('OK')
+      expect(completeRoundResult.Messages).to.have.lengthOf(2)
+      expect(completeRoundResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+      expect(completeRoundResult.Messages[1].Data).to.equal('OK')
     })
   })
 
