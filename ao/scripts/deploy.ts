@@ -5,7 +5,7 @@ import { join, resolve } from 'path'
 import { EthereumSigner, TurboFactory } from '@ardrive/turbo-sdk'
 import { spawn } from '@permaweb/aoconnect'
 
-import { logger } from './util/logger'
+import { logger as utilLogger } from './util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosDryRun,
@@ -23,12 +23,19 @@ const schedulerUnitAddress = process.env.SCHEDULER_UNIT_ADDRESS
 const messagingUnitAddress = process.env.MESSAGING_UNIT_ADDRESS
   || 'fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY'
 const aosModuleId = process.env.AOS_MODULE_ID
-  || 'cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk'
+  // || 'cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk' // OLD MODULE!
+  || 'ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s'
 const consulToken = process.env.CONSUL_TOKEN || 'no-token'
 const callInitHandler = process.env.CALL_INIT_HANDLER === 'true'
 const initData = process.env.INIT_DATA
 const isMigrationDeployment = process.env.IS_MIGRATION_DEPLOYMENT === 'true'
 const migrationSourceProcessId = process.env.MIGRATION_SOURCE_PROCESS_ID
+
+let logger = console
+if (process.env.USE_CONSOLE_LOGGER !== 'true') {
+  logger.info('Using json logger from util/logger.ts')
+  logger = utilLogger as any
+}
 
 if (!contractName) {
   throw new Error('CONTRACT_NAME is not set!')
@@ -56,31 +63,31 @@ const signer = new EthereumSigner(deployerPrivateKey)
 logger.info(
   `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
 )
-const turbo = TurboFactory.authenticated({ signer })
+// const turbo = TurboFactory.authenticated({ signer })
 
 async function deploy() {
   logger.info(`Deploying AO contract: ${contractName}`)
 
-  const bundledLuaPath = `./dist/${contractName}.lua`
-  const bundledLuaSize = statSync(bundledLuaPath).size
-  const uploadResult = await turbo.uploadFile({
-    fileStreamFactory: () => createReadStream(bundledLuaPath),
-    fileSizeFactory: () => bundledLuaSize,
-    dataItemOpts: {
-      tags: [
-        { name: 'App-Name', value: 'aos-LUA' },
-        { name: 'App-Version', value: '0.0.1' },
-        { name: 'Content-Type', value: 'text/x-lua' },
-        { name: 'Author', value: 'Anyone Protocol' },
-        { name: 'Contract-Name', value: contractName },
-        { name: 'Deploy-Nonce', value: new Date().getTime().toString() }
-      ]
-    }
-  })
+  // const bundledLuaPath = `./dist/${contractName}.lua`
+  // const bundledLuaSize = statSync(bundledLuaPath).size
+  // const uploadResult = await turbo.uploadFile({
+  //   fileStreamFactory: () => createReadStream(bundledLuaPath),
+  //   fileSizeFactory: () => bundledLuaSize,
+  //   dataItemOpts: {
+  //     tags: [
+  //       { name: 'App-Name', value: 'aos-LUA' },
+  //       { name: 'App-Version', value: '0.0.1' },
+  //       { name: 'Content-Type', value: 'text/x-lua' },
+  //       { name: 'Author', value: 'Anyone Protocol' },
+  //       { name: 'Contract-Name', value: contractName },
+  //       { name: 'Deploy-Nonce', value: new Date().getTime().toString() }
+  //     ]
+  //   }
+  // })
 
-  logger.info(
-    `Publish ${contractName} source result: ${JSON.stringify(uploadResult)}`
-  )
+  // logger.info(
+  //   `Publish ${contractName} source result: ${JSON.stringify(uploadResult)}`
+  // )
 
   const ethereumDataItemSigner = await createEthereumDataItemSigner(signer)
 
@@ -94,11 +101,12 @@ async function deploy() {
       { name: 'Contract-Name', value: contractName },
       { name: 'Authority', value: messagingUnitAddress },
       { name: 'Timestamp', value: Date.now().toString() },
-      {
-        name: 'Source-Code-TX-ID',
-        value: uploadResult.id
-      }
-    ]
+      // {
+      //   name: 'Source-Code-TX-ID',
+      //   value: uploadResult.id
+      // }
+    ],
+    data: 'AnyoneProtocol'
   })
 
   logger.info(`Sending EVAL of ${contractName} to AO Process ${processId}`)
@@ -109,10 +117,10 @@ async function deploy() {
     tags: [
       { name: 'Action', value: 'Eval' },
       { name: 'App-Name', value: 'ANYONE' },
-      {
-        name: 'Source-Code-TX-ID',
-        value: uploadResult.id
-      }
+      // {
+      //   name: 'Source-Code-TX-ID',
+      //   value: uploadResult.id
+      // }
     ]
   })
 
@@ -185,18 +193,24 @@ async function deploy() {
     })
     logger.info(`Contract address updated: ${contractResult}`)
 
-    const sourceResult = await consul.kv.set({
-      key: sourceKey,
-      value: uploadResult.id,
-      token: consulToken
-    })
-    logger.info(`Contract source updated: ${sourceResult}`)
+    // const sourceResult = await consul.kv.set({
+    //   key: sourceKey,
+    //   value: uploadResult.id,
+    //   token: consulToken
+    // })
+    // logger.info(`Contract source updated: ${sourceResult}`)
   } else {
     console.warn(
       'Deployment env var PHASE not defined,' +
         ' skipping update of cluster variable in Consul.'
     )
   }
+
+  logger.info(
+    `Deployment of ${contractName} complete!`
+      + ` Check the deployed process in your browser at`
+      + ` https://ao.link/#/entity/${processId}`
+  )
 }
 
 deploy().catch(e => { logger.error(e); process.exit(1); })

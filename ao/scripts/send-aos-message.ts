@@ -11,7 +11,10 @@ const {
   message: aoMessage,
   result: aoResult,
   dryrun: aoDryRun,
-} = aoConnect({ MODE: 'legacy', CU_URL })
+} = aoConnect({
+  // MODE: 'legacy',
+  CU_URL
+})
 
 export type SendAosBaseOptions = {
   processId: string
@@ -32,7 +35,7 @@ export async function createEthereumDataItemSigner(signer: Signer) {
       anchor?: string
     }
   ) => {
-    const dataItem = createData(data, signer, { tags, target, anchor })
+    const dataItem = createData(data || 'AnyoneProtocol', signer, { tags, target, anchor })
 
     return dataItem.sign(signer).then(async () => ({
       id: await dataItem.id,
@@ -40,6 +43,8 @@ export async function createEthereumDataItemSigner(signer: Signer) {
     }))
   }
 }
+
+// export async function createEvmSigner(create) {}
 
 export async function sendAosDryRun(
   { processId, data, tags }: SendAosDryRunOptions,
