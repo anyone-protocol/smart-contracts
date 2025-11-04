@@ -15,17 +15,17 @@ import {
 describe('Score processing of relay rewards', () => {
   let handle: AOTestHandle
 
-  let score0 = { Address: ALICE_ADDRESS, Network: 0, IsHardware: false, 
+  let score0 = { Address: ALICE_ADDRESS, Network: 0, IsHardware: false,
     UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
   }
-  let score1 = { Address: BOB_ADDRESS, Network: 100, IsHardware: false, 
+  let score1 = { Address: BOB_ADDRESS, Network: 100, IsHardware: false,
     UptimeStreak: 0, ExitBonus: false, FamilySize: 0, LocationSize: 0
   }
-  let score1WithMultipliers = { Address: BOB_ADDRESS, Network: 100, IsHardware: true, 
+  let score1WithMultipliers = { Address: BOB_ADDRESS, Network: 100, IsHardware: true,
     UptimeStreak: 0, ExitBonus: false, FamilySize: 10, LocationSize: 10
   }
   let refRound0 = JSON.stringify({ Scores: { [FINGERPRINT_A]: score0 } })
-  let refRound1 = JSON.stringify({ Scores: { [FINGERPRINT_A]: score0, 
+  let refRound1 = JSON.stringify({ Scores: { [FINGERPRINT_A]: score0,
     [FINGERPRINT_B]: score1 } })
   let refRound1WithMultipliers = JSON.stringify({
     Scores: { [FINGERPRINT_A]: score0, [FINGERPRINT_B]: score1WithMultipliers }
@@ -53,12 +53,16 @@ describe('Score processing of relay rewards', () => {
         },
         Multipliers: {
           Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
-          
+
         }
       })
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -78,9 +82,13 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
-    
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
+
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -99,8 +107,12 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '2000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const rewardsForAliceResult = await handle({
       From: ALICE_ADDRESS,
@@ -110,7 +122,7 @@ describe('Score processing of relay rewards', () => {
     })
     expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
     expect(rewardsForAliceResult.Messages[0].Data).to.equal('0')
-    
+
     const rewardsForBobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -138,8 +150,12 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '3000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
 
     const aliceResult = await handle({
       From: ALICE_ADDRESS,
@@ -149,7 +165,7 @@ describe('Score processing of relay rewards', () => {
     })
     expect(aliceResult.Messages).to.have.lengthOf(1)
     expect(aliceResult.Messages[0].Data).to.equal('0')
-    
+
     const bobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -168,7 +184,7 @@ describe('Score processing of relay rewards', () => {
     })
     expect(aResult.Messages).to.have.lengthOf(1)
     expect(aResult.Messages[0].Data).to.equal('0')
-    
+
     const bResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -211,8 +227,12 @@ describe('Score processing of relay rewards', () => {
         }
       })
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -232,9 +252,13 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
-    
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
+
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -253,8 +277,12 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '2000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const rewardsForAliceResult = await handle({
       From: ALICE_ADDRESS,
@@ -264,7 +292,7 @@ describe('Score processing of relay rewards', () => {
     })
     expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
     expect(rewardsForAliceResult.Messages[0].Data).to.equal('0')
-    
+
     const rewardsForBobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -292,8 +320,12 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '3000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
     const bobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -302,9 +334,9 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(bobResult.Messages).to.have.lengthOf(1)
-    
+
     const data = JSON.parse(bobResult.Messages[0].Data)
-    
+
     expect(data.Details.Variables.FamilyMultiplier).to.equal(1.1)
     expect(data.Details.Rating.Network).to.equal(110)
   })
@@ -339,8 +371,12 @@ describe('Score processing of relay rewards', () => {
         }
       })
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -360,9 +396,13 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
-    
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
+
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -381,8 +421,12 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '2000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const rewardsForAliceResult = await handle({
       From: ALICE_ADDRESS,
@@ -392,7 +436,7 @@ describe('Score processing of relay rewards', () => {
     })
     expect(rewardsForAliceResult.Messages).to.have.lengthOf(1)
     expect(rewardsForAliceResult.Messages[0].Data).to.equal('0')
-    
+
     const rewardsForBobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -420,8 +464,12 @@ describe('Score processing of relay rewards', () => {
           { name: 'Timestamp', value: '3000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
     const bobResult = await handle({
       From: BOB_ADDRESS,
       Tags: [
@@ -430,7 +478,7 @@ describe('Score processing of relay rewards', () => {
       ]
     })
     expect(bobResult.Messages).to.have.lengthOf(1)
-    
+
     const data = JSON.parse(bobResult.Messages[0].Data)
     expect(data.Details.Variables.LocationMultiplier).to.equal(0.7)
     expect(data.Details.Rating.Network).to.equal(70)

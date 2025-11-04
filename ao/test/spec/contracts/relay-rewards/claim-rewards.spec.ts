@@ -61,8 +61,12 @@ describe('Claiming relay rewards', () => {
         }
       })
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -84,8 +88,12 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
     
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -111,8 +119,12 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const aResult = await handle({
       From: ALICE_ADDRESS,
@@ -153,8 +165,19 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(aClaimResult.Messages).to.have.lengthOf(1)
-    const aClaim = JSON.parse(aClaimResult.Messages[0].Data)
+    expect(aClaimResult.Messages).to.have.lengthOf(2)
+    expect(aClaimResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    const claimedTagValue = aClaimResult.Messages[0].Tags.find(
+      t => t.name === 'claimed'
+    )?.value
+    expect(claimedTagValue).to.not.be.undefined
+    expect(claimedTagValue).to.deep.include({
+      [ALICE_ADDRESS]: '558'
+    })
+    const aClaim = JSON.parse(aClaimResult.Messages[1].Data)
     expect(aClaim).to.be.equal('558')
 
     const bClaimResult = await handle({
@@ -165,8 +188,19 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(bClaimResult.Messages).to.have.lengthOf(1)
-    const bClaim = JSON.parse(bClaimResult.Messages[0].Data)
+    expect(bClaimResult.Messages).to.have.lengthOf(2)
+    expect(bClaimResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    const bClaimedTagValue = bClaimResult.Messages[0].Tags.find(
+      t => t.name === 'claimed'
+    )?.value
+    expect(bClaimedTagValue).to.not.be.undefined
+    expect(bClaimedTagValue).to.deep.include({
+      [BOB_ADDRESS]: '3631'
+    })
+    const bClaim = JSON.parse(bClaimResult.Messages[1].Data)
     expect(bClaim).to.be.equal('3631')
 
     const aClaimedResult = await handle({
@@ -229,8 +263,12 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
 
     const aResult2 = await handle({
       From: ALICE_ADDRESS,
@@ -271,8 +309,19 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(aClaimResult2.Messages).to.have.lengthOf(1)
-    const aClaim2 = JSON.parse(aClaimResult2.Messages[0].Data)
+    expect(aClaimResult2.Messages).to.have.lengthOf(2)
+    expect(aClaimResult2.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    const aClaimTagValue2 = aClaimResult2.Messages[0].Tags.find(
+      t => t.name === 'claimed'
+    )?.value
+    expect(aClaimTagValue2).to.not.be.undefined
+    expect(aClaimTagValue2).to.deep.include({
+      [ALICE_ADDRESS]: '1116'
+    })
+    const aClaim2 = JSON.parse(aClaimResult2.Messages[1].Data)
     expect(aClaim2).to.be.equal('1116')
 
     const cClaimResult = await handle({
@@ -283,8 +332,19 @@ describe('Claiming relay rewards', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(cClaimResult.Messages).to.have.lengthOf(1)
-    const cClaim = JSON.parse(cClaimResult.Messages[0].Data)
+    expect(cClaimResult.Messages).to.have.lengthOf(2)
+    expect(cClaimResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    const cClaimedTagValue = cClaimResult.Messages[0].Tags.find(
+      t => t.name === 'claimed'
+    )?.value
+    expect(cClaimedTagValue).to.not.be.undefined
+    expect(cClaimedTagValue).to.deep.include({
+      [CHARLS_ADDRESS]: '11616'
+    })
+    const cClaim = JSON.parse(cClaimResult.Messages[1].Data)
     expect(cClaim).to.be.equal('11616')
 
     const aClaimedResult2 = await handle({

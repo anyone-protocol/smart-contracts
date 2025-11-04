@@ -185,8 +185,24 @@ describe('Set-Delegate of relay rewards', () => {
             { name: 'Share', value: '0.2' },
         ]
     })
-    expect(firstResult.Messages).to.have.lengthOf(1)
-    expect(firstResult.Messages[0].Data).to.equal('OK')
+    expect(firstResult.Messages).to.have.lengthOf(2)
+    expect(firstResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    const configurationTagValue = firstResult.Messages[0].Tags.find(
+      t => t.name === 'configuration'
+    )?.value
+    expect(configurationTagValue).to.not.be.undefined
+    expect(configurationTagValue).to.deep.include({
+      Delegates: {
+        [ALICE_ADDRESS]: {
+          Address: BOB_ADDRESS,
+          Share: 0.2
+        }
+      }
+    })
+    expect(firstResult.Messages[1].Data).to.equal('OK')
 
     const aliceResult = await handle({
         From: ALICE_ADDRESS,
@@ -205,8 +221,19 @@ describe('Set-Delegate of relay rewards', () => {
             { name: 'Action', value: 'Set-Delegate' }
         ]
     })
-    expect(secondResult.Messages).to.have.lengthOf(1)
-    expect(secondResult.Messages[0].Data).to.equal('RESET')
+    expect(secondResult.Messages).to.have.lengthOf(2)
+    expect(secondResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    const secondConfigurationTagValue = secondResult.Messages[0].Tags.find(
+      t => t.name === 'configuration'
+    )?.value
+    expect(secondConfigurationTagValue).to.not.be.undefined
+    expect(secondConfigurationTagValue).to.deep.include({
+      Delegates: []
+    })
+    expect(secondResult.Messages[1].Data).to.equal('RESET')
 
     const resetResult = await handle({
         From: ALICE_ADDRESS,

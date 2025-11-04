@@ -42,31 +42,31 @@ RelayRewards = {
     },
     Configuration = {},
     Details = {
--- [Fingerprint] = { 
---   Address = ''
---   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 }
---   Variables = { FamilyMultiplier = 0.0, LocationMultiplier = 0.0 }
---   Rating = { Network = 0, Uptime = 0, ExitBonus = 0 }
---   Reward = {
---     Total = '0', OperatorTotal = '0', DelegateTotal = '0',
---     Network = '0', Hardware = '0', Uptime = '0', ExitBonus = '0' 
---   }
--- }
+    -- [Fingerprint] = {
+    --   Address = ''
+    --   Score = { Network = 0, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 }
+    --   Variables = { FamilyMultiplier = 0.0, LocationMultiplier = 0.0 }
+    --   Rating = { Network = 0, Uptime = 0, ExitBonus = 0 }
+    --   Reward = {
+    --     Total = '0', OperatorTotal = '0', DelegateTotal = '0',
+    --     Network = '0', Hardware = '0', Uptime = '0', ExitBonus = '0'
+    --   }
+    -- }
     }
   },
   PendingRounds = {
--- Timestamp = {
---   Fingerprint = {
---     Address = ''
---     Score = {
---       Network = 0
---       IsHardware = false
---       UptimeStreak = 0
---       FamilySize = 1
---       ExitBonus = false, LocationSize = 0
---     }
---   }
--- }
+  -- Timestamp = {
+  --   Fingerprint = {
+  --     Address = ''
+  --     Score = {
+  --       Network = 0
+  --       IsHardware = false
+  --       UptimeStreak = 0
+  --       FamilySize = 1
+  --       ExitBonus = false, LocationSize = 0
+  --     }
+  --   }
+  -- }
   }
 }
 
@@ -216,7 +216,7 @@ function RelayRewards.init()
       assert(msg.Data, ErrorMessages.MessageDataRequired)
 
       local config = RelayRewards.Configuration
-      
+
       local request = nil
       local function parseData()
         request = json.decode(msg.Data)
@@ -226,9 +226,13 @@ function RelayRewards.init()
       assert(err == nil, 'Data must be valid JSON')
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
-      
+
       RelayRewards._updateConfiguration(config, request)
 
+      ao.send({
+        device = 'patch@1.0',
+        configuration = RelayRewards.Configuration
+      })
       ao.send({
         Target = msg.From,
         Action = 'Update-Configuration-Response',
@@ -250,7 +254,7 @@ function RelayRewards.init()
       )
 
       assert(msg.Data, ErrorMessages.MessageDataRequired)
-      
+
       local request = nil
       local function parseData()
         request = json.decode(msg.Data)
@@ -260,13 +264,13 @@ function RelayRewards.init()
       assert(err == nil, 'Data must be valid JSON')
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
-      
+
       local timestamp = tonumber(msg.Tags['Timestamp'])
       assert(timestamp, 'Timestamp tag must be a number')
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       assert(timestamp > 0, 'Timestamp has to be > 0')
       assert(timestamp > RelayRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
-      
+
       assert(type(request.Scores) == 'table', 'Scores have to be a table')
 
       local function assertScore(score, fingerprint)
@@ -329,23 +333,23 @@ function RelayRewards.init()
         msg.From,
         { 'owner', 'admin', 'Complete-Round' }
       )
-      
+
       local timestamp = tonumber(msg.Tags['Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
 
       local roundData = {}
-      
+
       local summary = {
         Ratings = { Network = bint(0), Uptime = 0.0, ExitBonus = bint(0) },
         Rewards = { Total = bint(0), Network = bint(0), Hardware = bint(0), Uptime = bint(0), ExitBonus = bint(0) }
       }
-      
+
       for fingerprint, scoreData in pairs(RelayRewards.PendingRounds[timestamp]) do
         roundData[fingerprint] = {}
         roundData[fingerprint].Address = scoreData.Address
         roundData[fingerprint].Score = scoreData.Score
-        
+
         local networkScore = scoreData.Score.Network
 
         local familyMultiplier = 1
@@ -408,7 +412,7 @@ function RelayRewards.init()
       local totalRewardsPerRound = tokensPerSecond * roundLength
 
       local sharePrecision = bint(1000)
-      
+
       local networkRewardsPerSec = (tokensPerSecond * bint((RelayRewards.Configuration.Modifiers.Network.Share * sharePrecision) // 1)) // sharePrecision
       local networkRewards = networkRewardsPerSec * roundLength
 
@@ -437,7 +441,7 @@ function RelayRewards.init()
 
       local fingerprintRewards = fingerprintRewardsPerSec * roundLength
       assert(bint.ule(fingerprintRewards, totalRewardsPerRound), 'Failed rewards share calculation')
-      
+
       local totalHwNetworkRewards = bint(0)
       local totalHwUptimeRewards = bint(0)
       local uptimePrecision = bint(100000)
@@ -467,14 +471,14 @@ function RelayRewards.init()
           end
         end
       end
-      
+
       local delegatePrecision = bint(1000)
       local influencePrecision = bint(1000)
       local uptimeInfluenceOnHw = 0.0
       if RelayRewards.Configuration.Modifiers.Uptime.Enabled then
         uptimeInfluenceOnHw = RelayRewards.Configuration.Modifiers.Hardware.UptimeInfluence
       end
-      
+
       local hwUptimePool = (hardwareRewards * bint((uptimeInfluenceOnHw * influencePrecision) // 1)) // influencePrecision
       local hwNetworkPool = hardwareRewards - hwUptimePool
 
@@ -494,11 +498,11 @@ function RelayRewards.init()
         if not bint.iszero(summary.Ratings.ExitBonus) then
           roundData[fingerprint].Reward.ExitBonus = (exitBonusRewards * ratedData.Rating.ExitBonus) // summary.Ratings.ExitBonus
         end
-        
+
         roundData[fingerprint].Reward.Total = roundData[fingerprint].Reward.Network +
             roundData[fingerprint].Reward.Hardware + roundData[fingerprint].Reward.Uptime +
             roundData[fingerprint].Reward.ExitBonus
-        
+
         local operatorAddress = roundData[fingerprint].Address
         local delegate = RelayRewards.Configuration.Delegates[operatorAddress]
         if delegate and delegate.Share > 0 then
@@ -557,8 +561,8 @@ function RelayRewards.init()
         Period = bint.tonumber(roundLength),
         Summary = {
           Ratings = {
-            Network = tostring(summary.Ratings.Network), 
-            Uptime = tostring(summary.Ratings.Uptime), 
+            Network = tostring(summary.Ratings.Network),
+            Uptime = tostring(summary.Ratings.Uptime),
             ExitBonus = tostring(summary.Ratings.ExitBonus)
           },
           Rewards = {
@@ -579,6 +583,12 @@ function RelayRewards.init()
         end
       end
 
+      ao.send({
+        device = 'patch@1.0',
+        total_address_reward = RelayRewards.TotalAddressReward,
+        total_fingerprint_reward = RelayRewards.TotalFingerprintReward,
+        previous_round = RelayRewards.PreviousRound
+      })
       ao.send({
         Target = msg.From,
         Action = 'Complete-Round-Response',
@@ -645,6 +655,10 @@ function RelayRewards.init()
       end
 
       ao.send({
+        device = 'patch@1.0',
+        configuration = RelayRewards.Configuration
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Set-Delegate-Response',
         Data = result
@@ -685,7 +699,7 @@ function RelayRewards.init()
       AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
 
       local claimed = RelayRewards.Claimed[address]
-      
+
       ao.send({
         Target = msg.From,
         Action = 'Get-Claimed-Response',
@@ -712,7 +726,11 @@ function RelayRewards.init()
       local rewarded = bint.tobint(RelayRewards.TotalAddressReward[address])
       assert(rewarded ~= nil, 'No rewards for ' .. address)
       RelayRewards.Claimed[address] = tostring(rewarded)
-      
+
+      ao.send({
+        device = 'patch@1.0',
+        claimed = RelayRewards.Claimed
+      })
       ao.send({
         Target = msg.From,
         Action = 'Claim-Rewards-Response',
@@ -720,7 +738,7 @@ function RelayRewards.init()
       })
     end
   )
-  
+
   Handlers.add(
     'Get-Rewards',
     Handlers.utils.hasMatchingTag(
@@ -730,7 +748,7 @@ function RelayRewards.init()
     function (msg)
       local address = AnyoneUtils.normalizeEvmAddress(msg.Tags['Address'] or msg.From)
       AnyoneUtils.assertValidEvmAddress(address, 'Address tag')
-      
+
       local fingerprint = msg.Tags['Fingerprint']
       if fingerprint then
         AnyoneUtils.assertValidFingerprint(fingerprint, 'Fingerprint tag')
@@ -779,7 +797,7 @@ function RelayRewards.init()
       local fingerprint = msg.Tags['Fingerprint']
       AnyoneUtils.assertValidFingerprint(fingerprint, 'Fingerprint tag')
       assert(RelayRewards.PreviousRound.Details[fingerprint], 'Fingerprint not found in round')
-      
+
       local encoded = json.encode({
         Timestamp = RelayRewards.PreviousRound.Timestamp,
         Period = RelayRewards.PreviousRound.Period,
@@ -924,13 +942,22 @@ function RelayRewards.init()
       RelayRewards._initialized = true
 
       ao.send({
+        device = 'patch@1.0',
+        relay_rewards_initialized = true,
+        claimed = RelayRewards.Claimed,
+        total_address_reward = RelayRewards.TotalAddressReward,
+        total_fingerprint_reward = RelayRewards.TotalFingerprintReward,
+        configuration = RelayRewards.Configuration,
+        previous_round = RelayRewards.PreviousRound,
+        pending_rounds = RelayRewards.PendingRounds
+      })
+      ao.send({
         Target = msg.From,
         Action = 'Init-Response',
         Data = 'OK'
       })
     end
   )
-
 end
 
 RelayRewards.init()

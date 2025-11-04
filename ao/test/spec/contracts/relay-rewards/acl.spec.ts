@@ -16,7 +16,7 @@ const MOCK_SCORES = {
     [FINGERPRINT_A]: {
       Address: ALICE_ADDRESS,
       Network: 0,
-      IsHardware: false, 
+      IsHardware: false,
       UptimeStreak: 0,
       ExitBonus: false,
       FamilySize: 0,
@@ -25,7 +25,7 @@ const MOCK_SCORES = {
     [FINGERPRINT_B]: {
       Address: BOB_ADDRESS,
       Network: 100,
-      IsHardware: false, 
+      IsHardware: false,
       UptimeStreak: 0,
       ExitBonus: false,
       FamilySize: 0,
@@ -52,12 +52,7 @@ describe('ACL enforcement of relay rewards', () => {
 
   describe('Update-Configuration', () => {
     it('Allows Admin Role', async () => {
-      const configResult = await handle({
-        From: ALICE_ADDRESS,
-        Tags: [
-            { name: 'Action', value: 'Update-Configuration' }
-        ],
-        Data: JSON.stringify({
+      const config = {
           TokensPerSecond: '100',
           Modifiers: {
             Network: {
@@ -71,11 +66,51 @@ describe('ACL enforcement of relay rewards', () => {
             Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
             Family: { Enabled: false, Offset: 1, Power: 1 }
           }
-        })
+        }
+      const configResult = await handle({
+        From: ALICE_ADDRESS,
+        Tags: [
+            { name: 'Action', value: 'Update-Configuration' }
+        ],
+        Data: JSON.stringify(config)
       })
 
-      expect(configResult.Messages).to.have.lengthOf(1)
-      expect(configResult.Messages[0].Data).to.equal('OK')
+      expect(configResult.Messages).to.have.lengthOf(2)
+      expect(configResult.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(configResult.Messages[0].Tags).to.deep.include({
+        name: 'configuration',
+        value: {
+          ...config,
+          Delegates: [],
+          'Modifiers': {
+            'Network': {
+              'Share': 1
+            },
+            'Hardware': {
+              'UptimeInfluence': 0,
+              'Enabled': false,
+              'Share': 0
+            },
+            'Uptime': {
+              'Tiers': {
+                '0': 0,
+                '3': 1,
+                '14': 3
+              },
+              'Enabled': false,
+              'Share': 0
+            },
+            'ExitBonus': {
+              'Enabled': false,
+              'Share': 0
+            }
+          }
+        }
+      })
+      expect(configResult.Messages[1].Data).to.equal('OK')
     })
 
     it('Allows Update-Configuration Role', async () => {
@@ -86,31 +121,65 @@ describe('ACL enforcement of relay rewards', () => {
           Grant: { [BOB_ADDRESS]: [ 'Update-Configuration' ] }
         })
       })
-
+      const config = {
+        TokensPerSecond: '100',
+        Modifiers: {
+          Network: {
+            Share: 1
+          },
+          Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
+          Uptime: { Enabled: false, Share: 0 },
+          ExitBonus: { Enabled: false, Share: 0 }
+        },
+        Multipliers: {
+          Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
+          Family: { Enabled: false, Offset: 1, Power: 1 }
+        }
+      }
       const configResult = await handle({
         From: BOB_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Update-Configuration' }
         ],
-        Data: JSON.stringify({
-          TokensPerSecond: '100',
-          Modifiers: {
-            Network: {
-              Share: 1
-            },
-            Hardware: { Enabled: false, Share: 0, UptimeInfluence: 0 },
-            Uptime: { Enabled: false, Share: 0 },
-            ExitBonus: { Enabled: false, Share: 0 }
-          },
-          Multipliers: {
-            Location: { Enabled: false, Offset: 1, Power: 1, Divider: 1 },
-            Family: { Enabled: false, Offset: 1, Power: 1 }
-          }
-        })
+        Data: JSON.stringify(config)
       })
 
-      expect(configResult.Messages).to.have.lengthOf(1)
-      expect(configResult.Messages[0].Data).to.equal('OK')
+      expect(configResult.Messages).to.have.lengthOf(2)
+      expect(configResult.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(configResult.Messages[0].Tags).to.deep.include({
+        name: 'configuration',
+        value: {
+          ...config,
+          Delegates: [],
+          'Modifiers': {
+            'Network': {
+              'Share': 1
+            },
+            'Hardware': {
+              'UptimeInfluence': 0,
+              'Enabled': false,
+              'Share': 0
+            },
+            'Uptime': {
+              'Tiers': {
+                '0': 0,
+                '3': 1,
+                '14': 3
+              },
+              'Enabled': false,
+              'Share': 0
+            },
+            'ExitBonus': {
+              'Enabled': false,
+              'Share': 0
+            }
+          }
+        }
+      })
+      expect(configResult.Messages[1].Data).to.equal('OK')
     })
   })
 
@@ -162,7 +231,7 @@ describe('ACL enforcement of relay rewards', () => {
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
-  
+
       const completeRoundResult = await handle({
         From: ALICE_ADDRESS,
         Tags: [
@@ -171,8 +240,12 @@ describe('ACL enforcement of relay rewards', () => {
         ]
       })
 
-      expect(completeRoundResult.Messages).to.have.lengthOf(1)
-      expect(completeRoundResult.Messages[0].Data).to.equal('OK')
+      expect(completeRoundResult.Messages).to.have.lengthOf(2)
+      expect(completeRoundResult.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(completeRoundResult.Messages[1].Data).to.equal('OK')
     })
 
     it('Allows Complete-Round Role', async () => {
@@ -200,8 +273,12 @@ describe('ACL enforcement of relay rewards', () => {
         ]
       })
 
-      expect(completeRoundResult.Messages).to.have.lengthOf(1)
-      expect(completeRoundResult.Messages[0].Data).to.equal('OK')
+      expect(completeRoundResult.Messages).to.have.lengthOf(2)
+      expect(completeRoundResult.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(completeRoundResult.Messages[1].Data).to.equal('OK')
     })
   })
 

@@ -123,8 +123,12 @@ describe('Add-Scores action of relay rewards', () => {
         }
       })
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(configResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -144,8 +148,12 @@ describe('Add-Scores action of relay rewards', () => {
           { name: 'Timestamp', value: '10' }
       ]
     })
-    expect(completeRoundResult.Messages).to.have.lengthOf(1)
-    expect(completeRoundResult.Messages[0].Data).to.equal('OK')
+    expect(completeRoundResult.Messages).to.have.lengthOf(2)
+    expect(completeRoundResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(completeRoundResult.Messages[1].Data).to.equal('OK')
 
     const outdatedStampResult = await handle({
       From: OWNER_ADDRESS,
