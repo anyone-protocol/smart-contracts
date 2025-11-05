@@ -43,3 +43,4 @@ secret-key-base64.txt
 
 test/util/test-keys/other
 scripts/relay-rewards/out.txt
+data/

@@ -1,8 +1,8 @@
 import dotenv from 'dotenv'
 import Consul from 'consul'
-import { createReadStream, readFileSync, statSync } from 'fs'
+import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
-import { EthereumSigner, TurboFactory } from '@ardrive/turbo-sdk'
+import { EthereumSigner } from '@ardrive/turbo-sdk'
 import { spawn } from '@permaweb/aoconnect'
 
 import { logger as utilLogger } from './util/logger'
@@ -27,7 +27,7 @@ const aosModuleId = process.env.AOS_MODULE_ID
   || 'ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s'
 const consulToken = process.env.CONSUL_TOKEN || 'no-token'
 const callInitHandler = process.env.CALL_INIT_HANDLER === 'true'
-const initData = process.env.INIT_DATA
+const initDataPath = process.env.INIT_DATA_PATH
 const isMigrationDeployment = process.env.IS_MIGRATION_DEPLOYMENT === 'true'
 const migrationSourceProcessId = process.env.MIGRATION_SOURCE_PROCESS_ID
 
@@ -59,36 +59,13 @@ if (callInitHandler && isMigrationDeployment) {
   )
 }
 
-const signer = new EthereumSigner(deployerPrivateKey)
-logger.info(
-  `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
-)
-// const turbo = TurboFactory.authenticated({ signer })
-
 async function deploy() {
+  const signer = new EthereumSigner(deployerPrivateKey)
+  logger.info(
+    `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
+  )
+
   logger.info(`Deploying AO contract: ${contractName}`)
-
-  // const bundledLuaPath = `./dist/${contractName}.lua`
-  // const bundledLuaSize = statSync(bundledLuaPath).size
-  // const uploadResult = await turbo.uploadFile({
-  //   fileStreamFactory: () => createReadStream(bundledLuaPath),
-  //   fileSizeFactory: () => bundledLuaSize,
-  //   dataItemOpts: {
-  //     tags: [
-  //       { name: 'App-Name', value: 'aos-LUA' },
-  //       { name: 'App-Version', value: '0.0.1' },
-  //       { name: 'Content-Type', value: 'text/x-lua' },
-  //       { name: 'Author', value: 'Anyone Protocol' },
-  //       { name: 'Contract-Name', value: contractName },
-  //       { name: 'Deploy-Nonce', value: new Date().getTime().toString() }
-  //     ]
-  //   }
-  // })
-
-  // logger.info(
-  //   `Publish ${contractName} source result: ${JSON.stringify(uploadResult)}`
-  // )
-
   const ethereumDataItemSigner = await createEthereumDataItemSigner(signer)
 
   logger.info(`Spawning new AO Process for ${contractName}...`)
@@ -100,11 +77,7 @@ async function deploy() {
       { name: 'App-Name', value: 'ANYONE' },
       { name: 'Contract-Name', value: contractName },
       { name: 'Authority', value: messagingUnitAddress },
-      { name: 'Timestamp', value: Date.now().toString() },
-      // {
-      //   name: 'Source-Code-TX-ID',
-      //   value: uploadResult.id
-      // }
+      { name: 'Timestamp', value: Date.now().toString() }
     ],
     data: 'AnyoneProtocol'
   })
@@ -116,11 +89,7 @@ async function deploy() {
     signer: ethereumDataItemSigner as any,
     tags: [
       { name: 'Action', value: 'Eval' },
-      { name: 'App-Name', value: 'ANYONE' },
-      // {
-      //   name: 'Source-Code-TX-ID',
-      //   value: uploadResult.id
-      // }
+      { name: 'App-Name', value: 'ANYONE' }
     ]
   })
 
@@ -148,7 +117,7 @@ async function deploy() {
 
   if (callInitHandler) {
     logger.info('Initializing with INIT action')
-    
+    const initData = readFileSync(initDataPath || 'NO_INIT_DATA_PATH', 'utf8')
     if (!initData) {
       logger.error('INIT_DATA is not present, could not initialize')
     } else {
@@ -182,9 +151,8 @@ async function deploy() {
       host: process.env.CONSUL_IP,
       port: process.env.CONSUL_PORT
     })
-    const sourceKey = process.env.CONTRACT_SOURCE_CONSUL_KEY || 'dummy-path'
     const consulKey = process.env.CONTRACT_CONSUL_KEY || 'dummy-path'
-    logger.info(`Using consul keys ${consulKey} / ${sourceKey}`)
+    logger.info(`Using consul key ${consulKey}`)
 
     const contractResult = await consul.kv.set({
       key: consulKey,
@@ -192,13 +160,6 @@ async function deploy() {
       token: consulToken
     })
     logger.info(`Contract address updated: ${contractResult}`)
-
-    // const sourceResult = await consul.kv.set({
-    //   key: sourceKey,
-    //   value: uploadResult.id,
-    //   token: consulToken
-    // })
-    // logger.info(`Contract source updated: ${sourceResult}`)
   } else {
     console.warn(
       'Deployment env var PHASE not defined,' +

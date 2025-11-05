@@ -118,7 +118,7 @@ export async function sendAosMessage(
         process: processId
       })
       logger.debug(`Got AO Message result ${messageId} from process ${processId}`)
-      console.dir(result, { depth: null })
+      // console.dir(result, { depth: null })
 
       return { messageId, result }
     } catch (error) {
