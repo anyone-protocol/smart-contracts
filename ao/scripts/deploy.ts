@@ -30,6 +30,7 @@ const callInitHandler = process.env.CALL_INIT_HANDLER === 'true'
 const initDataPath = process.env.INIT_DATA_PATH
 const isMigrationDeployment = process.env.IS_MIGRATION_DEPLOYMENT === 'true'
 const migrationSourceProcessId = process.env.MIGRATION_SOURCE_PROCESS_ID
+const initDelayMs = parseInt(process.env.INIT_DELAY_MS || '30000', 10)
 
 let logger = console
 if (process.env.USE_CONSOLE_LOGGER !== 'true') {
@@ -111,8 +112,8 @@ async function deploy() {
   }
 
   if (callInitHandler || isMigrationDeployment) {
-    logger.info('Sleeping 10s to allow EVAL action to settle')
-    await new Promise(resolve => setTimeout(resolve, 10_000))
+    logger.info(`Sleeping ${initDelayMs / 1000}s to allow EVAL action to settle`)
+    await new Promise(resolve => setTimeout(resolve, initDelayMs))
   }
 
   if (callInitHandler) {
