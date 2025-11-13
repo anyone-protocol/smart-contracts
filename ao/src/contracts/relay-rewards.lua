@@ -16,7 +16,9 @@ RelayRewards = {
     Modifiers = {
       Network = { Share = 0.56 },
       Hardware = { Enabled = true, Share = 0.2, UptimeInfluence = 0.35 },
-      Uptime = { Enabled = true, Share = 0.14,
+      Uptime = {
+        Enabled = true,
+        Share = 0.14,
         Tiers = {
           ['0'] = 0,
           ['3'] = 1,
@@ -943,6 +945,7 @@ function RelayRewards.init()
 
       ao.send({
         device = 'patch@1.0',
+        acl = ACL.State.Roles,
         relay_rewards_initialized = true,
         claimed = RelayRewards.Claimed,
         total_address_reward = RelayRewards.TotalAddressReward,

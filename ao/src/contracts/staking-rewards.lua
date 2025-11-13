@@ -755,6 +755,7 @@ function StakingRewards.init()
 
       ao.send({
         device = 'patch@1.0',
+        acl = ACL.State.Roles,
         staking_rewards_initialized = true,
         shares_enabled = StakingRewards._sharesEnabled,
         claimed = StakingRewards.Claimed,

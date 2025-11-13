@@ -653,6 +653,7 @@ function OperatorRegistry.init()
 
       ao.send({
         device = 'patch@1.0',
+        acl = ACL.State.Roles,
         operator_registry_initialized = OperatorRegistry._initialized,
         blocked_operator_addresses = OperatorRegistry.BlockedOperatorAddresses,
         claimable_fingerprints_to_operator_addresses = OperatorRegistry.ClaimableFingerprintsToOperatorAddresses,
