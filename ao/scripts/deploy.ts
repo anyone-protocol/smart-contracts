@@ -9,7 +9,7 @@ import { logger as utilLogger } from './util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosDryRun,
-  sendAosMessage  
+  sendAosMessage
 } from './send-aos-message'
 import HardhatKeys from './test-keys/hardhat.json'
 
@@ -31,6 +31,7 @@ const initDataPath = process.env.INIT_DATA_PATH
 const isMigrationDeployment = process.env.IS_MIGRATION_DEPLOYMENT === 'true'
 const migrationSourceProcessId = process.env.MIGRATION_SOURCE_PROCESS_ID
 const initDelayMs = parseInt(process.env.INIT_DELAY_MS || '30000', 10)
+const useProcessId = process.env.USE_PROCESS_ID
 
 let logger = console
 if (process.env.USE_CONSOLE_LOGGER !== 'true') {
@@ -69,8 +70,13 @@ async function deploy() {
   logger.info(`Deploying AO contract: ${contractName}`)
   const ethereumDataItemSigner = await createEthereumDataItemSigner(signer)
 
-  logger.info(`Spawning new AO Process for ${contractName}...`)
-  const processId = await spawn({
+  if (useProcessId) {
+    logger.info(`Using existing process id ${useProcessId} for ${contractName}`)
+  } else {
+    logger.info(`Spawning new AO Process for ${contractName}...`)
+  }
+
+  const processId = useProcessId ? useProcessId : await spawn({
     module: aosModuleId,
     scheduler: schedulerUnitAddress,
     signer: ethereumDataItemSigner as any,
