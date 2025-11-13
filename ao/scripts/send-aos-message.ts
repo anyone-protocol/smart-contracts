@@ -7,14 +7,14 @@ import { createData, Signer } from 'arbundles'
 import { logger } from './util/logger'
 
 export const CU_URL = process.env.CU_URL
-if (!CU_URL) {
-  throw new Error('CU_URL is not set!')
-}
 const {
   message: aoMessage,
   result: aoResult,
   dryrun: aoDryRun,
-} = aoConnect({ CU_URL })
+} = aoConnect({
+  // MODE: 'legacy',
+  CU_URL
+})
 
 export type SendAosBaseOptions = {
   processId: string
@@ -35,7 +35,7 @@ export async function createEthereumDataItemSigner(signer: Signer) {
       anchor?: string
     }
   ) => {
-    const dataItem = createData(data, signer, { tags, target, anchor })
+    const dataItem = createData(data || 'AnyoneProtocol', signer, { tags, target, anchor })
 
     return dataItem.sign(signer).then(async () => ({
       id: await dataItem.id,
@@ -43,6 +43,8 @@ export async function createEthereumDataItemSigner(signer: Signer) {
     }))
   }
 }
+
+// export async function createEvmSigner(create) {}
 
 export async function sendAosDryRun(
   { processId, data, tags }: SendAosDryRunOptions,
@@ -116,7 +118,7 @@ export async function sendAosMessage(
         process: processId
       })
       logger.debug(`Got AO Message result ${messageId} from process ${processId}`)
-      console.dir(result, { depth: null })
+      // console.dir(result, { depth: null })
 
       return { messageId, result }
     } catch (error) {

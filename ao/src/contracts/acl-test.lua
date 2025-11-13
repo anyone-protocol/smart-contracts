@@ -1,4 +1,4 @@
-local ACLTest = {}
+ACLTest = {}
 
 function ACLTest.init()
   local json = require('json')

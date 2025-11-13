@@ -111,8 +111,27 @@ describe('Operator Registry', () => {
         Data: JSON.stringify(certs)
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'claimable_fingerprints_to_operator_addresses',
+        value: {
+          [FINGERPRINT_A]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_B]: '0x' + BOB_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_C]: '0x' + CHARLS_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_D]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_E]: '0x' + BOB_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_F]: '0x' + CHARLS_ADDRESS.substring(2).toUpperCase()
+        }
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_hardware_fingerprints',
+        value: []
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
     })
 
     it('Lists Operator Certificates submitted by Owner', async () => {
@@ -157,11 +176,37 @@ describe('Operator Registry', () => {
         { f: FINGERPRINT_F, a: CHARLS_ADDRESS }
       ]
 
-      await handle({
+      const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Admin-Submit-Operator-Certificates' }],
         Data: JSON.stringify(certs)
       })
+
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'claimable_fingerprints_to_operator_addresses',
+        value: {
+          [FINGERPRINT_A]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_B]: '0x' + BOB_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_C]: '0x' + CHARLS_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_D]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_E]: '0x' + BOB_ADDRESS.substring(2).toUpperCase(),
+          [FINGERPRINT_F]: '0x' + CHARLS_ADDRESS.substring(2).toUpperCase()
+        }
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_hardware_fingerprints',
+        value: {
+          [FINGERPRINT_A]: true,
+          [FINGERPRINT_C]: true,
+          [FINGERPRINT_E]: true
+        }
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
 
       const listResult = await handle({
         From: ALICE_ADDRESS,
@@ -263,8 +308,22 @@ describe('Operator Registry', () => {
         ]
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_fingerprints_to_operator_addresses',
+        value: {
+          [fingerprint]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase()
+        }
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'claimable_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
     })
 
     it('Rejects Fingerprint Certs of unknown Fingerprints', async () => {
@@ -324,8 +383,16 @@ describe('Operator Registry', () => {
         ]
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
 
       const listResult = await handle({
         From: BOB_ADDRESS,
@@ -403,8 +470,16 @@ describe('Operator Registry', () => {
         ]
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
 
       const listResult = await handle({
         From: BOB_ADDRESS,
@@ -480,8 +555,16 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'blocked_operator_addresses',
+          value: { [ALICE_ADDRESS]: true }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Rejects blocking when missing addresses', async () => {
@@ -596,8 +679,16 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'blocked_operator_addresses',
+          value: []
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Rejects unblocking when missing addresses', async () => {
@@ -693,8 +784,22 @@ describe('Operator Registry', () => {
             ]
           })
 
-          expect(result.Messages).to.have.lengthOf(1)
-          expect(result.Messages[0].Data).to.equal('OK')
+          expect(result.Messages).to.have.lengthOf(2)
+          expect(result.Messages[0].Tags).to.deep.include({
+            name: 'device',
+            value: 'patch@1.0'
+          })
+          expect(result.Messages[0].Tags).to.deep.include({
+            name: 'verified_fingerprints_to_operator_addresses',
+            value: {
+              [fingerprint]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase()
+            }
+          })
+          expect(result.Messages[0].Tags).to.deep.include({
+            name: 'claimable_fingerprints_to_operator_addresses',
+            value: []
+          })
+          expect(result.Messages[1].Data).to.equal('OK')
         }
       )
     })
@@ -715,8 +820,19 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'registration_credits_fingerprints_to_operator_addresses',
+          value: {
+            [EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()]:
+              '0x' + ALICE_ADDRESS.substring(2).toUpperCase()
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Rejects adding RC when missing Address', async () => {
@@ -900,8 +1016,12 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(resultNoCredit.Messages).to.have.lengthOf(1)
-        expect(resultNoCredit.Messages[0].Data).to.equal('OK')
+        expect(resultNoCredit.Messages).to.have.lengthOf(2)
+        expect(resultNoCredit.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(resultNoCredit.Messages[1].Data).to.equal('OK')
       })
     })
 
@@ -952,8 +1072,20 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'registration_credits_fingerprints_to_operator_addresses',
+          value: {
+            [FINGERPRINT_A]: ALICE_ADDRESS,
+            [FINGERPRINT_B]: BOB_ADDRESS,
+            [FINGERPRINT_C]: CHARLS_ADDRESS
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
 
         const listResult = await handle({
           From: OWNER_ADDRESS,
@@ -1135,8 +1267,18 @@ describe('Operator Registry', () => {
           Data: fingerprints.join(',')
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'verified_hardware_fingerprints',
+          value: Object.fromEntries(
+            fingerprints.map(f => [f, true])
+          )
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Rejects adding VH when missing fingerprints', async () => {
@@ -1245,8 +1387,22 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(resultAfterVerified.Messages).to.have.lengthOf(1)
-        expect(resultAfterVerified.Messages[0].Data).to.equal('OK')
+        expect(resultAfterVerified.Messages).to.have.lengthOf(2)
+        expect(resultAfterVerified.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(resultAfterVerified.Messages[0].Tags).to.deep.include({
+          name: 'verified_fingerprints_to_operator_addresses',
+          value: {
+            [fingerprint]: '0x' + ALICE_ADDRESS.substring(2).toUpperCase()
+          }
+        })
+        expect(resultAfterVerified.Messages[0].Tags).to.deep.include({
+          name: 'claimable_fingerprints_to_operator_addresses',
+          value: []
+        })
+        expect(resultAfterVerified.Messages[1].Data).to.equal('OK')
       })
     })
 
@@ -1295,8 +1451,19 @@ describe('Operator Registry', () => {
           Data: `${FINGERPRINT_B},${FINGERPRINT_C}`
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'verified_hardware_fingerprints',
+          value: {
+            [FINGERPRINT_A]: true,
+            [FINGERPRINT_D]: true
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Rejects removing VH when missing Fingerprints', async () => {
@@ -1531,8 +1698,40 @@ describe('Operator Registry', () => {
         Data: JSON.stringify(initState)
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'blocked_operator_addresses',
+        value: initState.BlockedOperatorAddresses
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'claimable_fingerprints_to_operator_addresses',
+        value: initState.ClaimableFingerprintsToOperatorAddresses
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_fingerprints_to_operator_addresses',
+        value: initState.VerifiedFingerprintsToOperatorAddresses
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_hardware_fingerprints',
+        value: initState.VerifiedHardwareFingerprints
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'registration_credits_fingerprints_to_operator_addresses',
+        value: initState.RegistrationCreditsFingerprintsToOperatorAddresses
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'operator_registry_initialized',
+        value: true
+      })
+      expect(result.Messages[0].Tags).to.not.deep.include({
+        name: 'registration_credits_required',
+        value: 'false'
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
 
       const viewStateResult = await handle({
         From: OWNER_ADDRESS,
@@ -1543,7 +1742,7 @@ describe('Operator Registry', () => {
       expect(
         JSON.parse(viewStateResult.Messages[0].Data)
       ).to.deep.equal(initState)
-    })
+    }).timeout(5000)
 
     it('Prevents non-Owner from calling Init action', async () => {
       const result = await handle({
@@ -1563,8 +1762,28 @@ describe('Operator Registry', () => {
         Tags: [{ name: 'Action', value: 'Init' }]
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'blocked_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'claimable_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_hardware_fingerprints',
+        value: []
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
 
       const viewStateResult = await handle({
         From: OWNER_ADDRESS,
@@ -1731,8 +1950,28 @@ describe('Operator Registry', () => {
         Tags: [{ name: 'Action', value: 'Init' }]
       })
 
-      expect(result.Messages).to.have.lengthOf(1)
-      expect(result.Messages[0].Data).to.equal('OK')
+      expect(result.Messages).to.have.lengthOf(2)
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'device',
+        value: 'patch@1.0'
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'blocked_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'claimable_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_fingerprints_to_operator_addresses',
+        value: []
+      })
+      expect(result.Messages[0].Tags).to.deep.include({
+        name: 'verified_hardware_fingerprints',
+        value: []
+      })
+      expect(result.Messages[1].Data).to.equal('OK')
 
       const secondInitResult = await handle({
         From: OWNER_ADDRESS,
@@ -1777,8 +2016,23 @@ describe('Operator Registry', () => {
           Data: JSON.stringify(certs)
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'claimable_fingerprints_to_operator_addresses',
+          value: {
+            [FINGERPRINT_A]: ALICE_ADDRESS,
+            [FINGERPRINT_B]: BOB_ADDRESS,
+            [FINGERPRINT_C]: CHARLS_ADDRESS,
+            [FINGERPRINT_D]: ALICE_ADDRESS,
+            [FINGERPRINT_E]: BOB_ADDRESS,
+            [FINGERPRINT_F]: CHARLS_ADDRESS
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Allows Admin-Submit-Operator-Certificates Role', async () => {
@@ -1808,8 +2062,23 @@ describe('Operator Registry', () => {
           Data: JSON.stringify(certs)
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'claimable_fingerprints_to_operator_addresses',
+          value: {
+            [FINGERPRINT_A]: ALICE_ADDRESS,
+            [FINGERPRINT_B]: BOB_ADDRESS,
+            [FINGERPRINT_C]: CHARLS_ADDRESS,
+            [FINGERPRINT_D]: ALICE_ADDRESS,
+            [FINGERPRINT_E]: BOB_ADDRESS,
+            [FINGERPRINT_F]: CHARLS_ADDRESS
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
     })
 
@@ -1828,8 +2097,16 @@ describe('Operator Registry', () => {
           ]
         })
   
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'verified_fingerprints_to_operator_addresses',
+          value: []
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Allows Remove-Fingerprint-Certificate Role', async () => {
@@ -1854,8 +2131,16 @@ describe('Operator Registry', () => {
           ]
         })
   
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'verified_fingerprints_to_operator_addresses',
+          value: []
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
     })
 
@@ -1869,8 +2154,16 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'blocked_operator_addresses',
+          value: { [CHARLS_ADDRESS]: true }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Allows Block-Operator-Address Role', async () => {
@@ -1890,8 +2183,16 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'blocked_operator_addresses',
+          value: { [CHARLS_ADDRESS]: true }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
     })
 
@@ -1909,8 +2210,18 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'registration_credits_fingerprints_to_operator_addresses',
+          value: {
+            [EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()]: CHARLS_ADDRESS
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Allows Add-Registration-Credit Role', async () => {
@@ -1934,8 +2245,18 @@ describe('Operator Registry', () => {
           ]
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'registration_credits_fingerprints_to_operator_addresses',
+          value: {
+            [EXAMPLE_FINGERPRINT.toString('hex').toUpperCase()]: CHARLS_ADDRESS
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
     })
 
@@ -1956,8 +2277,21 @@ describe('Operator Registry', () => {
           Data: fingerprints.join(',')
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'verified_hardware_fingerprints',
+          value: {
+            [FINGERPRINT_A]: true,
+            [FINGERPRINT_B]: true,
+            [FINGERPRINT_C]: true,
+            [FINGERPRINT_D]: true
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
 
       it('Allows Add-Verified-Hardware Role', async () => {
@@ -1984,8 +2318,21 @@ describe('Operator Registry', () => {
           Data: fingerprints.join(',')
         })
 
-        expect(result.Messages).to.have.lengthOf(1)
-        expect(result.Messages[0].Data).to.equal('OK')
+        expect(result.Messages).to.have.lengthOf(2)
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'device',
+          value: 'patch@1.0'
+        })
+        expect(result.Messages[0].Tags).to.deep.include({
+          name: 'verified_hardware_fingerprints',
+          value: {
+            [FINGERPRINT_A]: true,
+            [FINGERPRINT_B]: true,
+            [FINGERPRINT_C]: true,
+            [FINGERPRINT_D]: true
+          }
+        })
+        expect(result.Messages[1].Data).to.equal('OK')
       })
     })
   })

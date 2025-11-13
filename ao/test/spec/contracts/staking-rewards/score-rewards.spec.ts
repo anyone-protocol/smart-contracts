@@ -32,18 +32,21 @@ describe('Calculating staking rewards based on ratings', () => {
   })
 
   it('Calculates a correct period since the last round', async () => {
+    const config = {
+      TokensPerSecond: '1000',
+      Requirements: { Running: 0.5 }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '1000',
-        Requirements: { Running: 0.5 }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -65,9 +68,10 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
-    
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
+
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -88,8 +92,9 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '2345' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary2 = await handle({
       From: ALICE_ADDRESS,
@@ -123,8 +128,9 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '40000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary3 = await handle({
       From: ALICE_ADDRESS,
@@ -147,21 +153,28 @@ describe('Calculating staking rewards based on ratings', () => {
       ],
       Data: JSON.stringify({ Enabled: true })
     })
+    expect(enableShareResult.Messages).to.have.lengthOf(2)
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
+    const config = {
+      TokensPerSecond: '1000',
+      Requirements: {
+        Running: 0.5
+      }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '1000',
-        Requirements: {
-          Running: 0.5
-        }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
       From: CHARLS_ADDRESS,
@@ -170,6 +183,18 @@ describe('Calculating staking rewards based on ratings', () => {
       ],
       Data: JSON.stringify({ Share: 0.1 })
     })
+    expect(shareResult.Messages).to.have.lengthOf(2)
+    expect(shareResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(shareResult.Messages[0].Tags).to.deep.include({
+      name: 'shares',
+      value: {
+        [CHARLS_ADDRESS]: 0.1
+      }
+    })
+    expect(shareResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -191,8 +216,41 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'rewarded',
+      value: {
+        [ALICE_ADDRESS]: [],
+        [BOB_ADDRESS]: []
+      }
+    })
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'previous_round',
+      value: {
+        Timestamp: 1000,
+        Period: 0,
+        Summary: {
+          Ratings: '1000',
+          Stakes: '1000',
+          Rewards: '0'
+        },
+        Details: {
+          [ALICE_ADDRESS]: {
+            [BOB_ADDRESS]: {
+              Reward: { Operator: '0', Hodler: '0' },
+              Rating: '1000',
+              Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
+            }
+          }
+        },
+        Configuration: { TokensPerSecond: '1000', Requirements: { Running: 0.5 } }
+      }
+    })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
     
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -218,8 +276,56 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'rewarded',
+      value: {
+        [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333' },
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000' },
+        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '1666' }
+      }
+    })
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
+      name: 'previous_round',
+      value: {
+        Timestamp: 11000,
+        Period: 10,
+        Summary: {
+          Ratings: '6000',
+          Stakes: '6000',
+          Rewards: '9999'
+        },
+        Details: {
+          [ALICE_ADDRESS]: {
+            [BOB_ADDRESS]: {
+              Reward: { Hodler: '1666', Operator: '0' },
+              Rating: '1000',
+              Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
+            }
+          },
+          [BOB_ADDRESS]: {
+            [CHARLS_ADDRESS]: {
+              Reward: { Hodler: '3000', Operator: '333' },
+              Rating: '2000',
+              Score: { Running: 0.7, Restaked: '0', Staked: '2000', Share: 0.1 }
+            }
+          },
+          [CHARLS_ADDRESS]: {
+            [CHARLS_ADDRESS]: {
+              Reward: { Hodler: '4500', Operator: '500' },
+              Rating: '3000',
+              Score: { Running: 0.8, Restaked: '0', Staked: '3000', Share: 0.1 }
+            }
+          }
+        },
+        Configuration: { TokensPerSecond: '1000', Requirements: { Running: 0.5 } }
+      }
+    })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary2 = await handle({
       From: ALICE_ADDRESS,
@@ -297,21 +403,28 @@ describe('Calculating staking rewards based on ratings', () => {
       ],
       Data: JSON.stringify({ Enabled: true })
     })
+    expect(enableShareResult.Messages).to.have.lengthOf(2)
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
+    const config = {
+      TokensPerSecond: '1000',
+      Requirements: {
+        Running: 0.5
+      }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '1000',
-        Requirements: {
-          Running: 0.5
-        }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
       From: CHARLS_ADDRESS,
@@ -320,6 +433,18 @@ describe('Calculating staking rewards based on ratings', () => {
       ],
       Data: JSON.stringify({ Share: 0.1 })
     })
+    expect(shareResult.Messages).to.have.lengthOf(2)
+    expect(shareResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(shareResult.Messages[0].Tags).to.deep.include({
+      name: 'shares',
+      value: {
+        [CHARLS_ADDRESS]: 0.1
+      }
+    })
+    expect(shareResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -341,8 +466,9 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
     
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -368,8 +494,9 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary2 = await handle({
       From: ALICE_ADDRESS,
@@ -437,8 +564,9 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary3 = await handle({
       From: ALICE_ADDRESS,

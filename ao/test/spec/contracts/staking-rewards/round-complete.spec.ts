@@ -83,20 +83,23 @@ describe('Round Completion of staking rewards', () => {
   })
 
   it('Removes rounds dated before completed timestamp', async () => {
+    const config = {
+      TokensPerSecond: '100000000',
+      Requirements: {
+        Running: 0.5
+      }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '100000000',
-        Requirements: {
-          Running: 0.5
-        }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const round1Result = await handle({
       From: OWNER_ADDRESS,
@@ -127,8 +130,9 @@ describe('Round Completion of staking rewards', () => {
           { name: 'Timestamp', value: '2000' }
       ]
     })
-    expect(round2CompleteResult.Messages).to.have.lengthOf(1)
-    expect(round2CompleteResult.Messages[0].Data).to.equal('OK')
+    expect(round2CompleteResult.Messages).to.have.lengthOf(2)
+    expect(round2CompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(round2CompleteResult.Messages[1].Data).to.equal('OK')
 
     const round1CancelResult = await handle({
       From: OWNER_ADDRESS,
@@ -141,20 +145,23 @@ describe('Round Completion of staking rewards', () => {
   })
 
   it('Tracks data and metadata of the last round', async () => {
+    const config = {
+      TokensPerSecond: '100000000',
+      Requirements: {
+        Running: 0.5
+      }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '100000000',
-        Requirements: {
-          Running: 0.5
-        }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const round1Result = await handle({
       From: OWNER_ADDRESS,
@@ -174,8 +181,9 @@ describe('Round Completion of staking rewards', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(round1CompleteResult.Messages).to.have.lengthOf(1)
-    expect(round1CompleteResult.Messages[0].Data).to.equal('OK')
+    expect(round1CompleteResult.Messages).to.have.lengthOf(2)
+    expect(round1CompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(round1CompleteResult.Messages[1].Data).to.equal('OK')
 
     const round2Result = await handle({
       From: OWNER_ADDRESS,
@@ -195,8 +203,9 @@ describe('Round Completion of staking rewards', () => {
           { name: 'Timestamp', value: '2000' }
       ]
     })
-    expect(round2CompleteResult.Messages).to.have.lengthOf(1)
-    expect(round2CompleteResult.Messages[0].Data).to.equal('OK')
+    expect(round2CompleteResult.Messages).to.have.lengthOf(2)
+    expect(round2CompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(round2CompleteResult.Messages[1].Data).to.equal('OK')
 
     const roundDataResult = await handle({
       From: BOB_ADDRESS,

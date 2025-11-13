@@ -52,8 +52,9 @@ describe('staking-rewards-view-init-state', () => {
       ]
     })
     
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
 
     const configResult = await handle({
       From: OWNER_ADDRESS,
@@ -62,8 +63,16 @@ describe('staking-rewards-view-init-state', () => {
       ],
       Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(configResult.Messages[0].Tags).to.deep.include({
+      name: 'configuration',
+      value: config
+    })
+    expect(configResult.Messages[1].Data).to.equal('OK')
     
     const secondScoresResult = await handle({
       From: OWNER_ADDRESS,
@@ -83,8 +92,9 @@ describe('staking-rewards-view-init-state', () => {
           { name: 'Timestamp', value: '1741829269954' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const viewStateResult = await handle({
       From: OWNER_ADDRESS,
@@ -104,8 +114,41 @@ describe('staking-rewards-view-init-state', () => {
       Data: state
     })
     
-    expect(initStateResult.Messages).to.have.lengthOf(1)
-    expect(initStateResult.Messages[0].Data).to.equal('OK')
+    expect(initStateResult.Messages).to.have.lengthOf(2)
+    expect(initStateResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    // staking_rewards_initialized = true,
+    // staking_rewards_shares_enabled = StakingRewards._sharesEnabled,
+    // claimed = StakingRewards.Claimed,
+    // rewarded = StakingRewards.Rewarded,
+    // shares = StakingRewards.Shares,
+    // configuration = StakingRewards.Configuration,
+    // previous_round = StakingRewards.PreviousRound
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'staking_rewards_initialized',
+      value: true
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: []
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'rewarded',
+      value: {
+        [CHARLS_ADDRESS]: {
+          [ALICE_ADDRESS]: '25000000000000',
+          [CHARLS_ADDRESS]: '75000000000000'
+        }
+      }
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'shares_enabled',
+      value: false
+    })
+    expect(initStateResult.Messages[0].Tags).to.deep.include({
+      name: 'configuration',
+      value: config
+    })
+    expect(initStateResult.Messages[1].Data).to.equal('OK')
 
     const viewState2Result = await newHandle({
       From: OWNER_ADDRESS,

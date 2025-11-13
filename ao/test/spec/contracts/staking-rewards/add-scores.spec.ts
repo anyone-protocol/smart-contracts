@@ -107,20 +107,23 @@ describe('Add-Scores action of staking rewards', () => {
   })
 
   it('Ensures timestamp is not backdated to previous round', async () => {
+    const config = {
+      TokensPerSecond: '100',
+      Requirements: {
+        Running: 0.5
+      }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '100',
-        Requirements: {
-          Running: 0.5
-        }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -140,8 +143,9 @@ describe('Add-Scores action of staking rewards', () => {
           { name: 'Timestamp', value: '10' }
       ]
     })
-    expect(completeRoundResult.Messages).to.have.lengthOf(1)
-    expect(completeRoundResult.Messages[0].Data).to.equal('OK')
+    expect(completeRoundResult.Messages).to.have.lengthOf(2)
+    expect(completeRoundResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(completeRoundResult.Messages[1].Data).to.equal('OK')
 
     const outdatedStampResult = await handle({
       From: OWNER_ADDRESS,
@@ -359,6 +363,10 @@ describe('Add-Scores action of staking rewards', () => {
       ],
       Data: JSON.stringify({ Enabled: true })
     })
+    expect(enableShareResult.Messages).to.have.lengthOf(2)
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const emptyShareResult = await handle({
       From: OWNER_ADDRESS,

@@ -23,7 +23,10 @@ function ACLUtils.assertHasOneOfRole(address, roles)
 end
 
 function ACLUtils.updateRoles(updateRolesDto)
+  local shouldPatchState = false
+
   if updateRolesDto.Grant ~= nil then
+    shouldPatchState = true
     for address, roles in pairs(updateRolesDto.Grant) do
       for _, role in pairs(roles) do
         if ACLUtils.State.Roles[role] == nil then
@@ -35,6 +38,7 @@ function ACLUtils.updateRoles(updateRolesDto)
   end
 
   if updateRolesDto.Revoke ~= nil then
+    shouldPatchState = true
     for address, roles in pairs(updateRolesDto.Revoke) do
       for _, role in pairs(roles) do
         if ACLUtils.State.Roles[role] == nil then
@@ -43,6 +47,13 @@ function ACLUtils.updateRoles(updateRolesDto)
         ACLUtils.State.Roles[role][address] = nil
       end
     end
+  end
+
+  if shouldPatchState then
+    ao.send({
+      device = 'patch@1.0',
+      acl = ACLUtils.State.Roles
+    })
   end
 end
 

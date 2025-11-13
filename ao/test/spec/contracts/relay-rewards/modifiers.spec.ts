@@ -740,7 +740,11 @@ describe('Update-Configuration Modifiers of relay rewards', () => {
       })
     })
     
-    expect(onlyEnabledResult.Messages).to.have.lengthOf(1)
-    expect(onlyEnabledResult.Messages[0].Data).to.equal('OK')
+    expect(onlyEnabledResult.Messages).to.have.lengthOf(2)
+    expect(onlyEnabledResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(onlyEnabledResult.Messages[1].Data).to.equal('OK')
   })
 })

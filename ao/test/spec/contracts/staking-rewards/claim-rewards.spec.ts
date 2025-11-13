@@ -39,21 +39,28 @@ describe('Claiming staking rewards', () => {
       ],
       Data: JSON.stringify({ Enabled: true })
     })
+    expect(enableShareResult.Messages).to.have.lengthOf(2)
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    expect(enableShareResult.Messages[1].Data).to.equal('OK')
     
+    const config = {
+      TokensPerSecond: '1000',
+      Requirements: {
+        Running: 0.5
+      }
+    }
     const configResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Update-Configuration' }
       ],
-      Data: JSON.stringify({
-        TokensPerSecond: '1000',
-        Requirements: {
-          Running: 0.5
-        }
-      })
+      Data: JSON.stringify(config)
     })
-    expect(configResult.Messages).to.have.lengthOf(1)
-    expect(configResult.Messages[0].Data).to.equal('OK')
+    expect(configResult.Messages).to.have.lengthOf(2)
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
       From: CHARLS_ADDRESS,
@@ -62,6 +69,18 @@ describe('Claiming staking rewards', () => {
       ],
       Data: JSON.stringify({ Share: 0.1 })
     })
+    expect(shareResult.Messages).to.have.lengthOf(2)
+    expect(shareResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(shareResult.Messages[0].Tags).to.deep.include({
+      name: 'shares',
+      value: {
+        [CHARLS_ADDRESS]: 0.1
+      }
+    })
+    expect(shareResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
       From: OWNER_ADDRESS,
@@ -83,9 +102,10 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '1000' }
       ]
     })
-    expect(firstCompleteResult.Messages).to.have.lengthOf(1)
-    expect(firstCompleteResult.Messages[0].Data).to.equal('OK')
-    
+    expect(firstCompleteResult.Messages).to.have.lengthOf(2)
+    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
+
     const scoredRoundResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -110,8 +130,9 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(secondCompleteResult.Messages).to.have.lengthOf(1)
-    expect(secondCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(secondCompleteResult.Messages).to.have.lengthOf(2)
+    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const aResult = await handle({
       From: ALICE_ADDRESS,
@@ -160,8 +181,16 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(ClaimResult.Messages).to.have.lengthOf(1)
-    const ClaimData = JSON.parse(ClaimResult.Messages[0].Data)
+    expect(ClaimResult.Messages).to.have.lengthOf(2)
+    expect(ClaimResult.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(ClaimResult.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: { [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'} }
+    })
+    const ClaimData = JSON.parse(ClaimResult.Messages[1].Data)
     expect(ClaimData[CHARLS_ADDRESS]).to.equal('5333')
 
     // const ClaimResult1 = await handle({
@@ -183,11 +212,21 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '11000' }
       ]
     })
-    expect(ClaimResult2.Messages).to.have.lengthOf(1)
-    const ClaimData2 = JSON.parse(ClaimResult2.Messages[0].Data)
+    expect(ClaimResult2.Messages).to.have.lengthOf(2)
+    expect(ClaimResult2.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(ClaimResult2.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: {
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000'},
+        [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'}
+      }
+    })
+    const ClaimData2 = JSON.parse(ClaimResult2.Messages[1].Data)
     expect(ClaimData2[CHARLS_ADDRESS]).to.equal('3000')
 
-    
     const ClaimedResult = await handle({
       From: CHARLS_ADDRESS,
       Tags: [
@@ -233,8 +272,9 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(thirdCompleteResult.Messages).to.have.lengthOf(1)
-    expect(thirdCompleteResult.Messages[0].Data).to.equal('OK')
+    expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
+    expect(thirdCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(thirdCompleteResult.Messages[1].Data).to.equal('OK')
 
     // const stateResult2 = await handle({
     //   From: OWNER_ADDRESS,
@@ -293,8 +333,20 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(ClaimResult3.Messages).to.have.lengthOf(1)
-    const ClaimData3 = JSON.parse(ClaimResult3.Messages[0].Data)
+    expect(ClaimResult3.Messages).to.have.lengthOf(2)
+    expect(ClaimResult3.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(ClaimResult3.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: {
+        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '5143' },
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000' },
+        [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'}
+      }
+    })
+    const ClaimData3 = JSON.parse(ClaimResult3.Messages[1].Data)
     expect(ClaimData3[BOB_ADDRESS]).to.equal('5143')
 
     const ClaimResult4 = await handle({
@@ -305,8 +357,20 @@ describe('Claiming staking rewards', () => {
           { name: 'Timestamp', value: '21000' }
       ]
     })
-    expect(ClaimResult4.Messages).to.have.lengthOf(1)
-    const ClaimData4 = JSON.parse(ClaimResult4.Messages[0].Data)
+    expect(ClaimResult4.Messages).to.have.lengthOf(2)
+    expect(ClaimResult4.Messages[0].Tags).to.deep.include({
+      name: 'device',
+      value: 'patch@1.0'
+    })
+    expect(ClaimResult4.Messages[0].Tags).to.deep.include({
+      name: 'claimed',
+      value: {
+        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '5143' },
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '5348' },
+        [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'}
+      }
+    })
+    const ClaimData4 = JSON.parse(ClaimResult4.Messages[1].Data)
     expect(ClaimData4[CHARLS_ADDRESS]).to.equal('5348')
 
     
@@ -334,6 +398,6 @@ describe('Claiming staking rewards', () => {
 
 
 
-  })
+  }).timeout(10_000)
 
 })
