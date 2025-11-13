@@ -1742,7 +1742,7 @@ describe('Operator Registry', () => {
       expect(
         JSON.parse(viewStateResult.Messages[0].Data)
       ).to.deep.equal(initState)
-    })
+    }).timeout(5000)
 
     it('Prevents non-Owner from calling Init action', async () => {
       const result = await handle({

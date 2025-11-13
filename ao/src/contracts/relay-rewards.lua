@@ -1,4 +1,4 @@
-RelayRewards = {
+RelayRewards = RelayRewards or {
   _initialized = false,
 
   Claimed = {

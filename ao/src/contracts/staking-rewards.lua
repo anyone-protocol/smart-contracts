@@ -1,4 +1,4 @@
-StakingRewards = {
+StakingRewards = StakingRewards or {
   _initialized = false,
   _sharesEnabled = false,
   Claimed = {
