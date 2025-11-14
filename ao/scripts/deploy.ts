@@ -149,7 +149,10 @@ async function deploy() {
     logger.info('CALL_INIT_HANDLER is not set to "true", skipping INIT')
   }
 
-  if (process.env.PHASE && process.env.CONSUL_IP) {
+  if (
+    ['stage', 'live'].includes(process.env.PHASE || '')
+      && process.env.CONSUL_IP && process.env.CONSUL_PORT
+  ) {
     logger.info(
       `Connecting to Consul at` +
         ` ${process.env.CONSUL_IP}:${process.env.CONSUL_PORT}...`
