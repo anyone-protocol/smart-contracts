@@ -923,7 +923,7 @@ function RelayRewards.init()
           assert(type(reward) == 'string', 'TotalFingerprintReward for ' .. fingerprint .. ' must be a string number')
           local safeReward = bint.tobint(reward)
           assert(safeReward ~= nil, 'TotalFingerprintReward for ' .. fingerprint .. ' must be an integer')
-          assert(bint.ispos(safeReward), 'TotalFingerprintReward for ' .. fingerprint .. ' must be a positive value')
+          assert(bint.ispos(safeReward) or bint.iszero(safeReward), 'TotalFingerprintReward for ' .. fingerprint .. ' must be a positive value or 0')
           RelayRewards.TotalFingerprintReward[fingerprint] = tostring(safeReward)
         end
       end
