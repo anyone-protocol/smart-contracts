@@ -10,7 +10,7 @@ if (!processId) {
 async function dryrunViewState() {
   const result = await sendAosDryRun({
     processId,
-    tags: [ { name: 'Action', value: 'View-State' } ]
+    tags: [ { name: 'Action', value: 'View-Roles' } ]
   })
   if (result.result.Messages[0]) {
     console.log(result.result.Messages[0].Data)
