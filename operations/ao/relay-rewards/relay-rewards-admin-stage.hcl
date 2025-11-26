@@ -14,7 +14,7 @@ job "relay-rewards-admin-stage" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":[\"Complete-Round\",\"Add-Scores\"],\"0x9a89f7bf1f6AE7B48DdEB9019bF46f425B596BB8\":[\"Claim-Rewards\"]}}"
+      # UPDATE_ROLES_DATA=""
 
       PHASE = "stage"
       CU_URL="https://cu-stage.anyone.tech"
@@ -24,7 +24,7 @@ job "relay-rewards-admin-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:ce3d635cbe88f16563720d39dd2073d1c5bd9053"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]

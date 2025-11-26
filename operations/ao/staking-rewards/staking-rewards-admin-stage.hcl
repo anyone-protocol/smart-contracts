@@ -16,7 +16,7 @@ job "staking-rewards-admin-stage" {
       PHASE = "stage"
       SCRIPT = "scripts/acl/update-roles.ts"
       # Stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x01B188F45bcde0D1E2dDD171279E1356782cDdE2\":[\"Complete-Round\",\"Add-Scores\"],\"0x999245c6ddc6E23F99844152e39045013C438d00\":[\"Claim-Rewards\"]}}"
+      # UPDATE_ROLES_DATA=""
 
       CU_URL="https://cu-stage.anyone.tech"
     }
@@ -41,7 +41,7 @@ job "staking-rewards-admin-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:ce3d635cbe88f16563720d39dd2073d1c5bd9053"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]

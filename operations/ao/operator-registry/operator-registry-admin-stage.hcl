@@ -14,7 +14,7 @@ job "operator-registry-admin-stage" {
     env {
       SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_ROLES_DATA="{\"Grant\":{\"0x38121cf84d897EF1ebE0d1804Ebf502f1E8D2Be0\":[\"Add-Verified-Hardware\",\"Remove-Fingerprint-Certificate\"],\"0x343D35d47818dEAACb5B9A1ddb67A2c7C6BB5413\":[\"Admin-Submit-Operator-Certificates\"]}}"
+      # UPDATE_ROLES_DATA=""
 
       PHASE = "stage"
       CU_URL="https://cu-stage.anyone.tech"
@@ -24,7 +24,7 @@ job "operator-registry-admin-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cfce3d635cbe88f16563720d39dd2073d1c5bd9053978246be973f9c0848e81e4ca0fe884c98"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]

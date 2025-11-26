@@ -25,7 +25,7 @@ job "relay-rewards-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:ce3d635cbe88f16563720d39dd2073d1c5bd9053"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -61,7 +61,8 @@ job "relay-rewards-live" {
 
     template {
       data = <<-EOF
-      MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/live/relay-rewards-address" }}
+      # MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/live/relay-rewards-address" }}
+      MIGRATION_SOURCE_PROCESS_ID="hZyEmQHHvl6Jne_4FMpiX7AiIe5QZeV-x1AZngfhMV0"
       EOF
       destination = "local/config.env"
       env = true
