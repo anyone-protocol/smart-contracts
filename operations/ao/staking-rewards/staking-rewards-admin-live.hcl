@@ -13,11 +13,11 @@ job "staking-rewards-admin-live" {
   task "staking-rewards-live" {
 
     env {
-      PHASE = "live"
-      SCRIPT = "scripts/staking-rewards/update-configuration.ts"
-
+      SCRIPT = ""
       # Stringified JSON
-      UPDATE_CONFIG_DATA="{\"TokensPerSecond\":\"28935185000000000\",\"Requirements\":{\"Running\":0.5}}"
+      # UPDATE_ROLES_DATA=""
+      
+      PHASE = "live"
       CU_URL="https://cu.anyone.tech"
     }
 
@@ -35,13 +35,11 @@ job "staking-rewards-admin-live" {
 
     consul {}
 
-    vault {
-      role = "any1-nomad-workloads-owner"
-    }
+    vault { role = "any1-nomad-workloads-owner" }
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8cc6c8bd0ace216de6a3c0cf90baa8c39e42b276"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
@@ -57,7 +55,7 @@ job "staking-rewards-admin-live" {
     template {
       destination = "local/config.env"
       env         = true
-      data = <<EOH
+      data = <<-EOH
       PROCESS_ID="{{ key `smart-contracts/live/staking-rewards-address` }}"
       EOH
     }
@@ -65,10 +63,10 @@ job "staking-rewards-admin-live" {
     template {
       destination = "secrets/file.env"
       env         = true
-      data = <<EOH
-      {{with secret "kv/live-protocol/staking-rewards-live"}}
-        ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
-      {{end}}
+      data = <<-EOH
+      {{- with secret "kv/live-protocol/staking-rewards-live"}}
+      ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      {{- end }}
       EOH
     }
   }

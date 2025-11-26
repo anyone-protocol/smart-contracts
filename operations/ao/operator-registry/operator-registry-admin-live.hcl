@@ -14,6 +14,7 @@ job "operator-registry-admin-live" {
     env {
       SCRIPT = ""
       # Script data - stringified JSON
+      # UPDATE_ROLES_DATA=""
 
       PHASE = "live"
       CU_URL="https://cu.anyone.tech"
@@ -23,7 +24,7 @@ job "operator-registry-admin-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:6f8b1d71117e40f343243655494f09cded2d620e"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
@@ -48,24 +49,22 @@ job "operator-registry-admin-live" {
 
     consul {}
 
-    vault {
-      role = "any1-nomad-workloads-owner"
-    }
+    vault { role = "any1-nomad-workloads-owner" }
 
     template {
       destination = "secrets/keys.env"
       env         = true
-      data = <<EOH
-      {{with secret "kv/live-protocol/operator-registry-live"}}
-        ETH_PRIVATE_KEY="{{.Data.data.OPERATOR_REGISTRY_OWNER_KEY}}"
-      {{end}}
+      data = <<-EOH
+      {{- with secret "kv/live-protocol/operator-registry-live" }}
+      ETH_PRIVATE_KEY="{{ .Data.data.OPERATOR_REGISTRY_OWNER_KEY }}"
+      {{- end }}
       EOH
     }
 
     template {
       destination = "local/config.env"
       env         = true
-      data = <<EOH
+      data = <<-EOH
       PROCESS_ID="{{ key `smart-contracts/live/operator-registry-address` }}"
       EOH
     }

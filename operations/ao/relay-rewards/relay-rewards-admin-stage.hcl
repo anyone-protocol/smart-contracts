@@ -12,9 +12,9 @@ job "relay-rewards-admin-stage" {
 
   task "relay-rewards-stage" {
     env {
-      SCRIPT = "scripts/relay-rewards/update-configuration.ts"
+      SCRIPT = "scripts/acl/update-roles.ts"
       # Script data - stringified JSON
-      UPDATE_CONFIG_DATA=""
+      UPDATE_ROLES_DATA="{\"Grant\":{\"0x8F666992a6dA43e2Be89F39497110e2b012D7e94\":[\"Complete-Round\",\"Add-Scores\"],\"0x9a89f7bf1f6AE7B48DdEB9019bF46f425B596BB8\":[\"Claim-Rewards\"]}}"
 
       PHASE = "stage"
       CU_URL="https://cu-stage.anyone.tech"
@@ -24,7 +24,7 @@ job "relay-rewards-admin-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:d35b61dcb47ef90cf2d7afd95af12e94aeb2dabd"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
@@ -49,24 +49,22 @@ job "relay-rewards-admin-stage" {
 
     consul {}
 
-    vault {
-      role = "any1-nomad-workloads-owner"
-    }
+    vault { role = "any1-nomad-workloads-owner" }
 
     template {
       destination = "secrets/keys.env"
       env         = true
-      data = <<EOH
-      {{with secret "kv/stage-protocol/relay-rewards-stage"}}
-        ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
-      {{end}}
+      data = <<-EOH
+      {{- with secret "kv/stage-protocol/relay-rewards-stage"}}
+      ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      {{- end }}
       EOH
     }
 
     template {
       destination = "local/config.env"
       env         = true
-      data = <<EOH
+      data = <<-EOH
       PROCESS_ID="{{ key `smart-contracts/stage/relay-rewards-address` }}"
       EOH
     }

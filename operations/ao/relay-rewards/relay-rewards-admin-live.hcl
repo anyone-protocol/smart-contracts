@@ -12,9 +12,9 @@ job "relay-rewards-admin-live" {
 
   task "relay-rewards-live" {
     env {
-      SCRIPT = "scripts/relay-rewards/update-configuration.ts"
+      SCRIPT = ""
       # Script data - stringified JSON
-      UPDATE_CONFIG_DATA=""
+      # UPDATE_ROLES_DATA=""
 
       PHASE = "live"
       CU_URL="https://cu.anyone.tech"
@@ -24,7 +24,7 @@ job "relay-rewards-admin-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8cc6c8bd0ace216de6a3c0cf90baa8c39e42b276"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
@@ -49,24 +49,22 @@ job "relay-rewards-admin-live" {
 
     consul {}
 
-    vault {
-      role = "any1-nomad-workloads-owner"
-    }
+    vault { role = "any1-nomad-workloads-owner" }
 
     template {
       destination = "secrets/keys.env"
       env         = true
-      data = <<EOH
-      {{with secret "kv/live-protocol/relay-rewards-live"}}
-        ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
-      {{end}}
+      data = <<-EOH
+      {{- with secret "kv/live-protocol/relay-rewards-live"}}
+      ETH_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      {{- end }}
       EOH
     }
 
     template {
       destination = "local/config.env"
       env         = true
-      data = <<EOH
+      data = <<-EOH
       PROCESS_ID="{{ key `smart-contracts/live/relay-rewards-address` }}"
       EOH
     }

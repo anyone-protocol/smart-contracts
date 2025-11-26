@@ -25,7 +25,7 @@ job "staking-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:8cc6c8bd0ace216de6a3c0cf90baa8c39e42b276"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:bec6cf978246be973f9c0848e81e4ca0fe884c98"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -38,9 +38,7 @@ job "staking-rewards-stage" {
       }
     }
 
-    vault {
-        role = "any1-nomad-workloads-controller"
-    }
+    vault { role = "any1-nomad-workloads-controller" }
 
     consul {}
 
@@ -48,20 +46,35 @@ job "staking-rewards-stage" {
       PHASE = "stage"
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
-      CONTRACT_NAME = "staking-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/staking-rewards-address"
-      CONTRACT_SOURCE_CONSUL_KEY = "smart-contracts/stage/staking-rewards-source"
+      CONTRACT_NAME = "staking-rewards"
       CU_URL="https://cu-stage.anyone.tech"
+
+      ## NB: Spawn a new process & migrate state from an existing one
+      ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
+      ##     existing process ID to migrate from
+      IS_MIGRATION_DEPLOYMENT = "true"
+
+      ## NB: Call Init with data from file at INIT_DATA_PATH
+      # CALL_INIT_HANDLER="true"
+    }
+
+    template {
+      data = <<-EOF
+      MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/stage/staking-rewards-address" }}
+      EOF
+      destination = "local/config.env"
+      env = true
     }
 
     template {
       destination = "secrets/file.env"
       env         = true
-      data = <<EOH
-      {{with secret "kv/stage-protocol/staking-rewards-stage"}}
-        DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
-        CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
-      {{end}}
+      data = <<-EOH
+      {{- with secret "kv/stage-protocol/staking-rewards-stage" }}
+      DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+      {{- end }}
       EOH
     }
   }
