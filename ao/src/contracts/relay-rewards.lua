@@ -912,7 +912,7 @@ function RelayRewards.init()
           assert(type(reward) == 'string', 'TotalAddressReward for ' .. address .. ' must be a string number')
           local safeReward = bint.tobint(reward)
           assert(safeReward ~= nil, 'TotalAddressReward for ' .. address .. ' must be an integer')
-          assert(bint.ispos(safeReward), 'TotalAddressReward for ' .. address .. ' must be a positive value')
+          assert(bint.ispos(safeReward) or bint.iszero(safeReward), 'TotalAddressReward for ' .. address .. ' must be a positive value or 0')
           RelayRewards.TotalAddressReward[normalizedAddress] = tostring(safeReward)
         end
       end
