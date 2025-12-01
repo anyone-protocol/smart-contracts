@@ -56,7 +56,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '' }
+          { name: 'Round-Timestamp', value: '' }
       ]
     })
     expect(emptyStampResult.Error).to.be.a('string').that.includes('Timestamp tag')
@@ -65,7 +65,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: 'bad-stamp' }
+          { name: 'Round-Timestamp', value: 'bad-stamp' }
       ]
     })
     expect(badStampResult.Error).to.be.a('string').that.includes('Timestamp tag')
@@ -76,7 +76,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(noRoundResult.Error).to.be.a('string').that.includes('No pending round for 1000')
@@ -105,7 +105,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: refRound1
     })
@@ -116,7 +116,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '2000' }
+          { name: 'Round-Timestamp', value: '2000' }
       ],
       Data: refRound1
     })
@@ -127,7 +127,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '2000' }
+          { name: 'Round-Timestamp', value: '2000' }
       ]
     })
     expect(round2CompleteResult.Messages).to.have.lengthOf(2)
@@ -138,7 +138,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Cancel-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(round1CancelResult.Error).to.be.a('string').that.includes('No pending round for 1000')
@@ -167,7 +167,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: refRound1
     })
@@ -178,7 +178,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(round1CompleteResult.Messages).to.have.lengthOf(2)
@@ -189,7 +189,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '2000' }
+          { name: 'Round-Timestamp', value: '2000' }
       ],
       Data: refRound1
     })
@@ -200,7 +200,7 @@ describe('Round Completion of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '2000' }
+          { name: 'Round-Timestamp', value: '2000' }
       ]
     })
     expect(round2CompleteResult.Messages).to.have.lengthOf(2)

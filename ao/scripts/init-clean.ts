@@ -39,7 +39,7 @@ async function initClean() {
     signer: await createEthereumDataItemSigner(signer) as any,
     tags: [
       { name: 'Action', value: 'Init' },
-      { name: 'Timestamp', value: new Date().toISOString() }
+      { name: 'Init-Timestamp', value: new Date().toISOString() }
     ],
     data: initCleanData
   })

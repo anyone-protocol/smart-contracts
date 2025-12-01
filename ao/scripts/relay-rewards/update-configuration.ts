@@ -39,7 +39,7 @@ async function updateRoles() {
     signer: await createEthereumDataItemSigner(signer) as any,
     tags: [
       { name: 'Action', value: 'Update-Configuration' },
-      { name: 'Timestamp', value: new Date().toISOString() }
+      { name: 'Update-Configuration-Timestamp', value: new Date().toISOString() }
     ],
     data: updateConfigData
   })

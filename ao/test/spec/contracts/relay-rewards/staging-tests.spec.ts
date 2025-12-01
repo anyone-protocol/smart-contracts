@@ -21,7 +21,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '100' }
+          { name: 'Round-Timestamp', value: '100' }
       ],
       Data: JSON.stringify(scores)
     })
@@ -32,7 +32,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '100' }
+          { name: 'Round-Timestamp', value: '100' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
@@ -60,7 +60,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '123456789000' }
+          { name: 'Round-Timestamp', value: '123456789000' }
       ],
       Data: JSON.stringify(scores)
     })
@@ -71,7 +71,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '123456789000' }
+          { name: 'Round-Timestamp', value: '123456789000' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)
@@ -87,7 +87,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1739283636342' }
+          { name: 'Round-Timestamp', value: '1739283636342' }
       ],
       Data: JSON.stringify(scores2)
     })
@@ -98,7 +98,7 @@ describe('Staging tests of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1739283636342' }
+          { name: 'Round-Timestamp', value: '1739283636342' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)

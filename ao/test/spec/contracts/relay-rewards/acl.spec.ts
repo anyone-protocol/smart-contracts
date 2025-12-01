@@ -189,7 +189,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: ALICE_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Add-Scores' },
-            { name: 'Timestamp', value: '1000' }
+            { name: 'Round-Timestamp', value: '1000' }
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
@@ -211,7 +211,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: BOB_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Add-Scores' },
-            { name: 'Timestamp', value: '1000' }
+            { name: 'Round-Timestamp', value: '1000' }
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
@@ -227,7 +227,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Add-Scores' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
@@ -236,7 +236,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: ALICE_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Complete-Round' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ]
       })
 
@@ -253,7 +253,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Add-Scores' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
@@ -269,7 +269,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: BOB_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Complete-Round' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ]
       })
 
@@ -288,7 +288,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Add-Scores' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
@@ -297,7 +297,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: ALICE_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Cancel-Round' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ]
       })
 
@@ -310,7 +310,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Add-Scores' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ],
         Data: JSON.stringify(MOCK_SCORES)
       })
@@ -326,7 +326,7 @@ describe('ACL enforcement of relay rewards', () => {
         From: BOB_ADDRESS,
         Tags: [
             { name: 'Action', value: 'Cancel-Round' },
-            { name: 'Timestamp', value: '2000' }
+            { name: 'Round-Timestamp', value: '2000' }
         ]
       })
 

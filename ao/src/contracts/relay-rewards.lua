@@ -32,7 +32,7 @@ RelayRewards = RelayRewards or {
       Location = { Enabled = true, Offset = 0.001, Power = 2.0, Divider = 20.0 }
     },
     Delegates = {
---      [Address] = { Address: '', Share = 0 }
+    -- [Address] = { Address: '', Share = 0 }
     }
   },
   PreviousRound = {
@@ -267,11 +267,11 @@ function RelayRewards.init()
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
 
-      local timestamp = tonumber(msg.Tags['Timestamp'])
-      assert(timestamp, 'Timestamp tag must be a number')
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
-      assert(timestamp > 0, 'Timestamp has to be > 0')
-      assert(timestamp > RelayRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
+      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      assert(timestamp, 'Round-Timestamp tag must be a number')
+      AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
+      assert(timestamp > 0, 'Round-Timestamp has to be > 0')
+      assert(timestamp > RelayRewards.PreviousRound.Timestamp, 'Round-Timestamp is backdated')
 
       assert(type(request.Scores) == 'table', 'Scores have to be a table')
 
@@ -336,8 +336,8 @@ function RelayRewards.init()
         { 'owner', 'admin', 'Complete-Round' }
       )
 
-      local timestamp = tonumber(msg.Tags['Timestamp'])
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
+      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
 
       local roundData = {}
@@ -611,8 +611,8 @@ function RelayRewards.init()
         { 'owner', 'admin', 'Cancel-Round' }
       )
 
-      local timestamp = tonumber(msg.Tags['Timestamp'])
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
+      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       if timestamp then
         assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
         RelayRewards.PendingRounds[timestamp] = nil
