@@ -50,7 +50,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: JSON.stringify({
         Scores: { [FINGERPRINT_A]: score1 }
@@ -63,7 +63,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
@@ -77,7 +77,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '2345' }
+          { name: 'Round-Timestamp', value: '2345' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -92,7 +92,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '2345' }
+          { name: 'Round-Timestamp', value: '2345' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)
@@ -119,7 +119,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '40000' }
+          { name: 'Round-Timestamp', value: '40000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -134,7 +134,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '40000' }
+          { name: 'Round-Timestamp', value: '40000' }
       ]
     })
     expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
@@ -194,7 +194,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: JSON.stringify({
         Scores: { [FINGERPRINT_A]: score1 }
@@ -207,7 +207,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
@@ -221,7 +221,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -238,7 +238,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)
@@ -353,7 +353,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: JSON.stringify({
         Scores: { [FINGERPRINT_A]: score1 }
@@ -366,7 +366,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
@@ -380,7 +380,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -395,7 +395,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)
@@ -475,7 +475,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: JSON.stringify({
         Scores: { [FINGERPRINT_A]: score1 }
@@ -488,7 +488,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
@@ -502,7 +502,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -519,7 +519,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)
@@ -602,7 +602,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -617,7 +617,7 @@ describe('Scoring relay rewards based on ratings', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(thirdCompleteResult.Messages).to.have.lengthOf(2)

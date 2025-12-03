@@ -12,7 +12,7 @@ async function dryrunViewState() {
     processId,
     tags: [ { name: 'Action', value: 'View-State' } ]
   })
-  if (result.result.Messages[0]) {
+  if (result.result?.Messages && result.result.Messages[0]) {
     console.log(result.result.Messages[0].Data)
   } else {
     console.error('Result error:', JSON.stringify(result.result, null, 2))

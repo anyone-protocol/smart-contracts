@@ -39,7 +39,7 @@ describe('Cancel-Round action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Cancel-Round' },
-          { name: 'Timestamp', value: '' }
+          { name: 'Round-Timestamp', value: '' }
       ]
     })
     expect(emptyStampResult.Error).to.be.a('string').that.includes('Timestamp tag')
@@ -48,7 +48,7 @@ describe('Cancel-Round action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Cancel-Round' },
-          { name: 'Timestamp', value: 'bad-stamp' }
+          { name: 'Round-Timestamp', value: 'bad-stamp' }
       ]
     })
     expect(badStampResult.Error).to.be.a('string').that.includes('Timestamp tag')
@@ -59,7 +59,7 @@ describe('Cancel-Round action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Cancel-Round' },
-          { name: 'Timestamp', value: '1234567890' }
+          { name: 'Round-Timestamp', value: '1234567890' }
       ]
     })
     expect(missingRoundResult.Error).to.be.a('string').that.includes('No pending round for 1234567890')
@@ -70,7 +70,7 @@ describe('Cancel-Round action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1234567890' }
+          { name: 'Round-Timestamp', value: '1234567890' }
       ],
       Data: JSON.stringify({
         Scores: {
@@ -91,7 +91,7 @@ describe('Cancel-Round action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Cancel-Round' },
-          { name: 'Timestamp', value: '1234567890' }
+          { name: 'Round-Timestamp', value: '1234567890' }
       ]
     })
     

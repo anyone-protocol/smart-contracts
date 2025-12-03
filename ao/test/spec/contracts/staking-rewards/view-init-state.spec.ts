@@ -37,7 +37,7 @@ describe('staking-rewards-view-init-state', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1741829169954' }
+          { name: 'Round-Timestamp', value: '1741829169954' }
       ],
       Data: JSON.stringify(scores)
     })
@@ -48,7 +48,7 @@ describe('staking-rewards-view-init-state', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1741829169954' }
+          { name: 'Round-Timestamp', value: '1741829169954' }
       ]
     })
     
@@ -78,7 +78,7 @@ describe('staking-rewards-view-init-state', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1741829269954' }
+          { name: 'Round-Timestamp', value: '1741829269954' }
       ],
       Data: JSON.stringify(scores)
     })
@@ -89,7 +89,7 @@ describe('staking-rewards-view-init-state', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1741829269954' }
+          { name: 'Round-Timestamp', value: '1741829269954' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)

@@ -72,7 +72,7 @@ describe('Claiming relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ],
       Data: JSON.stringify({
         Scores: { [FINGERPRINT_A]: score1 }
@@ -85,7 +85,7 @@ describe('Claiming relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '1000' }
+          { name: 'Round-Timestamp', value: '1000' }
       ]
     })
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
@@ -99,7 +99,7 @@ describe('Claiming relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -116,7 +116,7 @@ describe('Claiming relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(secondCompleteResult.Messages).to.have.lengthOf(2)
@@ -130,7 +130,7 @@ describe('Claiming relay rewards', () => {
       From: ALICE_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(aResult.Messages).to.have.lengthOf(1)
@@ -139,7 +139,7 @@ describe('Claiming relay rewards', () => {
       From: BOB_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(bResult.Messages).to.have.lengthOf(1)
@@ -148,7 +148,7 @@ describe('Claiming relay rewards', () => {
       From: CHARLS_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
 
@@ -162,7 +162,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Claim-Rewards' },
           { name: 'Address', value: ALICE_ADDRESS },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(aClaimResult.Messages).to.have.lengthOf(2)
@@ -185,7 +185,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Claim-Rewards' },
           { name: 'Address', value: BOB_ADDRESS },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(bClaimResult.Messages).to.have.lengthOf(2)
@@ -208,7 +208,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Get-Claimed' },
           { name: 'Address', value: ALICE_ADDRESS },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(aClaimedResult.Messages).to.have.lengthOf(1)
@@ -220,7 +220,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Get-Claimed' },
           { name: 'Address', value: BOB_ADDRESS },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(bClaimedResult.Messages).to.have.lengthOf(1)
@@ -232,7 +232,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Get-Claimed' },
           { name: 'Address', value: CHARLS_ADDRESS },
-          { name: 'Timestamp', value: '11000' }
+          { name: 'Round-Timestamp', value: '11000' }
       ]
     })
     expect(cClaimedResult.Messages).to.have.lengthOf(1)
@@ -243,7 +243,7 @@ describe('Claiming relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ],
       Data: JSON.stringify({
         Scores: { 
@@ -260,7 +260,7 @@ describe('Claiming relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(thirdCompleteResult.Messages).to.have.lengthOf(2)
@@ -274,7 +274,7 @@ describe('Claiming relay rewards', () => {
       From: ALICE_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(aResult2.Messages).to.have.lengthOf(1)
@@ -283,7 +283,7 @@ describe('Claiming relay rewards', () => {
       From: BOB_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(bResult2.Messages).to.have.lengthOf(1)
@@ -292,7 +292,7 @@ describe('Claiming relay rewards', () => {
       From: CHARLS_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Get-Rewards' },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
 
@@ -306,7 +306,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Claim-Rewards' },
           { name: 'Address', value: ALICE_ADDRESS },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(aClaimResult2.Messages).to.have.lengthOf(2)
@@ -329,7 +329,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Claim-Rewards' },
           { name: 'Address', value: CHARLS_ADDRESS },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(cClaimResult.Messages).to.have.lengthOf(2)
@@ -352,7 +352,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Get-Claimed' },
           { name: 'Address', value: ALICE_ADDRESS },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(aClaimedResult2.Messages).to.have.lengthOf(1)
@@ -364,7 +364,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Get-Claimed' },
           { name: 'Address', value: BOB_ADDRESS },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(bClaimedResult2.Messages).to.have.lengthOf(1)
@@ -376,7 +376,7 @@ describe('Claiming relay rewards', () => {
       Tags: [
           { name: 'Action', value: 'Get-Claimed' },
           { name: 'Address', value: CHARLS_ADDRESS },
-          { name: 'Timestamp', value: '21000' }
+          { name: 'Round-Timestamp', value: '21000' }
       ]
     })
     expect(cClaimedResult2.Messages).to.have.lengthOf(1)

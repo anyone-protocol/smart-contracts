@@ -67,7 +67,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '' }
+          { name: 'Round-Timestamp', value: '' }
       ],
       Data: refRound1
     })
@@ -77,7 +77,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: 'bad-stamp' }
+          { name: 'Round-Timestamp', value: 'bad-stamp' }
       ],
       Data: refRound1
     })
@@ -89,7 +89,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '0' }
+          { name: 'Round-Timestamp', value: '0' }
       ],
       Data: refRound1
     })
@@ -99,7 +99,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '-100' }
+          { name: 'Round-Timestamp', value: '-100' }
       ],
       Data: refRound1
     })
@@ -129,7 +129,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '10' }
+          { name: 'Round-Timestamp', value: '10' }
       ],
       Data: refRound1
     })
@@ -140,7 +140,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '10' }
+          { name: 'Round-Timestamp', value: '10' }
       ]
     })
     expect(completeRoundResult.Messages).to.have.lengthOf(2)
@@ -151,7 +151,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '10' }
+          { name: 'Round-Timestamp', value: '10' }
       ],
       Data: refRound1
     })
@@ -162,7 +162,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '20' }
+          { name: 'Round-Timestamp', value: '20' }
       ],
       Data: refRound1
     })
@@ -175,7 +175,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: "some scores"})
     })
@@ -187,7 +187,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [BOB_ADDRESS]: score0, 
@@ -203,7 +203,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: refRound1
     })
@@ -214,7 +214,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: refRound1
     })
@@ -226,7 +226,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: { 
@@ -244,7 +244,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: { 
@@ -258,7 +258,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: { 
@@ -272,7 +272,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: { 
@@ -286,7 +286,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: { 
@@ -302,7 +302,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: { 
@@ -316,7 +316,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: {
@@ -330,7 +330,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: {
@@ -344,7 +344,7 @@ describe('Add-Scores action of staking rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [ALICE_ADDRESS]: {

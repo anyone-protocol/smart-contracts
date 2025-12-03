@@ -232,12 +232,11 @@ function StakingRewards.init()
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
 
-      local timestamp = tonumber(msg.Tags['Timestamp'])
-      assert(timestamp, 'Timestamp tag must be a number')
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
-      assert(timestamp > 0, 'Timestamp has to be > 0')
-      assert(timestamp > StakingRewards.PreviousRound.Timestamp, 'Timestamp is backdated')
-
+      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      assert(timestamp, 'Round-Timestamp tag must be a number')
+      AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
+      assert(timestamp > 0, 'Round-Timestamp has to be > 0')
+      assert(timestamp > StakingRewards.PreviousRound.Timestamp, 'Round-Timestamp is backdated')
       assert(type(request.Scores) == 'table', 'Scores have to be a table')
       for hodlerAddress, scores in pairs(request.Scores) do
         AnyoneUtils.assertValidEvmAddress(hodlerAddress, 'Invalid Hodler Address:' .. hodlerAddress)
@@ -304,8 +303,8 @@ function StakingRewards.init()
         { 'owner', 'admin', 'Complete-Round' }
       )
 
-      local timestamp = tonumber(msg.Tags['Timestamp'])
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
+      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       assert(StakingRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
 
       local summary = {
@@ -458,8 +457,8 @@ function StakingRewards.init()
         { 'owner', 'admin', 'Cancel-Round' }
       )
 
-      local timestamp = tonumber(msg.Tags['Timestamp'])
-      AnyoneUtils.assertInteger(timestamp, 'Timestamp tag')
+      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       if timestamp then
         assert(StakingRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
         StakingRewards.PendingRounds[timestamp] = nil

@@ -66,7 +66,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '' }
+          { name: 'Round-Timestamp', value: '' }
       ],
       Data: refRound1
     })
@@ -76,7 +76,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: 'bad-stamp' }
+          { name: 'Round-Timestamp', value: 'bad-stamp' }
       ],
       Data: refRound1
     })
@@ -88,7 +88,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '0' }
+          { name: 'Round-Timestamp', value: '0' }
       ],
       Data: refRound1
     })
@@ -98,7 +98,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '-100' }
+          { name: 'Round-Timestamp', value: '-100' }
       ],
       Data: refRound1
     })
@@ -134,7 +134,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '10' }
+          { name: 'Round-Timestamp', value: '10' }
       ],
       Data: refRound1
     })
@@ -145,7 +145,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Complete-Round' },
-          { name: 'Timestamp', value: '10' }
+          { name: 'Round-Timestamp', value: '10' }
       ]
     })
     expect(completeRoundResult.Messages).to.have.lengthOf(2)
@@ -159,7 +159,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '10' }
+          { name: 'Round-Timestamp', value: '10' }
       ],
       Data: refRound1
     })
@@ -170,7 +170,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '20' }
+          { name: 'Round-Timestamp', value: '20' }
       ],
       Data: refRound1
     })
@@ -183,7 +183,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: "some scores"})
     })
@@ -195,7 +195,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: score0, 
@@ -211,7 +211,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: score0 
@@ -224,7 +224,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: score0 
@@ -238,7 +238,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, Address: '' }
@@ -250,7 +250,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, Address: 'some-wrong-address' }
@@ -264,7 +264,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, Network: '' }
@@ -276,7 +276,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, Network: -100 }
@@ -288,7 +288,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, Network: true }
@@ -300,7 +300,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, Network: null }
@@ -314,7 +314,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, IsHardware: '' }
@@ -326,7 +326,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, IsHardware: 12 }
@@ -338,7 +338,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, IsHardware: null }
@@ -353,7 +353,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, UptimeStreak: '' }
@@ -365,7 +365,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, UptimeStreak: -100 }
@@ -377,7 +377,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, UptimeStreak: true }
@@ -389,7 +389,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, UptimeStreak: null }
@@ -403,7 +403,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, ExitBonus: '' }
@@ -415,7 +415,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, ExitBonus: 12 }
@@ -427,7 +427,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, ExitBonus: null }
@@ -442,7 +442,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, FamilySize: '' }
@@ -454,7 +454,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, FamilySize: -100 }
@@ -466,7 +466,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, FamilySize: true }
@@ -478,7 +478,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, FamilySize: null }
@@ -492,7 +492,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, LocationSize: '' }
@@ -504,7 +504,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, LocationSize: -100 }
@@ -516,7 +516,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, LocationSize: true }
@@ -528,7 +528,7 @@ describe('Add-Scores action of relay rewards', () => {
       From: OWNER_ADDRESS,
       Tags: [
           { name: 'Action', value: 'Add-Scores' },
-          { name: 'Timestamp', value: '5' }
+          { name: 'Round-Timestamp', value: '5' }
       ],
       Data: JSON.stringify({ Scores: {
         [FINGERPRINT_A]: { ...score0, LocationSize: null }
