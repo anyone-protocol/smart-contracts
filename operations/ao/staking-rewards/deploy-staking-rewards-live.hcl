@@ -25,7 +25,7 @@ job "staking-rewards-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:ce3d635cbe88f16563720d39dd2073d1c5bd9053"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:0b586a503f7f89003607322c3d1a8f525d042383"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
