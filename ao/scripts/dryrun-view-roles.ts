@@ -18,14 +18,12 @@ async function dryrunViewState() {
       const parsedAcl = JSON.parse(result.result.Messages[0].Data)
       const migratedAcl: any = { Grant: {} }
       for (const role in parsedAcl.Roles) {
-        console.log('Role:', role)
         for (const address in parsedAcl.Roles[role]) {
-          console.log('  Address:', address)
           migratedAcl.Grant[address] = migratedAcl.Grant[address] || []
           migratedAcl.Grant[address].push(role)
         }
       }
-      console.log(JSON.stringify(migratedAcl, null, 2))
+      console.log(JSON.stringify(migratedAcl))
     } else {
       console.log(result.result.Messages[0].Data)
     }
