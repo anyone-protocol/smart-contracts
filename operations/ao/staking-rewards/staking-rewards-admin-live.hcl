@@ -39,7 +39,7 @@ job "staking-rewards-admin-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:0b586a503f7f89003607322c3d1a8f525d042383"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]
