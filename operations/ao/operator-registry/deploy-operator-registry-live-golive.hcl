@@ -30,6 +30,12 @@ job "operator-registry-live" {
       # command = "run"
       # args = ["deploy"]
       entrypoint = ["/usr/src/app/scripts/entrypoint.sh"]
+      mount {
+        type = "bind"
+        source = "local/entrypoint.sh"
+        target = "/usr/src/app/scripts/entrypoint.sh"
+        readonly = true
+      }
       logging {
         type = "loki"
         config {
