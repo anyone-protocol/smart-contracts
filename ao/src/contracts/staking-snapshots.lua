@@ -3,7 +3,7 @@ local json = require('json')
 ACL = require('.common.acl')
 
 StakingSnapshots = StakingSnapshots or {
-  Name = 'StakingSnapshots',
+  Name = 'Anyone Protocol Staking Snapshots',
   HistorySize = 10,
   Snapshots = {}
 }
@@ -40,6 +40,10 @@ Handlers.add('Set-History-Size', 'Set-History-Size', function (msg)
     Action = 'Set-History-Size-Response',
     Data = 'OK'
   })
+  ao.send({
+    device = 'patch@1.0',
+    history_size = StakingSnapshots.HistorySize
+  })
 end)
 
 Handlers.add('Add-Staking-Snapshot', 'Add-Staking-Snapshot', function (msg)
@@ -61,7 +65,8 @@ Handlers.add('Add-Staking-Snapshot', 'Add-Staking-Snapshot', function (msg)
   })
   ao.send({
     device = 'patch@1.0',
-    staking_snapshots = StakingSnapshots
+    staking_snapshots = StakingSnapshots.Snapshots,
+    snapshots_count = #StakingSnapshots.Snapshots
   })
 end)
 
