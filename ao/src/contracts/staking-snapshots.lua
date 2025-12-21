@@ -70,6 +70,30 @@ Handlers.add('Add-Staking-Snapshot', 'Add-Staking-Snapshot', function (msg)
   })
 end)
 
+Handlers.add('View-State', 'View-State', function (msg)
+  ao.send({
+    Target = msg.From,
+    Action = 'View-State-Response',
+    Data = json.encode({
+      HistorySize = StakingSnapshots.HistorySize,
+      Snapshots = StakingSnapshots.Snapshots
+    })
+  })
+end)
+
+Handlers.add('View-Snapshot', 'View-Snapshot', function (msg)
+  local index = tonumber(msg.Tags['Snapshot-Index'])
+  assert(
+    index and index > 0 and index <= #StakingSnapshots.Snapshots,
+    'Invalid snapshot index'
+  )
+  ao.send({
+    Target = msg.From,
+    Action = 'View-Snapshot-Response',
+    Data = json.encode(StakingSnapshots.Snapshots[index])
+  })
+end)
+
 Handlers.add('Info', 'Info', function (message)
   ao.send({
     Target = message.From,
