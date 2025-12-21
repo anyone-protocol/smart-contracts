@@ -32,7 +32,7 @@ end)
 
 Handlers.add('Set-History-Size', 'Set-History-Size', function (msg)
   ACL.assertHasOneOfRole(msg.From, { 'owner', 'admin', 'Set-History-Size' })
-  local size = tonumber(msg.Data)
+  local size = tonumber(msg.Tags['History-Size'])
   assert(size and size > 0, 'History size must be a positive integer')
   StakingSnapshots.HistorySize = size
   ao.send({
