@@ -180,7 +180,7 @@ async function deploy() {
   logger.info(
     `Deployment of ${contractName} complete!`
       + ` Check the deployed process in your browser at`
-      + ` https://ao.link/#/entity/${processId}`
+      + ` https://aolink.ar.anyone.tech/#/entity/${processId}`
   )
 }
 
