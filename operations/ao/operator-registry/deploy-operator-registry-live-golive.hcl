@@ -53,8 +53,8 @@ job "operator-registry-live" {
       PHASE = "live"
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
-      CONTRACT_NAME = "operator-registry"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/operator-registry-address"
+      CONTRACT_NAME = "operator-registry"
       CU_URL="https://cu.anyone.tech"
 
       ## NB: Spawn a new process & migrate state from an existing one
@@ -88,24 +88,24 @@ job "operator-registry-live" {
       set -e
 
       echo "Preparing to deploy Operator Registry to DEV environment"
-      
+
       npx tsx scripts/dryrun-view-state.ts > scripts/operator-registry-state.json
 
       jq '
         # Extract VerifiedHardwareFingerprints keys and remove all whitespace
         (.VerifiedHardwareFingerprints | keys | map(select(startswith(" ") | not))) as $hw_fps |
-        
+
         # Filter VerifiedFingerprintsToOperatorAddresses by verified hardware fingerprints
         # AND exclude any keys that originally contained whitespace
         {
           VerifiedHardwareFingerprints: (
-            $hw_fps | 
-            map({key: ., value: true}) | 
+            $hw_fps |
+            map({key: ., value: true}) |
             from_entries
           ),
           VerifiedFingerprintsToOperatorAddresses: (
-            .VerifiedFingerprintsToOperatorAddresses | 
-            to_entries | 
+            .VerifiedFingerprintsToOperatorAddresses |
+            to_entries |
             map(select(
               (.key | test("\\s") | not) and  # Exclude keys with whitespace
               (.key | IN($hw_fps[]))           # Keep only verified fingerprints
