@@ -1,0 +1,13 @@
+{
+  "Lua.workspace.ignoreDir": [
+    ".vscode",
+    "ao/data",
+    "ao/dist",
+    "ao/node_modules",
+    "evm",
+    "operations",
+    "smartweave",
+    "ao-core",
+    "ao/scripts"
+  ]
+}
