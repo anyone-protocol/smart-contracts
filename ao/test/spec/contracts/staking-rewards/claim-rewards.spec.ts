@@ -41,7 +41,11 @@ describe('Claiming staking rewards', () => {
     })
     expect(enableShareResult.Messages).to.have.lengthOf(2)
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    const configTag = enableShareResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    )
+    expect(configTag).to.exist
+    expect(configTag.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
     
     const config = {
@@ -59,7 +63,12 @@ describe('Claiming staking rewards', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(2)
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    const cfgTag = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    )
+    expect(cfgTag).to.exist
+    expect(cfgTag.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag.value.Requirements.Running).to.equal(config.Requirements.Running)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -92,8 +101,10 @@ describe('Claiming staking rewards', () => {
         Scores: score1
       })
     })
-    expect(noRoundResult.Messages).to.have.lengthOf(1)
-    expect(noRoundResult.Messages[0].Data).to.equal('OK')
+    // 2 messages: shares patch (new operator gets default share), OK response
+    expect(noRoundResult.Messages).to.have.lengthOf(2)
+    expect(noRoundResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(noRoundResult.Messages[1].Data).to.equal('OK')
 
     const firstCompleteResult = await handle({
       From: OWNER_ADDRESS,

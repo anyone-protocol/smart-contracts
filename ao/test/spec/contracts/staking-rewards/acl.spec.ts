@@ -56,7 +56,12 @@ describe('ACL enforcement of staking rewards', () => {
       })
       expect(configResult.Messages).to.have.lengthOf(2)
       expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-      expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+      const cfgTag = configResult.Messages[0].Tags.find(
+        (t: { name: string }) => t.name === 'configuration'
+      )
+      expect(cfgTag).to.exist
+      expect(cfgTag.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+      expect(cfgTag.value.Requirements.Running).to.equal(config.Requirements.Running)
       expect(configResult.Messages[1].Data).to.equal('OK')
     })
 
@@ -85,7 +90,12 @@ describe('ACL enforcement of staking rewards', () => {
 
       expect(configResult.Messages).to.have.lengthOf(2)
       expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-      expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+      const cfgTag2 = configResult.Messages[0].Tags.find(
+        (t: { name: string }) => t.name === 'configuration'
+      )
+      expect(cfgTag2).to.exist
+      expect(cfgTag2.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+      expect(cfgTag2.value.Requirements.Running).to.equal(config.Requirements.Running)
       expect(configResult.Messages[1].Data).to.equal('OK')
     })
   })

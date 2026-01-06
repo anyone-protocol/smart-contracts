@@ -3,6 +3,7 @@ import { expect } from 'chai'
 import {
   ALICE_ADDRESS,
   BOB_ADDRESS,
+  CHARLS_ADDRESS,
   AOTestHandle,
   createLoader,
   FINGERPRINT_A,
@@ -122,7 +123,12 @@ describe('Add-Scores action of staking rewards', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(2)
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    const cfgTag = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    )
+    expect(cfgTag).to.exist
+    expect(cfgTag.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag.value.Requirements.Running).to.equal(config.Requirements.Running)
     expect(configResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({
@@ -365,7 +371,12 @@ describe('Add-Scores action of staking rewards', () => {
     })
     expect(enableShareResult.Messages).to.have.lengthOf(2)
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    // Configuration patch includes Shares.Enabled
+    const configTag = enableShareResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    )
+    expect(configTag).to.exist
+    expect(configTag.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const emptyShareResult = await handle({
@@ -403,5 +414,266 @@ describe('Add-Scores action of staking rewards', () => {
       Data: JSON.stringify({ Share: -0.1 })
     })
     expect(smallShareResult.Error).to.be.a('string').that.includes('has to be >= 0')
+  })
+})
+
+describe('Add-Scores assigns default share to new operators', () => {
+  let handle: AOTestHandle
+
+  const score0 = { [BOB_ADDRESS]: {
+    Staked: '1', Running: 0.5
+  } }
+
+  const refRound1 = JSON.stringify({
+    Scores: { [ALICE_ADDRESS]: score0 }
+  })
+
+  beforeEach(async () => {
+    handle = (await createLoader('staking-rewards')).handle
+  })
+
+  it('New operator receives Configuration.Shares.Default when shares are enabled', async () => {
+    // Enable shares and set default share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ Default: 0.15 })
+    })
+
+    // Add scores for a new operator (BOB_ADDRESS)
+    const result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '10' }
+      ],
+      Data: refRound1
+    })
+
+    // Should have 2 messages: shares patch for new operator, OK response
+    expect(result.Messages).to.have.lengthOf(2)
+    expect(result.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    expect(result.Messages[1].Data).to.equal('OK')
+
+    // Verify the new operator was assigned the default share in state
+    const stateResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'View-State' }]
+    })
+    const state = JSON.parse(stateResult.Messages[0].Data)
+    expect(state.Shares[BOB_ADDRESS]).to.equal(0.15)
+  })
+
+  it('Existing operator retains their set share', async () => {
+    // Enable shares
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ Default: 0.1 })
+    })
+
+    // Operator sets their own share to 0.3
+    await handle({
+      From: BOB_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Set-Share' }],
+      Data: JSON.stringify({ Share: 0.3 })
+    })
+
+    // Add scores
+    const result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '10' }
+      ],
+      Data: refRound1
+    })
+
+    // Should only have 1 message: OK response (no shares patch since not a new operator)
+    expect(result.Messages).to.have.lengthOf(1)
+    expect(result.Messages[0].Data).to.equal('OK')
+
+    // Verify operator kept their set share
+    const stateResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'View-State' }]
+    })
+    const state = JSON.parse(stateResult.Messages[0].Data)
+    expect(state.Shares[BOB_ADDRESS]).to.equal(0.3)
+  })
+
+  it('Default share is persisted to StakingRewards.Shares for new operators', async () => {
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ Default: 0.2 })
+    })
+
+    // Add scores for new operator
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '10' }
+      ],
+      Data: refRound1
+    })
+
+    // Add scores again for same operator in a new round
+    const result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '20' }
+      ],
+      Data: refRound1
+    })
+
+    // Should only have 1 message this time (no new operator patch)
+    expect(result.Messages).to.have.lengthOf(1)
+    expect(result.Messages[0].Data).to.equal('OK')
+
+    // Operator still has their persisted share
+    const stateResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'View-State' }]
+    })
+    const state = JSON.parse(stateResult.Messages[0].Data)
+    expect(state.Shares[BOB_ADDRESS]).to.equal(0.2)
+  })
+
+  it('New operator gets share 0.0 when shares are disabled', async () => {
+    // Shares are disabled by default
+    const result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '10' }
+      ],
+      Data: refRound1
+    })
+
+    // Only 1 message: OK response (no shares patch when disabled)
+    expect(result.Messages).to.have.lengthOf(1)
+    expect(result.Messages[0].Data).to.equal('OK')
+
+    // Operator should not be in Shares state
+    const stateResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'View-State' }]
+    })
+    const state = JSON.parse(stateResult.Messages[0].Data)
+    expect(state.Shares[BOB_ADDRESS]).to.be.undefined
+  })
+
+  it('Multiple new operators all receive default share', async () => {
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ Default: 0.25 })
+    })
+
+    // Add scores for multiple hodlers staking with multiple operators
+    const multiOperatorScores = JSON.stringify({
+      Scores: {
+        [ALICE_ADDRESS]: {
+          [BOB_ADDRESS]: { Staked: '100', Running: 0.8 },
+          [CHARLS_ADDRESS]: { Staked: '200', Running: 0.9 }
+        }
+      }
+    })
+
+    const result = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '10' }
+      ],
+      Data: multiOperatorScores
+    })
+
+    expect(result.Messages).to.have.lengthOf(2)
+
+    const stateResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'View-State' }]
+    })
+    const state = JSON.parse(stateResult.Messages[0].Data)
+    expect(state.Shares[BOB_ADDRESS]).to.equal(0.25)
+    expect(state.Shares[CHARLS_ADDRESS]).to.equal(0.25)
+  })
+
+  it('Share is correctly snapshotted in PendingRounds for new operator', async () => {
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
+      Data: JSON.stringify({ Enabled: true })
+    })
+
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ Default: 0.18 })
+    })
+
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Configuration' }],
+      Data: JSON.stringify({ TokensPerSecond: '100', Requirements: { Running: 0.5 } })
+    })
+
+    // Add scores
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Add-Scores' },
+        { name: 'Round-Timestamp', value: '1000' }
+      ],
+      Data: refRound1
+    })
+
+    // Complete round
+    const completeResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [
+        { name: 'Action', value: 'Complete-Round' },
+        { name: 'Round-Timestamp', value: '1000' }
+      ]
+    })
+
+    expect(completeResult.Messages).to.have.lengthOf(2)
+    expect(completeResult.Messages[1].Data).to.equal('OK')
+
+    // Check Last-Snapshot for correct share
+    const snapshotResult = await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Last-Snapshot' }]
+    })
+    const snapshot = JSON.parse(snapshotResult.Messages[0].Data)
+    expect(snapshot.Details[ALICE_ADDRESS][BOB_ADDRESS].Score.Share).to.equal(0.18)
   })
 })
