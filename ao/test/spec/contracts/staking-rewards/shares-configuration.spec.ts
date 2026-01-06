@@ -390,11 +390,10 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         Data: JSON.stringify({ Min: 0.3, Default: 0.3 })
       })
 
-      // Should have 3 messages: config patch, shares patch, OK response
-      expect(result.Messages).to.have.lengthOf(3)
+      // Should have 2 messages: single patch (config+shares), OK response
+      expect(result.Messages).to.have.lengthOf(2)
       expect(result.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-      expect(result.Messages[1].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-      expect(result.Messages[2].Data).to.equal('OK')
+      expect(result.Messages[1].Data).to.equal('OK')
 
       // Verify share was clamped
       const stateResult = await handle({
@@ -425,7 +424,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         Data: JSON.stringify({ Max: 0.5 })
       })
 
-      expect(result.Messages).to.have.lengthOf(3)
+      expect(result.Messages).to.have.lengthOf(2)
 
       const stateResult = await handle({
         From: OWNER_ADDRESS,
@@ -495,7 +494,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         Data: JSON.stringify({ Min: 0.3, Max: 0.7, Default: 0.5 })
       })
 
-      expect(result.Messages).to.have.lengthOf(3)
+      expect(result.Messages).to.have.lengthOf(2)
 
       const stateResult = await handle({
         From: OWNER_ADDRESS,
@@ -533,9 +532,9 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         Data: JSON.stringify({ Min: 0.3, Default: 0.3 })
       })
 
-      expect(result.Messages).to.have.lengthOf(3)
-      // The shares patch contains ALL shares (patch is all-or-nothing)
-      const sharesPatch = result.Messages[1].Tags.find(
+      expect(result.Messages).to.have.lengthOf(2)
+      // The single patch contains configuration AND all shares
+      const sharesPatch = result.Messages[0].Tags.find(
         (t: { name: string }) => t.name === 'shares'
       )
       expect(sharesPatch).to.exist

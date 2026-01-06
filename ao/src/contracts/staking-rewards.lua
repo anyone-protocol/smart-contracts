@@ -229,24 +229,20 @@ function StakingRewards.init()
         StakingRewards.Shares
       )
 
-      -- Emit configuration patch always
-      ao.send({
+      -- Build single patch message with configuration, and shares if any were clamped
+      local patchMsg = {
         device = 'patch@1.0',
         configuration = StakingRewards.Configuration
-      })
-
-      -- Emit shares patch only if operator shares were modified (clamped)
+      }
       local hasModified = false
       for _ in pairs(modifiedShares) do
         hasModified = true
         break
       end
       if hasModified then
-        ao.send({
-          device = 'patch@1.0',
-          shares = StakingRewards.Shares
-        })
+        patchMsg.shares = StakingRewards.Shares
       end
+      ao.send(patchMsg)
 
       ao.send({
         Target = msg.From,
