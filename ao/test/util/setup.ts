@@ -151,6 +151,49 @@ export interface SharesPatchTag {
   value: Record<string, number>
 }
 
+// Score structure within previous round details
+export interface StakingRewardsScore {
+  Staked: string
+  Restaked: string
+  Running: number
+  Share: number
+}
+
+// Reward structure within previous round details
+export interface StakingRewardsReward {
+  Hodler: string
+  Operator: string
+}
+
+// Detail entry for a hodler-operator pair
+export interface StakingRewardsDetail {
+  Score: StakingRewardsScore
+  Rating: string
+  Reward: StakingRewardsReward
+}
+
+// Previous round summary
+export interface StakingRewardsSummary {
+  Rewards: string
+  Ratings: string
+  Stakes: string
+}
+
+// Previous round value structure
+export interface StakingRewardsPreviousRound {
+  Timestamp: number
+  Period: number
+  Summary: StakingRewardsSummary
+  Configuration: StakingRewardsConfiguration
+  Details: Record<string, Record<string, StakingRewardsDetail>>
+}
+
+// Patch tag with typed value for previous_round
+export interface PreviousRoundPatchTag {
+  name: 'previous_round'
+  value: StakingRewardsPreviousRound
+}
+
 export type FullAOHandleFunction = (
   buffer: ArrayBuffer | null,
   msg: AoLoader.Message,

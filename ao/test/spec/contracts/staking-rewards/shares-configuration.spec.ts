@@ -18,8 +18,6 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
     handle = (await createLoader('staking-rewards')).handle
   })
 
-  // ==================== PERMISSION TESTS ====================
-
   describe('Permission checks', () => {
     it('Blocks non-owners from doing updates', async () => {
       const result = await handle({
@@ -95,8 +93,6 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       expect(result.Error).to.be.a('string').that.includes('Permission Denied')
     })
   })
-
-  // ==================== INPUT VALIDATION TESTS ====================
 
   describe('Input validation', () => {
     it('Requires message data to be JSON', async () => {
@@ -202,8 +198,6 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
     })
   })
 
-  // ==================== OPTIONAL FIELD TESTS ====================
-
   describe('Optional field handling', () => {
     it('Allows omitting all fields (no-op update)', async () => {
       const result = await handle({
@@ -294,8 +288,6 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
     })
   })
 
-  // ==================== CROSS-VALIDATION TESTS ====================
-
   describe('Cross-validation constraints', () => {
     it('Rejects Min > Max', async () => {
       const result = await handle({
@@ -366,8 +358,6 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       expect(result.Messages[1].Data).to.equal('OK')
     })
   })
-
-  // ==================== RETROACTIVE CLAMPING TESTS ====================
 
   describe('Retroactive clamping of existing operator shares', () => {
     it('Clamps existing shares when Min is raised', async () => {

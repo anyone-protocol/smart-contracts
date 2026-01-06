@@ -254,22 +254,22 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     const prevRoundTag = firstCompleteResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'previous_round'
-    )
+    ) as PreviousRoundPatchTag | undefined
     expect(prevRoundTag).to.exist
-    expect(prevRoundTag.value.Timestamp).to.equal(1000)
-    expect(prevRoundTag.value.Period).to.equal(0)
-    expect(prevRoundTag.value.Summary).to.deep.equal({
+    expect(prevRoundTag!.value.Timestamp).to.equal(1000)
+    expect(prevRoundTag!.value.Period).to.equal(0)
+    expect(prevRoundTag!.value.Summary).to.deep.equal({
       Ratings: '1000',
       Stakes: '1000',
       Rewards: '0'
     })
-    expect(prevRoundTag.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
+    expect(prevRoundTag!.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
       Reward: { Operator: '0', Hodler: '0' },
       Rating: '1000',
       Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
     })
-    expect(prevRoundTag.value.Configuration.TokensPerSecond).to.equal('1000')
-    expect(prevRoundTag.value.Configuration.Requirements.Running).to.equal(0.5)
+    expect(prevRoundTag!.value.Configuration.TokensPerSecond).to.equal('1000')
+    expect(prevRoundTag!.value.Configuration.Requirements.Running).to.equal(0.5)
     expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
     
     const scoredRoundResult = await handle({
@@ -311,32 +311,32 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     const prevRoundTag2 = secondCompleteResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'previous_round'
-    )
+    ) as PreviousRoundPatchTag | undefined
     expect(prevRoundTag2).to.exist
-    expect(prevRoundTag2.value.Timestamp).to.equal(11000)
-    expect(prevRoundTag2.value.Period).to.equal(10)
-    expect(prevRoundTag2.value.Summary).to.deep.equal({
+    expect(prevRoundTag2!.value.Timestamp).to.equal(11000)
+    expect(prevRoundTag2!.value.Period).to.equal(10)
+    expect(prevRoundTag2!.value.Summary).to.deep.equal({
       Ratings: '6000',
       Stakes: '6000',
       Rewards: '9999'
     })
-    expect(prevRoundTag2.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
+    expect(prevRoundTag2!.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
       Reward: { Hodler: '1666', Operator: '0' },
       Rating: '1000',
       Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
     })
-    expect(prevRoundTag2.value.Details[BOB_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
+    expect(prevRoundTag2!.value.Details[BOB_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
       Reward: { Hodler: '3000', Operator: '333' },
       Rating: '2000',
       Score: { Running: 0.7, Restaked: '0', Staked: '2000', Share: 0.1 }
     })
-    expect(prevRoundTag2.value.Details[CHARLS_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
+    expect(prevRoundTag2!.value.Details[CHARLS_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
       Reward: { Hodler: '4500', Operator: '500' },
       Rating: '3000',
       Score: { Running: 0.8, Restaked: '0', Staked: '3000', Share: 0.1 }
     })
-    expect(prevRoundTag2.value.Configuration.TokensPerSecond).to.equal('1000')
-    expect(prevRoundTag2.value.Configuration.Requirements.Running).to.equal(0.5)
+    expect(prevRoundTag2!.value.Configuration.TokensPerSecond).to.equal('1000')
+    expect(prevRoundTag2!.value.Configuration.Requirements.Running).to.equal(0.5)
     expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary2 = await handle({
