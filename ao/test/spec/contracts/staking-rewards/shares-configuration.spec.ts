@@ -6,6 +6,7 @@ import {
   BOB_ADDRESS,
   CHARLS_ADDRESS,
   AOTestHandle,
+  SharesPatchTag,
   createLoader,
   OWNER_ADDRESS
 } from '~/test/util/setup'
@@ -536,10 +537,10 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       // The single patch contains configuration AND all shares
       const sharesPatch = result.Messages[0].Tags.find(
         (t: { name: string }) => t.name === 'shares'
-      )
+      ) as SharesPatchTag | undefined
       expect(sharesPatch).to.exist
-      expect(sharesPatch.value[ALICE_ADDRESS]).to.equal(0.3)  // clamped
-      expect(sharesPatch.value[BOB_ADDRESS]).to.equal(0.5)    // unchanged
+      expect(sharesPatch!.value[ALICE_ADDRESS]).to.equal(0.3)  // clamped
+      expect(sharesPatch!.value[BOB_ADDRESS]).to.equal(0.5)    // unchanged
     })
 
     it('Handles empty Shares state gracefully', async () => {

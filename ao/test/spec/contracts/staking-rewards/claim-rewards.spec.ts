@@ -44,9 +44,9 @@ describe('Claiming staking rewards', () => {
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     const configTag = enableShareResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(configTag).to.exist
-    expect(configTag.value.Shares.Enabled).to.equal(true)
+    expect(configTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
     
     const config = {

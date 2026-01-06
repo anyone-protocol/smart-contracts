@@ -5,6 +5,8 @@ import {
   BOB_ADDRESS,
   CHARLS_ADDRESS,
   AOTestHandle,
+  ConfigurationPatchTag,
+  SharesPatchTag,
   createLoader,
   FINGERPRINT_A,
   OWNER_ADDRESS
@@ -125,10 +127,14 @@ describe('Add-Scores action of staking rewards', () => {
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     const cfgTag = configResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(cfgTag).to.exist
-    expect(cfgTag.value.TokensPerSecond).to.equal(config.TokensPerSecond)
-    expect(cfgTag.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.Shares.Enabled).to.equal(false)
+    expect(cfgTag!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({
@@ -374,9 +380,12 @@ describe('Add-Scores action of staking rewards', () => {
     // Configuration patch includes Shares.Enabled
     const configTag = enableShareResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(configTag).to.exist
-    expect(configTag.value.Shares.Enabled).to.equal(true)
+    expect(configTag!.value.Shares.Enabled).to.equal(true)
+    expect(configTag!.value.Shares.Min).to.equal(0.0)
+    expect(configTag!.value.Shares.Max).to.equal(1.0)
+    expect(configTag!.value.Shares.Default).to.equal(0.0)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const emptyShareResult = await handle({
@@ -480,9 +489,9 @@ describe('Complete-Round assigns default share to new operators', () => {
     expect(completeResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
-    )
+    ) as SharesPatchTag | undefined
     expect(sharesPatch).to.exist
-    expect(sharesPatch.value[BOB_ADDRESS]).to.equal(0.15)
+    expect(sharesPatch!.value[BOB_ADDRESS]).to.equal(0.15)
     expect(completeResult.Messages[1].Data).to.equal('OK')
 
     // Verify the new operator was assigned the default share in state
@@ -543,7 +552,7 @@ describe('Complete-Round assigns default share to new operators', () => {
     // No shares patch since not a new operator
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
-    )
+    ) as SharesPatchTag | undefined
     expect(sharesPatch).to.be.undefined
 
     // Verify operator kept their set share
@@ -615,7 +624,7 @@ describe('Complete-Round assigns default share to new operators', () => {
     // No shares in patch since operator already exists
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
-    )
+    ) as SharesPatchTag | undefined
     expect(sharesPatch).to.be.undefined
 
     // Operator still has their persisted share
@@ -655,7 +664,7 @@ describe('Complete-Round assigns default share to new operators', () => {
     // No shares in patch when disabled
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
-    )
+    ) as SharesPatchTag | undefined
     expect(sharesPatch).to.be.undefined
 
     // Operator should not be in Shares state
@@ -715,10 +724,10 @@ describe('Complete-Round assigns default share to new operators', () => {
 
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
-    )
+    ) as SharesPatchTag | undefined
     expect(sharesPatch).to.exist
-    expect(sharesPatch.value[BOB_ADDRESS]).to.equal(0.25)
-    expect(sharesPatch.value[CHARLS_ADDRESS]).to.equal(0.25)
+    expect(sharesPatch!.value[BOB_ADDRESS]).to.equal(0.25)
+    expect(sharesPatch!.value[CHARLS_ADDRESS]).to.equal(0.25)
 
     const stateResult = await handle({
       From: OWNER_ADDRESS,

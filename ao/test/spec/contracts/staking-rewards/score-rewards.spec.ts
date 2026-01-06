@@ -167,9 +167,9 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     const enableConfigTag = enableShareResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(enableConfigTag).to.exist
-    expect(enableConfigTag.value.Shares.Enabled).to.equal(true)
+    expect(enableConfigTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const config = {
@@ -419,9 +419,9 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     const enableConfigTag2 = enableShareResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(enableConfigTag2).to.exist
-    expect(enableConfigTag2.value.Shares.Enabled).to.equal(true)
+    expect(enableConfigTag2!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const config = {

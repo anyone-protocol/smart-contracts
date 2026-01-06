@@ -149,11 +149,11 @@ describe('staking-rewards-view-init-state', () => {
     })
     const initConfigTag = initStateResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(initConfigTag).to.exist
-    expect(initConfigTag.value.Shares.Enabled).to.equal(false)
-    expect(initConfigTag.value.TokensPerSecond).to.equal(config.TokensPerSecond)
-    expect(initConfigTag.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(initConfigTag!.value.Shares.Enabled).to.equal(false)
+    expect(initConfigTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(initConfigTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
     expect(initStateResult.Messages[1].Data).to.equal('OK')
 
     const viewState2Result = await newHandle({

@@ -145,6 +145,12 @@ export interface ConfigurationPatchTag {
   value: StakingRewardsConfiguration
 }
 
+// Patch tag with typed value for shares (operator address -> share value)
+export interface SharesPatchTag {
+  name: 'shares'
+  value: Record<string, number>
+}
+
 export type FullAOHandleFunction = (
   buffer: ArrayBuffer | null,
   msg: AoLoader.Message,
