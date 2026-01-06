@@ -392,7 +392,6 @@ function StakingRewards.init()
         StakingRewards.PendingRounds[timestamp] = {}
       end
 
-      local newOperatorShares = {}
       for hodlerAddress, scores in pairs(request.Scores) do
         local nHodlerAddress = AnyoneUtils.normalizeEvmAddress(hodlerAddress)
         StakingRewards.PendingRounds[timestamp][nHodlerAddress] = {}
@@ -401,32 +400,14 @@ function StakingRewards.init()
           local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
           if StakingRewards.Configuration.Shares.Enabled then
             if StakingRewards.Shares[nOperatorAddress] ~= nil then
-              -- Existing operator: use their set share
               share = StakingRewards.Shares[nOperatorAddress]
-            else
-              -- New operator: assign default share and persist to state
-              share = StakingRewards.Configuration.Shares.Default
-              StakingRewards.Shares[nOperatorAddress] = share
-              newOperatorShares[nOperatorAddress] = share
             end
+            -- Note: new operators get share assigned in Complete-Round
           end
           StakingRewards.PendingRounds[timestamp][nHodlerAddress][nOperatorAddress] = {
             Staked = tostring(bint(score.Staked)), Running = score.Running, Share = share,
           }
         end
-      end
-
-      -- Emit patch for new operator shares if any were assigned
-      local hasNewShares = false
-      for _ in pairs(newOperatorShares) do
-        hasNewShares = true
-        break
-      end
-      if hasNewShares then
-        ao.send({
-          device = 'patch@1.0',
-          shares = StakingRewards.Shares
-        })
       end
 
       ao.send({
@@ -452,6 +433,23 @@ function StakingRewards.init()
       local timestamp = tonumber(msg.Tags['Round-Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       assert(StakingRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
+
+      -- Assign default shares to new operators and update pending round scores
+      local newOperatorShares = {}
+      if StakingRewards.Configuration.Shares.Enabled then
+        for hodlerAddress, scores in pairs(StakingRewards.PendingRounds[timestamp]) do
+          for operatorAddress, score in pairs(scores) do
+            if StakingRewards.Shares[operatorAddress] == nil then
+              -- New operator: assign default share
+              local defaultShare = StakingRewards.Configuration.Shares.Default
+              StakingRewards.Shares[operatorAddress] = defaultShare
+              newOperatorShares[operatorAddress] = defaultShare
+              -- Update the pending round score with the assigned share
+              score.Share = defaultShare
+            end
+          end
+        end
+      end
 
       local summary = {
         Rewards = bint(0), Ratings = bint(0), Stakes = bint(0)
@@ -578,11 +576,22 @@ function StakingRewards.init()
         end
       end
 
-      ao.send({
+      -- Build patch message, include shares if new operators were assigned
+      local patchMsg = {
         device = 'patch@1.0',
         rewarded = StakingRewards.Rewarded,
         previous_round = StakingRewards.PreviousRound
-      })
+      }
+      local hasNewShares = false
+      for _ in pairs(newOperatorShares) do
+        hasNewShares = true
+        break
+      end
+      if hasNewShares then
+        patchMsg.shares = StakingRewards.Shares
+      end
+      ao.send(patchMsg)
+
       ao.send({
         Target = msg.From,
         Action = 'Complete-Round-Response',

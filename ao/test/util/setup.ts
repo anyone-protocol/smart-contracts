@@ -122,6 +122,29 @@ const bundledContractSources = Object.fromEntries(contractNames.map(cn => [
   fs.readFileSync(path.join(path.resolve(), `./dist/${cn}.lua`), 'utf-8')
 ]))
 
+// Staking Rewards Configuration Shares structure
+export interface StakingRewardsConfigurationShares {
+  Enabled: boolean
+  Min: number
+  Max: number
+  Default: number
+}
+
+// Staking Rewards Configuration structure for patch tags
+export interface StakingRewardsConfiguration {
+  TokensPerSecond: string
+  Requirements: {
+    Running: number
+  }
+  Shares: StakingRewardsConfigurationShares
+}
+
+// Patch tag with typed value for configuration
+export interface ConfigurationPatchTag {
+  name: 'configuration'
+  value: StakingRewardsConfiguration
+}
+
 export type FullAOHandleFunction = (
   buffer: ArrayBuffer | null,
   msg: AoLoader.Message,

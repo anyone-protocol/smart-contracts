@@ -5,6 +5,7 @@ import {
     BOB_ADDRESS,
     CHARLS_ADDRESS,
     AOTestHandle,
+    ConfigurationPatchTag,
     createLoader,
     FINGERPRINT_A,
     FINGERPRINT_B,
@@ -65,10 +66,14 @@ describe('Claiming staking rewards', () => {
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     const cfgTag = configResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'configuration'
-    )
+    ) as ConfigurationPatchTag | undefined
     expect(cfgTag).to.exist
-    expect(cfgTag.value.TokensPerSecond).to.equal(config.TokensPerSecond)
-    expect(cfgTag.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.Shares.Enabled).to.equal(true)
+    expect(cfgTag!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -101,10 +106,8 @@ describe('Claiming staking rewards', () => {
         Scores: score1
       })
     })
-    // 2 messages: shares patch (new operator gets default share), OK response
-    expect(noRoundResult.Messages).to.have.lengthOf(2)
-    expect(noRoundResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(noRoundResult.Messages[1].Data).to.equal('OK')
+    expect(noRoundResult.Messages).to.have.lengthOf(1)
+    expect(noRoundResult.Messages[0].Data).to.equal('OK')
 
     const firstCompleteResult = await handle({
       From: OWNER_ADDRESS,
