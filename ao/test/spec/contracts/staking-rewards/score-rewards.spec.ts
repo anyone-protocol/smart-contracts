@@ -10,7 +10,8 @@ import {
     FINGERPRINT_A,
     FINGERPRINT_B,
     FINGERPRINT_C,
-    OWNER_ADDRESS
+    OWNER_ADDRESS,
+    PreviousRoundPatchTag
   } from '~/test/util/setup'
 
 describe('Calculating staking rewards based on ratings', () => {
