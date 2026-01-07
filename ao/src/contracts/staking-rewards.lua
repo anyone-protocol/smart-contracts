@@ -1,6 +1,5 @@
 StakingRewards = StakingRewards or {
   _initialized = false,
-  _sharesEnabled = false,
   Claimed = {
   -- [Address] = { // Hodler
   --   [Address] = '0' // Operator -> Hodler's score per operator stake
@@ -18,6 +17,12 @@ StakingRewards = StakingRewards or {
     TokensPerSecond = '100000000',
     Requirements = {
       Running = 0.5
+    },
+    Shares = {
+      Enabled = false,
+      Min = 0.0,
+      Max = 1.0,
+      Default = 0.0
     }
   },
   PreviousRound = {
@@ -83,6 +88,69 @@ function StakingRewards._updateConfiguration(config, request)
   StakingRewards.Configuration = config
 end
 
+function StakingRewards._updateSharesConfiguration(config, request, shares)
+  local AnyoneUtils = require('.common.utils')
+
+  -- Collect the new values, falling back to current config if not provided
+  local newMin = config.Shares.Min
+  local newMax = config.Shares.Max
+  local newDefault = config.Shares.Default
+
+  -- Validate and update Min if provided
+  if request.Min ~= nil then
+    AnyoneUtils.assertNumber(request.Min, 'Min')
+    assert(request.Min >= 0, 'Min has to be >= 0')
+    assert(request.Min <= 1, 'Min has to be <= 1')
+    newMin = request.Min
+  end
+
+  -- Validate and update Max if provided
+  if request.Max ~= nil then
+    AnyoneUtils.assertNumber(request.Max, 'Max')
+    assert(request.Max >= 0, 'Max has to be >= 0')
+    assert(request.Max <= 1, 'Max has to be <= 1')
+    newMax = request.Max
+  end
+
+  -- Validate and update Default if provided
+  if request.Default ~= nil then
+    AnyoneUtils.assertNumber(request.Default, 'Default')
+    assert(request.Default >= 0, 'Default has to be >= 0')
+    assert(request.Default <= 1, 'Default has to be <= 1')
+    newDefault = request.Default
+  end
+
+  -- Cross-validate: Min <= Max
+  assert(newMin <= newMax, 'Min must be <= Max')
+
+  -- Cross-validate: Default within [Min, Max]
+  assert(newDefault >= newMin, 'Default must be >= Min')
+  assert(newDefault <= newMax, 'Default must be <= Max')
+
+  -- Apply the validated values
+  config.Shares.Min = newMin
+  config.Shares.Max = newMax
+  config.Shares.Default = newDefault
+
+  -- Clamp existing operator shares to new bounds, track modified entries
+  local modifiedShares = {}
+  for operatorAddress, share in pairs(shares) do
+    local clampedShare = share
+    if clampedShare < newMin then
+      clampedShare = newMin
+    end
+    if clampedShare > newMax then
+      clampedShare = newMax
+    end
+    if clampedShare ~= share then
+      shares[operatorAddress] = clampedShare
+      modifiedShares[operatorAddress] = clampedShare
+    end
+  end
+
+  return modifiedShares
+end
+
 function StakingRewards.init()
   local bint = require('.bint')(256)
   local json = require('json')
@@ -131,6 +199,60 @@ function StakingRewards.init()
   )
 
   Handlers.add(
+    'Update-Shares-Configuration',
+    Handlers.utils.hasMatchingTag(
+      'Action',
+      'Update-Shares-Configuration'
+    ),
+    function (msg)
+      ACL.assertHasOneOfRole(
+        msg.From,
+        { 'owner', 'admin', 'Update-Shares-Configuration' }
+      )
+
+      assert(msg.Data, ErrorMessages.MessageDataRequired)
+
+      local request = nil
+      local function parseData()
+        request = json.decode(msg.Data)
+      end
+
+      local status, err = pcall(parseData)
+      assert(err == nil, 'Data must be valid JSON')
+      assert(status, 'Failed to parse input data')
+      assert(request, 'Failed to parse data')
+
+      local config = StakingRewards.Configuration
+      local modifiedShares = StakingRewards._updateSharesConfiguration(
+        config,
+        request,
+        StakingRewards.Shares
+      )
+
+      -- Build single patch message with configuration, and shares if any were clamped
+      local patchMsg = {
+        device = 'patch@1.0',
+        configuration = StakingRewards.Configuration
+      }
+      local hasModified = false
+      for _ in pairs(modifiedShares) do
+        hasModified = true
+        break
+      end
+      if hasModified then
+        patchMsg.shares = StakingRewards.Shares
+      end
+      ao.send(patchMsg)
+
+      ao.send({
+        Target = msg.From,
+        Action = 'Update-Shares-Configuration-Response',
+        Data = 'OK'
+      })
+    end
+  )
+
+  Handlers.add(
     'Toggle-Feature-Shares',
     Handlers.utils.hasMatchingTag(
       'Action',
@@ -155,11 +277,11 @@ function StakingRewards.init()
       assert(request, 'Failed to parse data')
       assert(type(request.Enabled) == 'boolean', 'Enabled must be a boolean')
 
-      StakingRewards._sharesEnabled = request.Enabled
+      StakingRewards.Configuration.Shares.Enabled = request.Enabled
 
       ao.send({
         device = 'patch@1.0',
-        shares_enabled = StakingRewards._sharesEnabled
+        configuration = StakingRewards.Configuration
       })
       ao.send({
         Target = msg.From,
@@ -176,7 +298,7 @@ function StakingRewards.init()
       'Set-Share'
     ),
     function (msg)
-      assert(StakingRewards._sharesEnabled, 'Shares feature is disabled')
+      assert(StakingRewards.Configuration.Shares.Enabled, 'Shares feature is disabled')
       local operatorAddress = AnyoneUtils.normalizeEvmAddress(msg.From)
       AnyoneUtils.assertValidEvmAddress(operatorAddress, 'Address tag')
 
@@ -191,8 +313,10 @@ function StakingRewards.init()
       assert(request, 'Failed to parse data')
 
       AnyoneUtils.assertNumber(request.Share, 'Share')
-      assert(request.Share >= 0, 'Share has to be >= 0')
-      assert(request.Share <= 1, 'Share has to be <= 1')
+      local minShare = StakingRewards.Configuration.Shares.Min
+      local maxShare = StakingRewards.Configuration.Shares.Max
+      assert(request.Share >= minShare, 'Share has to be >= ' .. minShare)
+      assert(request.Share <= maxShare, 'Share has to be <= ' .. maxShare)
 
       StakingRewards.Shares[operatorAddress] = request.Share
 
@@ -274,8 +398,11 @@ function StakingRewards.init()
         for operatorAddress, score in pairs(scores) do
           local share = 0.0
           local nOperatorAddress = AnyoneUtils.normalizeEvmAddress(operatorAddress)
-          if StakingRewards._sharesEnabled and StakingRewards.Shares[nOperatorAddress] ~= nil then
-            share = StakingRewards.Shares[nOperatorAddress]
+          if StakingRewards.Configuration.Shares.Enabled then
+            if StakingRewards.Shares[nOperatorAddress] ~= nil then
+              share = StakingRewards.Shares[nOperatorAddress]
+            end
+            -- Note: new operators get share assigned in Complete-Round
           end
           StakingRewards.PendingRounds[timestamp][nHodlerAddress][nOperatorAddress] = {
             Staked = tostring(bint(score.Staked)), Running = score.Running, Share = share,
@@ -306,6 +433,23 @@ function StakingRewards.init()
       local timestamp = tonumber(msg.Tags['Round-Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       assert(StakingRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
+
+      -- Assign default shares to new operators and update pending round scores
+      local newOperatorShares = {}
+      if StakingRewards.Configuration.Shares.Enabled then
+        for hodlerAddress, scores in pairs(StakingRewards.PendingRounds[timestamp]) do
+          for operatorAddress, score in pairs(scores) do
+            if StakingRewards.Shares[operatorAddress] == nil then
+              -- New operator: assign default share
+              local defaultShare = StakingRewards.Configuration.Shares.Default
+              StakingRewards.Shares[operatorAddress] = defaultShare
+              newOperatorShares[operatorAddress] = defaultShare
+              -- Update the pending round score with the assigned share
+              score.Share = defaultShare
+            end
+          end
+        end
+      end
 
       local summary = {
         Rewards = bint(0), Ratings = bint(0), Stakes = bint(0)
@@ -432,11 +576,22 @@ function StakingRewards.init()
         end
       end
 
-      ao.send({
+      -- Build patch message, include shares if new operators were assigned
+      local patchMsg = {
         device = 'patch@1.0',
         rewarded = StakingRewards.Rewarded,
         previous_round = StakingRewards.PreviousRound
-      })
+      }
+      local hasNewShares = false
+      for _ in pairs(newOperatorShares) do
+        hasNewShares = true
+        break
+      end
+      if hasNewShares then
+        patchMsg.shares = StakingRewards.Shares
+      end
+      ao.send(patchMsg)
+
       ao.send({
         Target = msg.From,
         Action = 'Complete-Round-Response',
@@ -657,7 +812,6 @@ function StakingRewards.init()
     function (msg)
       local result = {
         _initialized = StakingRewards._initialized,
-        _sharesEnabled = StakingRewards._sharesEnabled,
         Claimed = StakingRewards.Claimed,
         Rewarded = StakingRewards.Rewarded,
         Shares = StakingRewards.Shares,
@@ -687,11 +841,6 @@ function StakingRewards.init()
       )
 
       local initState = json.decode(msg.Data or '{}')
-
-      if initState._sharesEnabled ~= nil then
-        assert(type(initState._sharesEnabled) == 'boolean', '_sharesEnabled must be a boolean')
-        StakingRewards._sharesEnabled = initState._sharesEnabled
-      end
 
       if initState.Rewarded then
         for hodlerAddress, rewards in pairs(initState.Rewarded) do
@@ -741,6 +890,14 @@ function StakingRewards.init()
       if initState.Configuration then
         local config = StakingRewards.Configuration
         StakingRewards._updateConfiguration(config, initState.Configuration)
+        -- Handle Shares configuration separately with full validation
+        if initState.Configuration.Shares then
+          StakingRewards._updateSharesConfiguration(
+            config,
+            initState.Configuration.Shares,
+            StakingRewards.Shares
+          )
+        end
       end
 
       if initState.PreviousRound then
@@ -756,7 +913,6 @@ function StakingRewards.init()
         device = 'patch@1.0',
         acl = ACL.State.Roles,
         staking_rewards_initialized = true,
-        shares_enabled = StakingRewards._sharesEnabled,
         claimed = StakingRewards.Claimed,
         rewarded = StakingRewards.Rewarded,
         shares = StakingRewards.Shares,

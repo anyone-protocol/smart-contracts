@@ -5,6 +5,7 @@ import {
     BOB_ADDRESS,
     CHARLS_ADDRESS,
     AOTestHandle,
+    ConfigurationPatchTag,
     createLoader,
     FINGERPRINT_A,
     FINGERPRINT_B,
@@ -35,7 +36,16 @@ describe('Score ratings of staking rewards', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(2)
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    const cfgTag = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(cfgTag).to.exist
+    expect(cfgTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.Shares.Enabled).to.equal(false)
+    expect(cfgTag!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({

@@ -4,6 +4,7 @@ import {
   ALICE_ADDRESS,
   AOTestHandle,
   CHARLS_ADDRESS,
+  ConfigurationPatchTag,
   createLoader,
   OWNER_ADDRESS
 } from '~/test/util/setup'
@@ -68,10 +69,16 @@ describe('staking-rewards-view-init-state', () => {
       name: 'device',
       value: 'patch@1.0'
     })
-    expect(configResult.Messages[0].Tags).to.deep.include({
-      name: 'configuration',
-      value: config
-    })
+    const cfgTag = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(cfgTag).to.exist
+    expect(cfgTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.Shares.Enabled).to.equal(false)
+    expect(cfgTag!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
     
     const secondScoresResult = await handle({
@@ -140,14 +147,13 @@ describe('staking-rewards-view-init-state', () => {
         }
       }
     })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({
-      name: 'shares_enabled',
-      value: false
-    })
-    expect(initStateResult.Messages[0].Tags).to.deep.include({
-      name: 'configuration',
-      value: config
-    })
+    const initConfigTag = initStateResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(initConfigTag).to.exist
+    expect(initConfigTag!.value.Shares.Enabled).to.equal(false)
+    expect(initConfigTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(initConfigTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
     expect(initStateResult.Messages[1].Data).to.equal('OK')
 
     const viewState2Result = await newHandle({

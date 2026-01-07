@@ -5,11 +5,13 @@ import {
     BOB_ADDRESS,
     CHARLS_ADDRESS,
     AOTestHandle,
+    ConfigurationPatchTag,
     createLoader,
     FINGERPRINT_A,
     FINGERPRINT_B,
     FINGERPRINT_C,
-    OWNER_ADDRESS
+    OWNER_ADDRESS,
+    PreviousRoundPatchTag
   } from '~/test/util/setup'
 
 describe('Calculating staking rewards based on ratings', () => {
@@ -45,7 +47,16 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(2)
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    const cfgTag = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(cfgTag).to.exist
+    expect(cfgTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.Shares.Enabled).to.equal(false)
+    expect(cfgTag!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
@@ -155,7 +166,11 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(enableShareResult.Messages).to.have.lengthOf(2)
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    const enableConfigTag = enableShareResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(enableConfigTag).to.exist
+    expect(enableConfigTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const config = {
@@ -173,7 +188,16 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(2)
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    const cfgTag = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(cfgTag).to.exist
+    expect(cfgTag!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag!.value.Shares.Enabled).to.equal(true)
+    expect(cfgTag!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -216,6 +240,7 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Round-Timestamp', value: '1000' }
       ]
     })
+    // 2 messages: patch (includes shares for new operators), OK response
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
     expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
       name: 'device',
@@ -228,28 +253,24 @@ describe('Calculating staking rewards based on ratings', () => {
         [BOB_ADDRESS]: []
       }
     })
-    expect(firstCompleteResult.Messages[0].Tags).to.deep.include({
-      name: 'previous_round',
-      value: {
-        Timestamp: 1000,
-        Period: 0,
-        Summary: {
-          Ratings: '1000',
-          Stakes: '1000',
-          Rewards: '0'
-        },
-        Details: {
-          [ALICE_ADDRESS]: {
-            [BOB_ADDRESS]: {
-              Reward: { Operator: '0', Hodler: '0' },
-              Rating: '1000',
-              Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
-            }
-          }
-        },
-        Configuration: { TokensPerSecond: '1000', Requirements: { Running: 0.5 } }
-      }
+    const prevRoundTag = firstCompleteResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'previous_round'
+    ) as PreviousRoundPatchTag | undefined
+    expect(prevRoundTag).to.exist
+    expect(prevRoundTag!.value.Timestamp).to.equal(1000)
+    expect(prevRoundTag!.value.Period).to.equal(0)
+    expect(prevRoundTag!.value.Summary).to.deep.equal({
+      Ratings: '1000',
+      Stakes: '1000',
+      Rewards: '0'
     })
+    expect(prevRoundTag!.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
+      Reward: { Operator: '0', Hodler: '0' },
+      Rating: '1000',
+      Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
+    })
+    expect(prevRoundTag!.value.Configuration.TokensPerSecond).to.equal('1000')
+    expect(prevRoundTag!.value.Configuration.Requirements.Running).to.equal(0.5)
     expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
     
     const scoredRoundResult = await handle({
@@ -289,42 +310,34 @@ describe('Calculating staking rewards based on ratings', () => {
         [ALICE_ADDRESS]: { [BOB_ADDRESS]: '1666' }
       }
     })
-    expect(secondCompleteResult.Messages[0].Tags).to.deep.include({
-      name: 'previous_round',
-      value: {
-        Timestamp: 11000,
-        Period: 10,
-        Summary: {
-          Ratings: '6000',
-          Stakes: '6000',
-          Rewards: '9999'
-        },
-        Details: {
-          [ALICE_ADDRESS]: {
-            [BOB_ADDRESS]: {
-              Reward: { Hodler: '1666', Operator: '0' },
-              Rating: '1000',
-              Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
-            }
-          },
-          [BOB_ADDRESS]: {
-            [CHARLS_ADDRESS]: {
-              Reward: { Hodler: '3000', Operator: '333' },
-              Rating: '2000',
-              Score: { Running: 0.7, Restaked: '0', Staked: '2000', Share: 0.1 }
-            }
-          },
-          [CHARLS_ADDRESS]: {
-            [CHARLS_ADDRESS]: {
-              Reward: { Hodler: '4500', Operator: '500' },
-              Rating: '3000',
-              Score: { Running: 0.8, Restaked: '0', Staked: '3000', Share: 0.1 }
-            }
-          }
-        },
-        Configuration: { TokensPerSecond: '1000', Requirements: { Running: 0.5 } }
-      }
+    const prevRoundTag2 = secondCompleteResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'previous_round'
+    ) as PreviousRoundPatchTag | undefined
+    expect(prevRoundTag2).to.exist
+    expect(prevRoundTag2!.value.Timestamp).to.equal(11000)
+    expect(prevRoundTag2!.value.Period).to.equal(10)
+    expect(prevRoundTag2!.value.Summary).to.deep.equal({
+      Ratings: '6000',
+      Stakes: '6000',
+      Rewards: '9999'
     })
+    expect(prevRoundTag2!.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
+      Reward: { Hodler: '1666', Operator: '0' },
+      Rating: '1000',
+      Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
+    })
+    expect(prevRoundTag2!.value.Details[BOB_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
+      Reward: { Hodler: '3000', Operator: '333' },
+      Rating: '2000',
+      Score: { Running: 0.7, Restaked: '0', Staked: '2000', Share: 0.1 }
+    })
+    expect(prevRoundTag2!.value.Details[CHARLS_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
+      Reward: { Hodler: '4500', Operator: '500' },
+      Rating: '3000',
+      Score: { Running: 0.8, Restaked: '0', Staked: '3000', Share: 0.1 }
+    })
+    expect(prevRoundTag2!.value.Configuration.TokensPerSecond).to.equal('1000')
+    expect(prevRoundTag2!.value.Configuration.Requirements.Running).to.equal(0.5)
     expect(secondCompleteResult.Messages[1].Data).to.equal('OK')
 
     const summary2 = await handle({
@@ -405,7 +418,11 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(enableShareResult.Messages).to.have.lengthOf(2)
     expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'shares_enabled', value: true })
+    const enableConfigTag2 = enableShareResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(enableConfigTag2).to.exist
+    expect(enableConfigTag2!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
     const config = {
@@ -423,7 +440,16 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(configResult.Messages).to.have.lengthOf(2)
     expect(configResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    expect(configResult.Messages[0].Tags).to.deep.include({ name: 'configuration', value: config })
+    const cfgTag2 = configResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'configuration'
+    ) as ConfigurationPatchTag | undefined
+    expect(cfgTag2).to.exist
+    expect(cfgTag2!.value.TokensPerSecond).to.equal(config.TokensPerSecond)
+    expect(cfgTag2!.value.Requirements.Running).to.equal(config.Requirements.Running)
+    expect(cfgTag2!.value.Shares.Enabled).to.equal(true)
+    expect(cfgTag2!.value.Shares.Min).to.equal(0.0)
+    expect(cfgTag2!.value.Shares.Max).to.equal(1.0)
+    expect(cfgTag2!.value.Shares.Default).to.equal(0.0)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -466,6 +492,7 @@ describe('Calculating staking rewards based on ratings', () => {
           { name: 'Round-Timestamp', value: '1000' }
       ]
     })
+    // 2 messages: patch (includes shares for new operators), OK response
     expect(firstCompleteResult.Messages).to.have.lengthOf(2)
     expect(firstCompleteResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
     expect(firstCompleteResult.Messages[1].Data).to.equal('OK')
