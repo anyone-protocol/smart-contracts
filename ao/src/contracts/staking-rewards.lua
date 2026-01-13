@@ -13,6 +13,12 @@ StakingRewards = StakingRewards or {
   Shares = {
   -- [Operator Address] = 0.0
   },
+  PendingShareChanges = {
+  -- [Operator Address] = {
+  --   Share = 0.0,
+  --   RequestedTimestamp = 0
+  -- }
+  },
   Configuration = {
     TokensPerSecond = '100000000',
     Requirements = {
@@ -23,7 +29,8 @@ StakingRewards = StakingRewards or {
       SetSharesEnabled = true,
       Min = 0.0,
       Max = 1.0,
-      Default = 0.0
+      Default = 0.0,
+      ChangeDelay = 0
     }
   },
   PreviousRound = {
@@ -96,6 +103,13 @@ function StakingRewards._updateSharesConfiguration(config, request, shares)
   if request.SetSharesEnabled ~= nil then
     assert(type(request.SetSharesEnabled) == 'boolean', 'SetSharesEnabled must be a boolean')
     config.Shares.SetSharesEnabled = request.SetSharesEnabled
+  end
+
+  -- Validate and update ChangeDelay if provided
+  if request.ChangeDelay ~= nil then
+    AnyoneUtils.assertInteger(request.ChangeDelay, 'ChangeDelay')
+    assert(request.ChangeDelay >= 0, 'ChangeDelay has to be >= 0')
+    config.Shares.ChangeDelay = request.ChangeDelay
   end
 
   -- Collect the new values, falling back to current config if not provided
@@ -326,12 +340,26 @@ function StakingRewards.init()
       assert(request.Share >= minShare, 'Share has to be >= ' .. minShare)
       assert(request.Share <= maxShare, 'Share has to be <= ' .. maxShare)
 
-      StakingRewards.Shares[operatorAddress] = request.Share
+      local changeDelay = StakingRewards.Configuration.Shares.ChangeDelay or 0
+      if changeDelay > 0 then
+        -- Queue the change with the current timestamp
+        StakingRewards.PendingShareChanges[operatorAddress] = {
+          Share = request.Share,
+          RequestedTimestamp = msg.Timestamp
+        }
+        ao.send({
+          device = 'patch@1.0',
+          pending_share_changes = StakingRewards.PendingShareChanges
+        })
+      else
+        -- Apply immediately when no delay configured
+        StakingRewards.Shares[operatorAddress] = request.Share
+        ao.send({
+          device = 'patch@1.0',
+          shares = StakingRewards.Shares
+        })
+      end
 
-      ao.send({
-        device = 'patch@1.0',
-        shares = StakingRewards.Shares
-      })
       ao.send({
         Target = msg.From,
         Action = 'Set-Share-Response',
@@ -571,11 +599,27 @@ function StakingRewards.init()
         end
       end
 
-      ao.send({
+      -- Apply pending share changes that have passed their delay
+      local changeDelay = StakingRewards.Configuration.Shares.ChangeDelay or 0
+      local appliedShareChanges = false
+      for operatorAddress, pendingChange in pairs(StakingRewards.PendingShareChanges) do
+        if pendingChange.RequestedTimestamp + changeDelay <= timestamp then
+          StakingRewards.Shares[operatorAddress] = pendingChange.Share
+          StakingRewards.PendingShareChanges[operatorAddress] = nil
+          appliedShareChanges = true
+        end
+      end
+
+      local patchMsg = {
         device = 'patch@1.0',
         rewarded = StakingRewards.Rewarded,
         previous_round = StakingRewards.PreviousRound
-      })
+      }
+      if appliedShareChanges then
+        patchMsg.shares = StakingRewards.Shares
+        patchMsg.pending_share_changes = StakingRewards.PendingShareChanges
+      end
+      ao.send(patchMsg)
 
       ao.send({
         Target = msg.From,
@@ -800,6 +844,7 @@ function StakingRewards.init()
         Claimed = StakingRewards.Claimed,
         Rewarded = StakingRewards.Rewarded,
         Shares = StakingRewards.Shares,
+        PendingShareChanges = StakingRewards.PendingShareChanges,
         Configuration = StakingRewards.Configuration,
         PreviousRound = {
           Timestamp = StakingRewards.PreviousRound.Timestamp,

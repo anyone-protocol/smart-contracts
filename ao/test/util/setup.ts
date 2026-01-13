@@ -129,6 +129,13 @@ export interface StakingRewardsConfigurationShares {
   Min: number
   Max: number
   Default: number
+  ChangeDelay: number
+}
+
+// Pending share change structure
+export interface PendingShareChange {
+  Share: number
+  RequestedTimestamp: number
 }
 
 // Staking Rewards Configuration structure for patch tags
@@ -150,6 +157,12 @@ export interface ConfigurationPatchTag {
 export interface SharesPatchTag {
   name: 'shares'
   value: Record<string, number>
+}
+
+// Patch tag with typed value for pending share changes
+export interface PendingShareChangesPatchTag {
+  name: 'pending_share_changes'
+  value: Record<string, PendingShareChange>
 }
 
 // Score structure within previous round details
