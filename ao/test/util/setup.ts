@@ -125,6 +125,7 @@ const bundledContractSources = Object.fromEntries(contractNames.map(cn => [
 // Staking Rewards Configuration Shares structure
 export interface StakingRewardsConfigurationShares {
   Enabled: boolean
+  SetSharesEnabled: boolean
   Min: number
   Max: number
   Default: number
