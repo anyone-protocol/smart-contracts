@@ -15,14 +15,16 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 ## Feature Summary
 
 ### What's New for Operators
-- Operators can now set a "share" percentage (when feature is enabled)
+- Operators can now set a "share" percentage (when feature is enabled AND operator setting is enabled)
 - Share determines how much of the staking reward goes to the operator vs the hodler
 - Example: 10% share means operator gets 10% of rewards, hodler gets 90%
+- When operator share setting is disabled by admin, all operators use the configured default share
 
 ### Configuration Bounds (set by contract owner)
 - **Min**: Minimum allowed share percentage
 - **Max**: Maximum allowed share percentage  
-- **Default**: Share assigned to new operators automatically
+- **Default**: Share used for all operators when "Set Shares" is disabled, or for operators who haven't set their own share
+- **SetSharesEnabled**: Whether operators can set their own custom share (if false, everyone uses Default)
 
 ---
 
@@ -99,11 +101,71 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Dashboard shows feature is disabled OR
 - Transaction fails with "Shares feature is disabled" error
 
+#### TC1.7: Set share when operator setting is disabled
+**Precondition:** Shares feature is enabled, but "Set Shares" toggle is disabled
+
+**Steps:**
+1. Connect operator wallet
+2. Attempt to set a custom share
+
+**Expected:**
+- Dashboard shows operator share setting is disabled OR
+- Transaction fails with "Operator share setting is disabled" error
+- Dashboard may show that all operators are using the default share
+
 ---
 
-### Section 2: Reward Distribution Verification
+### Section 2: Operator Setting Disabled Behavior
 
-#### TC2.1: Verify reward split in Dashboard
+#### TC2.1: All operators use default share when SetSharesEnabled is off
+**Precondition:** 
+- Shares feature enabled
+- SetSharesEnabled is OFF
+- Default share is 10%
+- Operator A previously set share to 25%
+
+**Steps:**
+1. Wait for a staking round to complete
+2. Check reward distribution for Operator A
+
+**Expected:**
+- Operator A's reward is calculated using 10% (default), NOT 25%
+- All operators receive the same share percentage
+
+#### TC2.2: Operator share resumes when SetSharesEnabled is re-enabled
+**Precondition:**
+- Operator had set share to 25%
+- SetSharesEnabled was toggled OFF, then back ON
+
+**Steps:**
+1. Verify SetSharesEnabled is now ON
+2. Wait for a staking round to complete
+3. Check reward distribution
+
+**Expected:**
+- Operator's custom share (25%) is used again
+- Previous share setting was preserved
+
+#### TC2.3: New operators use default share
+**Precondition:** 
+- Shares feature enabled
+- SetSharesEnabled is ON
+- Default share is 15%
+- Operator has NOT set a custom share
+
+**Steps:**
+1. Complete a staking round with a new operator
+2. Check the share used for that operator
+
+**Expected:**
+- New operator's rewards calculated using default share (15%)
+- Operator can then set a custom share if desired
+
+---
+
+### Section 3: Reward Distribution Verification
+
+#### TC3.1: Verify reward split in Dashboard
 **Precondition:** Operator has share set to 10%
 
 **Steps:**
@@ -116,7 +178,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
   - Operator reward: 10% of total
 - Total adds up correctly
 
-#### TC2.2: Zero share - all rewards to hodler
+#### TC3.2: Zero share - all rewards to hodler
 **Precondition:** Operator has share set to 0%
 
 **Steps:**
@@ -127,19 +189,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Hodler receives 100% of reward
 - Operator reward shows 0
 
-#### TC2.3: New operator gets default share
-**Precondition:** Default share is configured to 10%
-
-**Steps:**
-1. Register a new operator (first time appearing in scores)
-2. Complete a round
-3. Check the operator's share in Dashboard
-
-**Expected:**
-- New operator automatically has 10% share
-- Reward split reflects default share
-
-#### TC2.4: Share persists across multiple rounds
+#### TC3.3: Share persists across multiple rounds
 **Steps:**
 1. Operator sets share to 15%
 2. Complete round 1 - verify 15% split
@@ -152,9 +202,9 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 
 ---
 
-### Section 3: Dashboard UI/UX
+### Section 4: Dashboard UI/UX
 
-#### TC3.1: Share input validation
+#### TC4.1: Share input validation
 **Steps:**
 1. Try entering various invalid inputs:
    - Negative number (-5%)
@@ -167,7 +217,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Clear error messages shown
 - Invalid submissions prevented
 
-#### TC3.2: Share display formatting
+#### TC4.2: Share display formatting
 **Steps:**
 1. Set share to various values (0%, 5.5%, 10%, 100%)
 2. View how share is displayed
@@ -176,7 +226,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Consistent percentage formatting
 - Decimal places handled appropriately
 
-#### TC3.3: Transaction feedback
+#### TC4.3: Transaction feedback
 **Steps:**
 1. Submit a share update
 2. Observe UI during transaction
@@ -188,9 +238,9 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 
 ---
 
-### Section 4: Edge Cases
+### Section 5: Edge Cases
 
-#### TC4.1: Boundary value - minimum (0%)
+#### TC5.1: Boundary value - minimum (0%)
 **Precondition:** Min=0%
 
 **Steps:**
@@ -201,7 +251,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Valid, transaction succeeds
 - All rewards go to hodler
 
-#### TC4.2: Boundary value - maximum (if 100% allowed)
+#### TC5.2: Boundary value - maximum (if 100% allowed)
 **Precondition:** Max=100%
 
 **Steps:**
@@ -212,7 +262,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Valid, transaction succeeds
 - All rewards go to operator
 
-#### TC4.3: Multiple operators with different shares
+#### TC5.3: Multiple operators with different shares
 **Steps:**
 1. Operator A: 5% share
 2. Operator B: 20% share
@@ -224,7 +274,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Each operator's rewards calculated independently
 - Hodler gets different amounts from each based on operator's share
 
-#### TC4.4: Share change mid-round
+#### TC5.4: Share change mid-round
 **Steps:**
 1. Operator has 10% share
 2. Round starts (scores added)
@@ -237,9 +287,9 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 
 ---
 
-### Section 5: Wallet Connection Scenarios
+### Section 6: Wallet Connection Scenarios
 
-#### TC5.1: Correct operator address used
+#### TC6.1: Correct operator address used
 **Steps:**
 1. Connect wallet with operator address
 2. Set share
@@ -249,7 +299,7 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - Share associated with connected wallet address
 - Lowercase address normalization applied
 
-#### TC5.2: Non-operator wallet
+#### TC6.2: Non-operator wallet
 **Steps:**
 1. Connect a wallet that is not a registered operator
 2. Navigate to share configuration
@@ -266,10 +316,13 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 - [ ] Operators can set share within allowed bounds
 - [ ] Share below min is rejected
 - [ ] Share above max is rejected
-- [ ] Set-Share blocked when feature disabled
+- [ ] Set-Share blocked when shares feature is disabled
+- [ ] Set-Share blocked when operator setting (SetSharesEnabled) is disabled
+- [ ] When SetSharesEnabled is OFF, all operators use default share
+- [ ] Operator shares resume when SetSharesEnabled is toggled back ON
 - [ ] Reward split displays correctly (hodler vs operator)
 - [ ] Zero share = all rewards to hodler
-- [ ] New operators get default share automatically
+- [ ] New operators use default share (no automatic assignment to Shares table)
 - [ ] Share persists across rounds
 - [ ] Dashboard input validation works
 - [ ] Transaction feedback is clear
@@ -280,5 +333,8 @@ This document provides a manual test plan for QA to verify the Staking Rewards S
 ## Notes
 
 - Shares feature must be enabled by contract owner before operators can set shares
+- SetSharesEnabled must also be enabled for operators to set custom shares
+- When SetSharesEnabled is OFF, all operators use the configured Default share
+- Operator shares are preserved when SetSharesEnabled is toggled off - they resume when re-enabled
 - Share values are stored as decimals (0.0 - 1.0) but displayed as percentages in Dashboard
 - Changes to share take effect on the next round after the change is confirmed

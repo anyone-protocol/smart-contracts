@@ -267,7 +267,7 @@ describe('Round Completion of staking rewards', () => {
     expect(Object.keys(snapshot.Details).length).to.equal(2)
   })
 
-  describe('Complete-Round assigns default share to new operators', () => {
+  describe('Complete-Round uses default share for new operators', () => {
   let handle: AOTestHandle
 
   const score0 = { [BOB_ADDRESS]: {
@@ -282,7 +282,7 @@ describe('Round Completion of staking rewards', () => {
     handle = (await createLoader('staking-rewards')).handle
   })
 
-  it('New operator receives Configuration.Shares.Default when round is completed', async () => {
+  it('New operator uses default share (not persisted to Shares table)', async () => {
     // Enable shares and set default share
     await handle({
       From: OWNER_ADDRESS,
@@ -316,7 +316,7 @@ describe('Round Completion of staking rewards', () => {
     expect(addResult.Messages).to.have.lengthOf(1)
     expect(addResult.Messages[0].Data).to.equal('OK')
 
-    // Complete the round - this is when default share is assigned
+    // Complete the round
     const completeResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -325,23 +325,31 @@ describe('Round Completion of staking rewards', () => {
       ]
     })
 
-    // Should have 2 messages: patch (with shares), OK response
+    // Should have 2 messages: patch, OK response
     expect(completeResult.Messages).to.have.lengthOf(2)
     expect(completeResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
+    
+    // No shares patch since we no longer persist new operator shares
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
     ) as SharesPatchTag | undefined
-    expect(sharesPatch).to.exist
-    expect(sharesPatch!.value[BOB_ADDRESS]).to.equal(0.15)
+    expect(sharesPatch).to.be.undefined
     expect(completeResult.Messages[1].Data).to.equal('OK')
 
-    // Verify the new operator was assigned the default share in state
+    // Verify the new operator was NOT added to Shares table
     const stateResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'View-State' }]
     })
     const state = JSON.parse(stateResult.Messages[0].Data)
-    expect(state.Shares[BOB_ADDRESS]).to.equal(0.15)
+    expect(state.Shares[BOB_ADDRESS]).to.be.undefined
+
+    // But the previous_round should show the default share was used
+    const prevRoundTag = completeResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'previous_round'
+    )
+    expect(prevRoundTag).to.exist
+    expect(prevRoundTag.value.Details[ALICE_ADDRESS][BOB_ADDRESS].Score.Share).to.equal(0.15)
   })
 
   it('Existing operator retains their set share', async () => {
@@ -405,7 +413,7 @@ describe('Round Completion of staking rewards', () => {
     expect(state.Shares[BOB_ADDRESS]).to.equal(0.3)
   })
 
-  it('Default share is persisted to StakingRewards.Shares after round completes', async () => {
+  it('New operator continues to use default share across rounds (no persistence)', async () => {
     await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
@@ -434,13 +442,20 @@ describe('Round Completion of staking rewards', () => {
       Data: refRound1
     })
 
-    // Complete round - this assigns the default share
+    // Complete round
     await handle({
       From: OWNER_ADDRESS,
       Tags: [
         { name: 'Action', value: 'Complete-Round' },
         { name: 'Round-Timestamp', value: '1000' }
       ]
+    })
+
+    // Change default share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ Default: 0.35 })
     })
 
     // Add scores again for same operator in a new round
@@ -453,7 +468,7 @@ describe('Round Completion of staking rewards', () => {
       Data: refRound1
     })
 
-    // Complete second round - no new shares patch
+    // Complete second round
     const completeResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [
@@ -462,19 +477,26 @@ describe('Round Completion of staking rewards', () => {
       ]
     })
 
-    // No shares in patch since operator already exists
+    // No shares in patch
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
     ) as SharesPatchTag | undefined
     expect(sharesPatch).to.be.undefined
 
-    // Operator still has their persisted share
+    // Operator should NOT be in Shares state (still using default)
     const stateResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'View-State' }]
     })
     const state = JSON.parse(stateResult.Messages[0].Data)
-    expect(state.Shares[BOB_ADDRESS]).to.equal(0.2)
+    expect(state.Shares[BOB_ADDRESS]).to.be.undefined
+
+    // But the previous_round should show the NEW default share was used
+    const prevRoundTag = completeResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'previous_round'
+    )
+    expect(prevRoundTag).to.exist
+    expect(prevRoundTag.value.Details[ALICE_ADDRESS][BOB_ADDRESS].Score.Share).to.equal(0.35)
   })
 
   it('New operator gets share 0.0 when shares are disabled', async () => {
@@ -517,7 +539,7 @@ describe('Round Completion of staking rewards', () => {
     expect(state.Shares[BOB_ADDRESS]).to.be.undefined
   })
 
-  it('Multiple new operators all receive default share on round completion', async () => {
+  it('Multiple new operators all use default share (not persisted)', async () => {
     await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
@@ -563,20 +585,28 @@ describe('Round Completion of staking rewards', () => {
       ]
     })
 
+    // No shares patch since we no longer persist new operator shares
     const sharesPatch = completeResult.Messages[0].Tags.find(
       (t: { name: string }) => t.name === 'shares'
     ) as SharesPatchTag | undefined
-    expect(sharesPatch).to.exist
-    expect(sharesPatch!.value[BOB_ADDRESS]).to.equal(0.25)
-    expect(sharesPatch!.value[CHARLS_ADDRESS]).to.equal(0.25)
+    expect(sharesPatch).to.be.undefined
 
+    // Operators should NOT be in Shares state
     const stateResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'View-State' }]
     })
     const state = JSON.parse(stateResult.Messages[0].Data)
-    expect(state.Shares[BOB_ADDRESS]).to.equal(0.25)
-    expect(state.Shares[CHARLS_ADDRESS]).to.equal(0.25)
+    expect(state.Shares[BOB_ADDRESS]).to.be.undefined
+    expect(state.Shares[CHARLS_ADDRESS]).to.be.undefined
+
+    // But the previous_round should show the default share was used for both
+    const prevRoundTag = completeResult.Messages[0].Tags.find(
+      (t: { name: string }) => t.name === 'previous_round'
+    )
+    expect(prevRoundTag).to.exist
+    expect(prevRoundTag.value.Details[ALICE_ADDRESS][BOB_ADDRESS].Score.Share).to.equal(0.25)
+    expect(prevRoundTag.value.Details[ALICE_ADDRESS][CHARLS_ADDRESS].Score.Share).to.equal(0.25)
   })
 
   it('Share is correctly snapshotted in PendingRounds for new operator', async () => {
