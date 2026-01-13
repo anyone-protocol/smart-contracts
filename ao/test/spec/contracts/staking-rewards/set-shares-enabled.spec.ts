@@ -1,145 +1,47 @@
-// ** Toggle-Set-Shares Handler Tests
+// ** SetSharesEnabled Tests (via Update-Shares-Configuration)
 import { expect } from 'chai'
 
 import {
   ALICE_ADDRESS,
   BOB_ADDRESS,
-  CHARLS_ADDRESS,
   AOTestHandle,
   ConfigurationPatchTag,
   createLoader,
   OWNER_ADDRESS
 } from '~/test/util/setup'
 
-describe('Toggle-Set-Shares action of staking rewards', () => {
+describe('SetSharesEnabled via Update-Shares-Configuration', () => {
   let handle: AOTestHandle
 
   beforeEach(async () => {
     handle = (await createLoader('staking-rewards')).handle
   })
 
-  describe('Permission checks', () => {
-    it('Blocks non-owners from toggling set shares', async () => {
-      const result = await handle({
-        From: ALICE_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
-      })
-      expect(result.Error).to.be.a('string').that.includes('Permission Denied')
-    })
-
-    it('Allows owner to toggle set shares', async () => {
-      const result = await handle({
-        From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
-      })
-      expect(result.Messages).to.have.lengthOf(2)
-      expect(result.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-      const configTag = result.Messages[0].Tags.find(
-        (t: { name: string }) => t.name === 'configuration'
-      ) as ConfigurationPatchTag | undefined
-      expect(configTag).to.exist
-      expect(configTag!.value.Shares.SetSharesEnabled).to.equal(false)
-      expect(result.Messages[1].Data).to.equal('OK')
-    })
-
-    it('Allows admin role to toggle set shares', async () => {
-      await handle({
-        From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Update-Roles' }],
-        Data: JSON.stringify({ Grant: { [ALICE_ADDRESS]: ['admin'] } })
-      })
-
-      const result = await handle({
-        From: ALICE_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
-      })
-      expect(result.Messages).to.have.lengthOf(2)
-      const configTag = result.Messages[0].Tags.find(
-        (t: { name: string }) => t.name === 'configuration'
-      ) as ConfigurationPatchTag | undefined
-      expect(configTag).to.exist
-      expect(configTag!.value.Shares.SetSharesEnabled).to.equal(false)
-      expect(result.Messages[1].Data).to.equal('OK')
-    })
-
-    it('Allows Toggle-Set-Shares specific role', async () => {
-      await handle({
-        From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Update-Roles' }],
-        Data: JSON.stringify({ Grant: { [BOB_ADDRESS]: ['Toggle-Set-Shares'] } })
-      })
-
-      const result = await handle({
-        From: BOB_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
-      })
-      expect(result.Error).to.be.undefined
-      expect(result.Messages).to.have.lengthOf(2)
-      expect(result.Messages[1].Data).to.equal('OK')
-    })
-
-    it('Denies users with other roles but not Toggle-Set-Shares', async () => {
-      await handle({
-        From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Update-Roles' }],
-        Data: JSON.stringify({ Grant: { [CHARLS_ADDRESS]: ['Add-Scores'] } })
-      })
-
-      const result = await handle({
-        From: CHARLS_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
-      })
-      expect(result.Error).to.be.a('string').that.includes('Permission Denied')
-    })
-  })
-
   describe('Input validation', () => {
-    it('Requires message data', async () => {
-      const result = await handle({
-        From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }]
-      })
-      expect(result.Error).to.be.a('string').that.includes('Message data is required')
-    })
-
-    it('Requires valid JSON', async () => {
-      const result = await handle({
-        From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: 'not-json'
-      })
-      expect(result.Error).to.be.a('string').that.includes('Data must be valid JSON')
-    })
-
-    it('Requires Enabled to be a boolean', async () => {
+    it('Requires SetSharesEnabled to be a boolean', async () => {
       const stringResult = await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: 'yes' })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: 'yes' })
       })
-      expect(stringResult.Error).to.be.a('string').that.includes('Enabled must be a boolean')
+      expect(stringResult.Error).to.be.a('string').that.includes('SetSharesEnabled must be a boolean')
 
       const numberResult = await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: 1 })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: 1 })
       })
-      expect(numberResult.Error).to.be.a('string').that.includes('Enabled must be a boolean')
+      expect(numberResult.Error).to.be.a('string').that.includes('SetSharesEnabled must be a boolean')
     })
   })
 
   describe('Toggle behavior', () => {
-    it('Can disable and re-enable set shares', async () => {
+    it('Can disable and re-enable set shares via Update-Shares-Configuration', async () => {
       // Disable
       const disableResult = await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: false })
       })
       expect(disableResult.Messages).to.have.lengthOf(2)
       const disableConfigTag = disableResult.Messages[0].Tags.find(
@@ -150,8 +52,8 @@ describe('Toggle-Set-Shares action of staking rewards', () => {
       // Re-enable
       const enableResult = await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: true })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
       expect(enableResult.Messages).to.have.lengthOf(2)
       const enableConfigTag = enableResult.Messages[0].Tags.find(
@@ -168,17 +70,38 @@ describe('Toggle-Set-Shares action of staking rewards', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Disable set shares
+      // Disable set shares via Update-Shares-Configuration
       const result = await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: false })
       })
       const configTag = result.Messages[0].Tags.find(
         (t: { name: string }) => t.name === 'configuration'
       ) as ConfigurationPatchTag | undefined
       expect(configTag!.value.Shares.Enabled).to.equal(true)
       expect(configTag!.value.Shares.SetSharesEnabled).to.equal(false)
+    })
+
+    it('Can update SetSharesEnabled together with other share config options', async () => {
+      const result = await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({
+          SetSharesEnabled: false,
+          Default: 0.2,
+          Min: 0.1,
+          Max: 0.5
+        })
+      })
+      expect(result.Messages).to.have.lengthOf(2)
+      const configTag = result.Messages[0].Tags.find(
+        (t: { name: string }) => t.name === 'configuration'
+      ) as ConfigurationPatchTag | undefined
+      expect(configTag!.value.Shares.SetSharesEnabled).to.equal(false)
+      expect(configTag!.value.Shares.Default).to.equal(0.2)
+      expect(configTag!.value.Shares.Min).to.equal(0.1)
+      expect(configTag!.value.Shares.Max).to.equal(0.5)
     })
   })
 
@@ -194,8 +117,8 @@ describe('Toggle-Set-Shares action of staking rewards', () => {
       // Disable set shares
       await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: false })
       })
 
       // Try to set share as operator
@@ -218,15 +141,15 @@ describe('Toggle-Set-Shares action of staking rewards', () => {
       // Disable set shares
       await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: false })
       })
 
       // Re-enable set shares
       await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: true })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
 
       // Set share as operator should work now
@@ -269,8 +192,8 @@ describe('Toggle-Set-Shares action of staking rewards', () => {
       // Disable set shares - now all operators should use default
       await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: false })
       })
 
       // Configure tokens per second
@@ -437,15 +360,15 @@ describe('Toggle-Set-Shares action of staking rewards', () => {
       // Disable set shares
       await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: false })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: false })
       })
 
       // Re-enable set shares
       await handle({
         From: OWNER_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Toggle-Set-Shares' }],
-        Data: JSON.stringify({ Enabled: true })
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
 
       // Configure and add scores

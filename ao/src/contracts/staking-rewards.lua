@@ -92,6 +92,12 @@ end
 function StakingRewards._updateSharesConfiguration(config, request, shares)
   local AnyoneUtils = require('.common.utils')
 
+  -- Validate and update SetSharesEnabled if provided
+  if request.SetSharesEnabled ~= nil then
+    assert(type(request.SetSharesEnabled) == 'boolean', 'SetSharesEnabled must be a boolean')
+    config.Shares.SetSharesEnabled = request.SetSharesEnabled
+  end
+
   -- Collect the new values, falling back to current config if not provided
   local newMin = config.Shares.Min
   local newMax = config.Shares.Max
@@ -287,45 +293,6 @@ function StakingRewards.init()
       ao.send({
         Target = msg.From,
         Action = 'Toggle-Feature-Shares-Response',
-        Data = 'OK'
-      })
-    end
-  )
-
-  Handlers.add(
-    'Toggle-Set-Shares',
-    Handlers.utils.hasMatchingTag(
-      'Action',
-      'Toggle-Set-Shares'
-    ),
-    function (msg)
-      ACL.assertHasOneOfRole(
-        msg.From,
-        { 'owner', 'admin', 'Toggle-Set-Shares' }
-      )
-
-      assert(msg.Data, ErrorMessages.MessageDataRequired)
-
-      local request = nil
-      local function parseData()
-        request = json.decode(msg.Data)
-      end
-
-      local status, err = pcall(parseData)
-      assert(err == nil, 'Data must be valid JSON')
-      assert(status, 'Failed to parse input data')
-      assert(request, 'Failed to parse data')
-      assert(type(request.Enabled) == 'boolean', 'Enabled must be a boolean')
-
-      StakingRewards.Configuration.Shares.SetSharesEnabled = request.Enabled
-
-      ao.send({
-        device = 'patch@1.0',
-        configuration = StakingRewards.Configuration
-      })
-      ao.send({
-        Target = msg.From,
-        Action = 'Toggle-Set-Shares-Response',
         Data = 'OK'
       })
     end
