@@ -26,11 +26,11 @@ StakingRewards = StakingRewards or {
     },
     Shares = {
       Enabled = false,
-      SetSharesEnabled = true,
+      SetSharesEnabled = false,
       Min = 0.0,
       Max = 1.0,
       Default = 0.0,
-      ChangeDelay = 0
+      ChangeDelaySeconds = 0
     }
   },
   PreviousRound = {
@@ -105,11 +105,11 @@ function StakingRewards._updateSharesConfiguration(config, request, shares)
     config.Shares.SetSharesEnabled = request.SetSharesEnabled
   end
 
-  -- Validate and update ChangeDelay if provided
-  if request.ChangeDelay ~= nil then
-    AnyoneUtils.assertInteger(request.ChangeDelay, 'ChangeDelay')
-    assert(request.ChangeDelay >= 0, 'ChangeDelay has to be >= 0')
-    config.Shares.ChangeDelay = request.ChangeDelay
+  -- Validate and update ChangeDelaySeconds if provided
+  if request.ChangeDelaySeconds ~= nil then
+    AnyoneUtils.assertInteger(request.ChangeDelaySeconds, 'ChangeDelaySeconds')
+    assert(request.ChangeDelaySeconds >= 0, 'ChangeDelaySeconds has to be >= 0')
+    config.Shares.ChangeDelaySeconds = request.ChangeDelaySeconds
   end
 
   -- Collect the new values, falling back to current config if not provided
@@ -340,8 +340,8 @@ function StakingRewards.init()
       assert(request.Share >= minShare, 'Share has to be >= ' .. minShare)
       assert(request.Share <= maxShare, 'Share has to be <= ' .. maxShare)
 
-      local changeDelay = StakingRewards.Configuration.Shares.ChangeDelay or 0
-      if changeDelay > 0 then
+      local changeDelaySeconds = StakingRewards.Configuration.Shares.ChangeDelaySeconds or 0
+      if changeDelaySeconds > 0 then
         -- Queue the change with the current timestamp
         StakingRewards.PendingShareChanges[operatorAddress] = {
           Share = request.Share,
@@ -600,10 +600,10 @@ function StakingRewards.init()
       end
 
       -- Apply pending share changes that have passed their delay
-      local changeDelay = StakingRewards.Configuration.Shares.ChangeDelay or 0
+      local changeDelaySeconds = StakingRewards.Configuration.Shares.ChangeDelaySeconds or 0
       local appliedShareChanges = false
       for operatorAddress, pendingChange in pairs(StakingRewards.PendingShareChanges) do
-        if pendingChange.RequestedTimestamp + changeDelay <= timestamp then
+        if pendingChange.RequestedTimestamp + changeDelaySeconds <= timestamp then
           StakingRewards.Shares[operatorAddress] = pendingChange.Share
           StakingRewards.PendingShareChanges[operatorAddress] = nil
           appliedShareChanges = true

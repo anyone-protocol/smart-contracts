@@ -21,58 +21,58 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
     handle = (await createLoader('staking-rewards')).handle
   })
 
-  describe('ChangeDelay configuration', () => {
-    it('Allows configuring ChangeDelay via Update-Shares-Configuration', async () => {
+  describe('ChangeDelaySeconds configuration', () => {
+    it('Allows configuring ChangeDelaySeconds via Update-Shares-Configuration', async () => {
       const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 3600 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 3600 })
       })
       expect(result.Messages).to.have.lengthOf(2)
       const configTag = result.Messages[0].Tags.find(
         (t: { name: string }) => t.name === 'configuration'
       ) as ConfigurationPatchTag | undefined
       expect(configTag).to.exist
-      expect(configTag!.value.Shares.ChangeDelay).to.equal(3600)
+      expect(configTag!.value.Shares.ChangeDelaySeconds).to.equal(3600)
     })
 
-    it('Rejects non-integer ChangeDelay', async () => {
+    it('Rejects non-integer ChangeDelaySeconds', async () => {
       const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 3600.5 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 3600.5 })
       })
-      expect(result.Error).to.be.a('string').that.includes('ChangeDelay')
+      expect(result.Error).to.be.a('string').that.includes('ChangeDelaySeconds')
     })
 
-    it('Rejects negative ChangeDelay', async () => {
+    it('Rejects negative ChangeDelaySeconds', async () => {
       const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: -1 })
+        Data: JSON.stringify({ ChangeDelaySeconds: -1 })
       })
-      expect(result.Error).to.be.a('string').that.includes('ChangeDelay has to be >= 0')
+      expect(result.Error).to.be.a('string').that.includes('ChangeDelaySeconds has to be >= 0')
     })
 
-    it('Allows ChangeDelay of 0 (immediate)', async () => {
+    it('Allows ChangeDelaySeconds of 0 (immediate)', async () => {
       const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 0 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 0 })
       })
       expect(result.Messages).to.have.lengthOf(2)
       const configTag = result.Messages[0].Tags.find(
         (t: { name: string }) => t.name === 'configuration'
       ) as ConfigurationPatchTag | undefined
-      expect(configTag!.value.Shares.ChangeDelay).to.equal(0)
+      expect(configTag!.value.Shares.ChangeDelaySeconds).to.equal(0)
     })
 
-    it('Can update ChangeDelay together with other share config options', async () => {
+    it('Can update ChangeDelaySeconds together with other share config options', async () => {
       const result = await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
         Data: JSON.stringify({
-          ChangeDelay: 7200,
+          ChangeDelaySeconds: 7200,
           Default: 0.1,
           Min: 0.05,
           Max: 0.5
@@ -82,15 +82,15 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
       const configTag = result.Messages[0].Tags.find(
         (t: { name: string }) => t.name === 'configuration'
       ) as ConfigurationPatchTag | undefined
-      expect(configTag!.value.Shares.ChangeDelay).to.equal(7200)
+      expect(configTag!.value.Shares.ChangeDelaySeconds).to.equal(7200)
       expect(configTag!.value.Shares.Default).to.equal(0.1)
       expect(configTag!.value.Shares.Min).to.equal(0.05)
       expect(configTag!.value.Shares.Max).to.equal(0.5)
     })
   })
 
-  describe('Immediate application when ChangeDelay is 0', () => {
-    it('Applies share change immediately when ChangeDelay is 0', async () => {
+  describe('Immediate application when ChangeDelaySeconds is 0', () => {
+    it('Applies share change immediately when ChangeDelaySeconds is 0', async () => {
       // Enable shares feature
       await handle({
         From: OWNER_ADDRESS,
@@ -98,11 +98,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Ensure ChangeDelay is 0 (default)
+      // Ensure ChangeDelaySeconds is 0 (default) and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 0 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 0, SetSharesEnabled: true })
       })
 
       // Set share as operator
@@ -129,8 +129,8 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
     })
   })
 
-  describe('Delayed application when ChangeDelay > 0', () => {
-    it('Queues share change when ChangeDelay > 0', async () => {
+  describe('Delayed application when ChangeDelaySeconds > 0', () => {
+    it('Queues share change when ChangeDelaySeconds > 0', async () => {
       // Enable shares feature
       await handle({
         From: OWNER_ADDRESS,
@@ -138,11 +138,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay to 1 hour (3600 seconds)
+      // Set ChangeDelaySeconds to 1 hour (3600 seconds) and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 3600 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 3600, SetSharesEnabled: true })
       })
 
       // Set share as operator
@@ -179,11 +179,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay
+      // Set ChangeDelaySeconds and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 3600 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 3600, SetSharesEnabled: true })
       })
 
       // First share change request
@@ -220,11 +220,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay
+      // Set ChangeDelaySeconds and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 3600 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 3600, SetSharesEnabled: true })
       })
 
       // Queue a pending change
@@ -282,11 +282,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay to 1000 seconds
+      // Set ChangeDelaySeconds to 1000 seconds and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 1000 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 1000, SetSharesEnabled: true })
       })
 
       // Queue pending change at timestamp 1000
@@ -330,11 +330,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay to 2000 seconds
+      // Set ChangeDelaySeconds to 2000 seconds and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 2000 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 2000, SetSharesEnabled: true })
       })
 
       // Queue pending change at timestamp 1000
@@ -387,11 +387,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay to 500 seconds
+      // Set ChangeDelaySeconds to 500 seconds and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 500 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 500, SetSharesEnabled: true })
       })
 
       // Queue pending changes for multiple operators
@@ -454,11 +454,11 @@ describe('Share Change Delay via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set ChangeDelay to 1000 seconds
+      // Set ChangeDelaySeconds to 1000 seconds and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ ChangeDelay: 1000 })
+        Data: JSON.stringify({ ChangeDelaySeconds: 1000, SetSharesEnabled: true })
       })
 
       // Queue pending changes at different times

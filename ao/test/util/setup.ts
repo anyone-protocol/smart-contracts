@@ -129,7 +129,7 @@ export interface StakingRewardsConfigurationShares {
   Min: number
   Max: number
   Default: number
-  ChangeDelay: number
+  ChangeDelaySeconds: number
 }
 
 // Pending share change structure

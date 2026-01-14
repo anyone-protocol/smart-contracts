@@ -48,6 +48,13 @@ describe('Claiming staking rewards', () => {
     expect(configTag).to.exist
     expect(configTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
+
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true })
+    })
     
     const config = {
       TokensPerSecond: '1000',

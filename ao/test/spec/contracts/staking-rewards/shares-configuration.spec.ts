@@ -361,11 +361,16 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
 
   describe('Retroactive clamping of existing operator shares', () => {
     it('Clamps existing shares when Min is raised', async () => {
-      // Enable shares and set an operator share
+      // Enable shares and SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
         Data: JSON.stringify({ Enabled: true })
+      })
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
 
       await handle({
@@ -401,6 +406,11 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
         Data: JSON.stringify({ Enabled: true })
       })
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
+      })
 
       await handle({
         From: ALICE_ADDRESS,
@@ -430,6 +440,11 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
         Data: JSON.stringify({ Enabled: true })
+      })
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
 
       await handle({
@@ -464,6 +479,11 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
         Data: JSON.stringify({ Enabled: true })
+      })
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
 
       await handle({
@@ -501,6 +521,11 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
         Data: JSON.stringify({ Enabled: true })
+      })
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true })
       })
 
       // Set shares for multiple operators
@@ -551,11 +576,16 @@ describe('Set-Share respects configuration bounds', () => {
 
   beforeEach(async () => {
     handle = (await createLoader('staking-rewards')).handle
-    // Enable shares feature
+    // Enable shares feature and SetSharesEnabled
     await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
       Data: JSON.stringify({ Enabled: true })
+    })
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true })
     })
   })
 

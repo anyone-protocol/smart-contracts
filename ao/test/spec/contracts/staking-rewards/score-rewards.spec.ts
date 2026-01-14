@@ -173,6 +173,13 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(enableConfigTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true })
+    })
+
     const config = {
       TokensPerSecond: '1000',
       Requirements: {
@@ -424,6 +431,13 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(enableConfigTag2).to.exist
     expect(enableConfigTag2!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
+
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true })
+    })
 
     const config = {
       TokensPerSecond: '1000',

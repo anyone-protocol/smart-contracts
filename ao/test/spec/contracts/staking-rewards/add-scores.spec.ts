@@ -385,6 +385,13 @@ describe('Add-Scores action of staking rewards', () => {
     expect(configTag!.value.Shares.Default).to.equal(0.0)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true })
+    })
+
     const emptyShareResult = await handle({
       From: OWNER_ADDRESS,
       Tags: [

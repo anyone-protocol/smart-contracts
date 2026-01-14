@@ -363,7 +363,7 @@ describe('Round Completion of staking rewards', () => {
     await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-      Data: JSON.stringify({ Default: 0.1 })
+      Data: JSON.stringify({ Default: 0.1, SetSharesEnabled: true })
     })
 
     await handle({
