@@ -131,7 +131,7 @@ describe('Add-Scores action of staking rewards', () => {
     expect(cfgTag!.value.Shares.Enabled).to.equal(false)
     expect(cfgTag!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({

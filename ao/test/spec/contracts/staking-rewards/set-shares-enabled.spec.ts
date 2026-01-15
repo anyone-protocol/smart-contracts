@@ -243,7 +243,7 @@ describe('SetSharesEnabled via Update-Shares-Configuration', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ Default: 0.15, SetSharesEnabled: true })
+        Data: JSON.stringify({ Default: 0.15, SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       // Operator sets their share to 0.25
@@ -352,7 +352,7 @@ describe('SetSharesEnabled via Update-Shares-Configuration', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ SetSharesEnabled: true })
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       // Operator sets their share

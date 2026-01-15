@@ -370,7 +370,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ SetSharesEnabled: true })
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       await handle({
@@ -409,7 +409,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ SetSharesEnabled: true })
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       await handle({
@@ -444,7 +444,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ SetSharesEnabled: true })
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       await handle({
@@ -483,7 +483,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ SetSharesEnabled: true })
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       await handle({
@@ -525,7 +525,7 @@ describe('Update-Shares-Configuration action of staking rewards', () => {
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ SetSharesEnabled: true })
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       // Set shares for multiple operators

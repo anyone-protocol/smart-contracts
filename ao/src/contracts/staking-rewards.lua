@@ -29,8 +29,8 @@ StakingRewards = StakingRewards or {
       SetSharesEnabled = false,
       Min = 0.0,
       Max = 1.0,
-      Default = 0.0,
-      ChangeDelaySeconds = 0
+      Default = 0.05, -- 5% share default
+      ChangeDelaySeconds = 604800 -- 7 days default
     }
   },
   PreviousRound = {

@@ -106,7 +106,7 @@ describe('Round Completion of staking rewards', () => {
     expect(cfgTag!.value.Shares.Enabled).to.equal(false)
     expect(cfgTag!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const round1Result = await handle({
@@ -177,7 +177,7 @@ describe('Round Completion of staking rewards', () => {
     expect(cfgTag2!.value.Shares.Enabled).to.equal(false)
     expect(cfgTag2!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag2!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag2!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag2!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const round1Result = await handle({
@@ -363,7 +363,7 @@ describe('Round Completion of staking rewards', () => {
     await handle({
       From: OWNER_ADDRESS,
       Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-      Data: JSON.stringify({ Default: 0.1, SetSharesEnabled: true })
+      Data: JSON.stringify({ Default: 0.1, SetSharesEnabled: true, ChangeDelaySeconds: 0 })
     })
 
     await handle({
