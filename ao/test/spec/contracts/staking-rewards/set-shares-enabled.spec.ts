@@ -239,11 +239,11 @@ describe('SetSharesEnabled via Update-Shares-Configuration', () => {
         Data: JSON.stringify({ Enabled: true })
       })
 
-      // Set default share to 0.15
+      // Set default share to 0.15 and enable SetSharesEnabled
       await handle({
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
-        Data: JSON.stringify({ Default: 0.15 })
+        Data: JSON.stringify({ Default: 0.15, SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       // Operator sets their share to 0.25
@@ -252,8 +252,6 @@ describe('SetSharesEnabled via Update-Shares-Configuration', () => {
         Tags: [{ name: 'Action', value: 'Set-Share' }],
         Data: JSON.stringify({ Share: 0.25 })
       })
-
-      // SetSharesEnabled is true by default, operator's share should be used
 
       // Configure tokens per second
       await handle({
@@ -348,6 +346,13 @@ describe('SetSharesEnabled via Update-Shares-Configuration', () => {
         From: OWNER_ADDRESS,
         Tags: [{ name: 'Action', value: 'Toggle-Feature-Shares' }],
         Data: JSON.stringify({ Enabled: true })
+      })
+
+      // Enable SetSharesEnabled first
+      await handle({
+        From: OWNER_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+        Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
       })
 
       // Operator sets their share

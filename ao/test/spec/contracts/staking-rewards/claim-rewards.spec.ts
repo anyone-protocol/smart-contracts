@@ -48,6 +48,13 @@ describe('Claiming staking rewards', () => {
     expect(configTag).to.exist
     expect(configTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
+
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
+    })
     
     const config = {
       TokensPerSecond: '1000',
@@ -73,7 +80,7 @@ describe('Claiming staking rewards', () => {
     expect(cfgTag!.value.Shares.Enabled).to.equal(true)
     expect(cfgTag!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -158,7 +165,7 @@ describe('Claiming staking rewards', () => {
     })
     expect(aResult.Messages).to.have.lengthOf(1)
     const aData = JSON.parse(aResult.Messages[0].Data)
-    expect(aData.Rewarded[BOB_ADDRESS]).to.equal('1666')
+    expect(aData.Rewarded[BOB_ADDRESS]).to.equal('1583') // 95% of 1666 with 5% default share
     expect(aData.Claimed.length).to.equal(0)
     
     const bResult = await handle({
@@ -234,7 +241,7 @@ describe('Claiming staking rewards', () => {
     expect(ClaimResult2.Messages[0].Tags).to.deep.include({
       name: 'claimed',
       value: {
-        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000'},
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000', [BOB_ADDRESS]: '83'},
         [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'}
       }
     })
@@ -310,7 +317,7 @@ describe('Claiming staking rewards', () => {
     })
     expect(aResult2.Messages).to.have.lengthOf(1)
     const aData2 = JSON.parse(aResult2.Messages[0].Data)
-    expect(aData2.Rewarded[BOB_ADDRESS]).to.equal('5143') // includes reward for auto-restaked tokens that were not Claimed
+    expect(aData2.Rewarded[BOB_ADDRESS]).to.equal('4819') // includes reward for auto-restaked tokens with 5% default share
     expect(aData2.Claimed.length).to.equal(0)
 
     const bResult2 = await handle({
@@ -323,7 +330,7 @@ describe('Claiming staking rewards', () => {
     })
     expect(bResult2.Messages).to.have.lengthOf(1)
     const bData2 = JSON.parse(bResult2.Messages[0].Data)
-    expect(bData2.Rewarded[CHARLS_ADDRESS]).to.equal('5348')
+    expect(bData2.Rewarded[CHARLS_ADDRESS]).to.equal('5374') // Adjusted for 5% default share
     expect(bData2.Claimed[CHARLS_ADDRESS]).to.equal('3000')
 
     const cResult2 = await handle({
@@ -336,7 +343,7 @@ describe('Claiming staking rewards', () => {
     })
     expect(cResult2.Messages).to.have.lengthOf(1)
     const cData2 = JSON.parse(cResult2.Messages[0].Data)
-    expect(cData2.Rewarded[CHARLS_ADDRESS]).to.equal('9506')
+    expect(cData2.Rewarded[CHARLS_ADDRESS]).to.equal('9552') // Adjusted for 5% default share
     expect(cData2.Claimed[CHARLS_ADDRESS]).to.equal('5333')
 
     const ClaimResult3 = await handle({
@@ -355,13 +362,13 @@ describe('Claiming staking rewards', () => {
     expect(ClaimResult3.Messages[0].Tags).to.deep.include({
       name: 'claimed',
       value: {
-        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '5143' },
-        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000' },
+        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '4819' },
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000', [BOB_ADDRESS]: '83' },
         [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'}
       }
     })
     const ClaimData3 = JSON.parse(ClaimResult3.Messages[1].Data)
-    expect(ClaimData3[BOB_ADDRESS]).to.equal('5143')
+    expect(ClaimData3[BOB_ADDRESS]).to.equal('4819')
 
     const ClaimResult4 = await handle({
       From: OWNER_ADDRESS,
@@ -379,13 +386,13 @@ describe('Claiming staking rewards', () => {
     expect(ClaimResult4.Messages[0].Tags).to.deep.include({
       name: 'claimed',
       value: {
-        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '5143' },
-        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '5348' },
+        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '4819' },
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '5374', [BOB_ADDRESS]: '253' },
         [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333'}
       }
     })
     const ClaimData4 = JSON.parse(ClaimResult4.Messages[1].Data)
-    expect(ClaimData4[CHARLS_ADDRESS]).to.equal('5348')
+    expect(ClaimData4[CHARLS_ADDRESS]).to.equal('5374')
 
     
     const ClaimedResult2 = await handle({
@@ -397,7 +404,7 @@ describe('Claiming staking rewards', () => {
     })
     expect(ClaimedResult2.Messages).to.have.lengthOf(1)
     const ClaimedData2 = JSON.parse(ClaimedResult2.Messages[0].Data)
-    expect(ClaimedData2[CHARLS_ADDRESS]).to.equal('5348')
+    expect(ClaimedData2[CHARLS_ADDRESS]).to.equal('5374')
     
     const ClaimedResult3 = await handle({
       From: ALICE_ADDRESS,
@@ -408,7 +415,7 @@ describe('Claiming staking rewards', () => {
     })
     expect(ClaimedResult3.Messages).to.have.lengthOf(1)
     const ClaimedData3 = JSON.parse(ClaimedResult3.Messages[0].Data)
-    expect(ClaimedData3[BOB_ADDRESS]).to.equal('5143')
+    expect(ClaimedData3[BOB_ADDRESS]).to.equal('4819')
 
 
 

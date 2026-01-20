@@ -56,7 +56,7 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(cfgTag!.value.Shares.Enabled).to.equal(false)
     expect(cfgTag!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const noRoundResult = await handle({
@@ -173,6 +173,13 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(enableConfigTag!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
+    })
+
     const config = {
       TokensPerSecond: '1000',
       Requirements: {
@@ -197,7 +204,7 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(cfgTag!.value.Shares.Enabled).to.equal(true)
     expect(cfgTag!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -267,7 +274,7 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(prevRoundTag!.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
       Reward: { Operator: '0', Hodler: '0' },
       Rating: '1000',
-      Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
+      Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0.05 }
     })
     expect(prevRoundTag!.value.Configuration.TokensPerSecond).to.equal('1000')
     expect(prevRoundTag!.value.Configuration.Requirements.Running).to.equal(0.5)
@@ -306,8 +313,8 @@ describe('Calculating staking rewards based on ratings', () => {
       name: 'rewarded',
       value: {
         [CHARLS_ADDRESS]: { [CHARLS_ADDRESS]: '5333' },
-        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000' },
-        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '1666' }
+        [BOB_ADDRESS]: { [CHARLS_ADDRESS]: '3000', [BOB_ADDRESS]: '83' },
+        [ALICE_ADDRESS]: { [BOB_ADDRESS]: '1583' }
       }
     })
     const prevRoundTag2 = secondCompleteResult.Messages[0].Tags.find(
@@ -322,9 +329,9 @@ describe('Calculating staking rewards based on ratings', () => {
       Rewards: '9999'
     })
     expect(prevRoundTag2!.value.Details[ALICE_ADDRESS][BOB_ADDRESS]).to.deep.equal({
-      Reward: { Hodler: '1666', Operator: '0' },
+      Reward: { Hodler: '1583', Operator: '83' },
       Rating: '1000',
-      Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0 }
+      Score: { Running: 0.6, Restaked: '0', Staked: '1000', Share: 0.05 }
     })
     expect(prevRoundTag2!.value.Details[BOB_ADDRESS][CHARLS_ADDRESS]).to.deep.equal({
       Reward: { Hodler: '3000', Operator: '333' },
@@ -366,10 +373,10 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(aData.Period).to.equal(10)
     expect(aData.Details[BOB_ADDRESS].Score.Staked).to.equal('1000')
     expect(aData.Details[BOB_ADDRESS].Score.Running).to.equal(0.6)
-    expect(aData.Details[BOB_ADDRESS].Score.Share).to.equal(0)
+    expect(aData.Details[BOB_ADDRESS].Score.Share).to.equal(0.05)
     expect(aData.Details[BOB_ADDRESS].Rating).to.equal('1000')
-    expect(aData.Details[BOB_ADDRESS].Reward.Hodler).to.equal('1666')
-    expect(aData.Details[BOB_ADDRESS].Reward.Operator).to.equal('0')
+    expect(aData.Details[BOB_ADDRESS].Reward.Hodler).to.equal('1583')
+    expect(aData.Details[BOB_ADDRESS].Reward.Operator).to.equal('83')
 
     const bResult = await handle({
       From: ALICE_ADDRESS,
@@ -425,6 +432,13 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(enableConfigTag2!.value.Shares.Enabled).to.equal(true)
     expect(enableShareResult.Messages[1].Data).to.equal('OK')
 
+    // Enable SetSharesEnabled for operators to call Set-Share
+    await handle({
+      From: OWNER_ADDRESS,
+      Tags: [{ name: 'Action', value: 'Update-Shares-Configuration' }],
+      Data: JSON.stringify({ SetSharesEnabled: true, ChangeDelaySeconds: 0 })
+    })
+
     const config = {
       TokensPerSecond: '1000',
       Requirements: {
@@ -449,7 +463,7 @@ describe('Calculating staking rewards based on ratings', () => {
     expect(cfgTag2!.value.Shares.Enabled).to.equal(true)
     expect(cfgTag2!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag2!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag2!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag2!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
 
     const shareResult = await handle({
@@ -545,7 +559,7 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(aResult.Messages).to.have.lengthOf(1)
     const aData = JSON.parse(aResult.Messages[0].Data)
-    expect(aData.Rewarded[BOB_ADDRESS]).to.equal('1666')
+    expect(aData.Rewarded[BOB_ADDRESS]).to.equal('1583') // 95% of 1666 with 5% default share
 
     const bResult = await handle({
       From: BOB_ADDRESS,
@@ -605,7 +619,7 @@ describe('Calculating staking rewards based on ratings', () => {
     const summary3data = JSON.parse(summary3.Messages[0].Data)
     expect(summary3data.Timestamp).to.equal(21000)
     expect(summary3data.Period).to.equal(10)
-    expect(summary3data.Summary.Rewards).to.equal('9999')
+    expect(summary3data.Summary.Rewards).to.equal('9998') // Slight rounding due to 5% default share
 
     const a2Result = await handle({
       From: ALICE_ADDRESS,
@@ -615,7 +629,7 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(a2Result.Messages).to.have.lengthOf(1)
     const a2Data = JSON.parse(a2Result.Messages[0].Data)
-    expect(a2Data.Rewarded[BOB_ADDRESS]).to.equal('3332')
+    expect(a2Data.Rewarded[BOB_ADDRESS]).to.equal('3124') // 95% of base with 5% default share
 
     const b2Result = await handle({
       From: BOB_ADDRESS,
@@ -625,7 +639,7 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(b2Result.Messages).to.have.lengthOf(1)
     const b2Data = JSON.parse(b2Result.Messages[0].Data)
-    expect(b2Data.Rewarded[CHARLS_ADDRESS]).to.equal('5813')
+    expect(b2Data.Rewarded[CHARLS_ADDRESS]).to.equal('5827') // Adjusted for 5% default share
 
     const c2Result = await handle({
       From: CHARLS_ADDRESS,
@@ -635,7 +649,7 @@ describe('Calculating staking rewards based on ratings', () => {
     })
     expect(c2Result.Messages).to.have.lengthOf(1)
     const c2Data = JSON.parse(c2Result.Messages[0].Data)
-    expect(c2Data.Rewarded[CHARLS_ADDRESS]).to.equal('10853')
+    expect(c2Data.Rewarded[CHARLS_ADDRESS]).to.equal('10882') // Adjusted for 5% default share
   })
 
 

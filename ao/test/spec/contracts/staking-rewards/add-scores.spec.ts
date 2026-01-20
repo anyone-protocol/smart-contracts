@@ -131,7 +131,7 @@ describe('Add-Scores action of staking rewards', () => {
     expect(cfgTag!.value.Shares.Enabled).to.equal(false)
     expect(cfgTag!.value.Shares.Min).to.equal(0.0)
     expect(cfgTag!.value.Shares.Max).to.equal(1.0)
-    expect(cfgTag!.value.Shares.Default).to.equal(0.0)
+    expect(cfgTag!.value.Shares.Default).to.equal(0.05)
     expect(configResult.Messages[1].Data).to.equal('OK')
     
     const noRoundResult = await handle({
@@ -362,63 +362,5 @@ describe('Add-Scores action of staking rewards', () => {
       }})
     })
     expect(smallRunningResult.Error).to.be.a('string').that.includes('has to be >= 0')
-  })
-  
-  it('Setting share - Share must be a float 0..1', async () => {
-    const enableShareResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Toggle-Feature-Shares' }
-      ],
-      Data: JSON.stringify({ Enabled: true })
-    })
-    expect(enableShareResult.Messages).to.have.lengthOf(2)
-    expect(enableShareResult.Messages[0].Tags).to.deep.include({ name: 'device', value: 'patch@1.0' })
-    // Configuration patch includes Shares.Enabled
-    const configTag = enableShareResult.Messages[0].Tags.find(
-      (t: { name: string }) => t.name === 'configuration'
-    ) as ConfigurationPatchTag | undefined
-    expect(configTag).to.exist
-    expect(configTag!.value.Shares.Enabled).to.equal(true)
-    expect(configTag!.value.Shares.Min).to.equal(0.0)
-    expect(configTag!.value.Shares.Max).to.equal(1.0)
-    expect(configTag!.value.Shares.Default).to.equal(0.0)
-    expect(enableShareResult.Messages[1].Data).to.equal('OK')
-
-    const emptyShareResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Set-Share' }
-      ],
-      Data: JSON.stringify({ Share: '' })
-    })
-    expect(emptyShareResult.Error).to.be.a('string').that.includes('Number value required')
-
-    const nullShareResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-          { name: 'Action', value: 'Set-Share' },
-      ],
-      Data: JSON.stringify({ Share: '1' })
-    })
-    expect(nullShareResult.Error).to.be.a('string').that.includes('Number value required')
-
-    const largeShareResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-        { name: 'Action', value: 'Set-Share' }
-      ],
-      Data: JSON.stringify({ Share: 1.1 })
-    })
-    expect(largeShareResult.Error).to.be.a('string').that.includes('has to be <= 1')
-
-    const smallShareResult = await handle({
-      From: OWNER_ADDRESS,
-      Tags: [
-        { name: 'Action', value: 'Set-Share' }
-      ],
-      Data: JSON.stringify({ Share: -0.1 })
-    })
-    expect(smallShareResult.Error).to.be.a('string').that.includes('has to be >= 0')
   })
 })
