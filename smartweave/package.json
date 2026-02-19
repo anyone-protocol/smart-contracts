@@ -35,7 +35,7 @@
     "@types/node": "^18.15.12",
     "@types/prettier": "2.4.1",
     "arlocal": "1.1.65",
-    "axios": "^1.8.2",
+    "axios": "^1.13.5",
     "chai": "^4.3.7",
     "consul": "^1.2.0",
     "dotenv": "^16.0.3",
@@ -52,7 +52,7 @@
   "dependencies": {
     "@irys/query": "^0.0.9",
     "arweave": "1.14.4",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "warp-contracts": "1.4.32",
     "warp-contracts-plugin-deploy": "1.0.12",
     "warp-contracts-plugin-ethers": "1.0.7"
