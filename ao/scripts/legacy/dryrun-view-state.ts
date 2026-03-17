@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { sendAosDryRun } from './send-aos-message'
+import { sendAosDryRun } from '../send-aos-message'
 
 const processId = process.env.PROCESS_ID || ''
 

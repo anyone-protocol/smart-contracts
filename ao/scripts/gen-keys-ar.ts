@@ -1,6 +1,6 @@
 import Arweave from 'arweave'
 
-import { logger } from '../util/logger'
+import { logger } from './util/logger'
 
 const arweave = Arweave.init({
   host: 'arweave.net',

@@ -2,7 +2,7 @@ import { EthereumSigner } from '@ardrive/turbo-sdk'
 import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
 
-import { logger } from '../util/logger'
+import { logger } from '../../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosMessage

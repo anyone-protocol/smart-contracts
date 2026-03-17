@@ -1,5 +1,5 @@
 import { writeFileSync } from 'fs'
-import { logger } from '../util/logger'
+import { logger } from '../../util/logger'
 import { sendAosDryRun } from '../send-aos-message'
 const processId = process.env.PROCESS_ID || ''
 const phase = process.env.PHASE || 'dev'

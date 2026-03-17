@@ -1,7 +1,8 @@
 import { EthereumSigner } from '@ardrive/turbo-sdk'
 import dotenv from 'dotenv'
+import { readFileSync } from 'fs'
 
-import { logger } from '../util/logger'
+import { logger } from '../../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosMessage
@@ -11,7 +12,12 @@ dotenv.config()
 
 const ethPrivateKey = process.env.ETH_PRIVATE_KEY
 const processId = process.env.PROCESS_ID
-const fingerprints = process.env.FINGERPRINTS
+const evalCode = process.env.EVAL_CODE
+const evalCodePath = process.env.EVAL_CODE_PATH
+
+if (!evalCode && !evalCodePath) {
+  throw new Error('EVAL_CODE or EVAL_CODE_PATH is not set!')
+}
 
 if (!ethPrivateKey) {
   throw new Error('ETH_PRIVATE_KEY is not set!')
@@ -21,30 +27,30 @@ if (!processId) {
   throw new Error('PROCESS_ID is not set!')
 }
 
-if (!fingerprints) {
-  throw new Error(
-    'FINGERPRINTS is not set! (comma separated, e.g. abc123,def456,ghi789)'
-  )
-}
-
 const signer = new EthereumSigner(ethPrivateKey)
 
-async function updateRoles() {
+async function evalAction() {
   logger.info(
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
-  logger.info(`Calling Add-Verified-Hardware on AO Process ${processId}`)
-  logger.info(`With Data: `, fingerprints)
+  logger.info(`Calling Eval on AO Process ${processId}`)
+  const data = evalCodePath
+    ? readFileSync(evalCodePath, 'utf8')
+    : evalCode
+
+  if (!data) {
+    throw new Error('No eval code found!')
+  }
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
     signer: await createEthereumDataItemSigner(signer) as any,
-    tags: [{ name: 'Action', value: 'Add-Verified-Hardware' }],
-    data: fingerprints
+    tags: [{ name: 'Action', value: 'Eval' }],
+    data: data
   })
 
   logger.info(`Got reply with messageId: ${messageId}`)
-  logger.info(`Add-Verified-Hardware Result:`, JSON.stringify(result))
+  logger.info(`Eval Result:`, JSON.stringify(result))
 }
 
-updateRoles().catch(e => { logger.error(e); process.exit(1); })
+evalAction().catch(e => { logger.error(e); process.exit(1); })

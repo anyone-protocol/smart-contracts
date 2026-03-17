@@ -5,13 +5,13 @@ import { logger } from '../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosMessage
-} from '../send-aos-message'
+} from './send-aos-message'
 
 dotenv.config()
 
 const ethPrivateKey = process.env.ETH_PRIVATE_KEY
 const processId = process.env.PROCESS_ID
-const updateConfigData = process.env.UPDATE_CONFIG_DATA
+const initCleanData = process.env.INIT_CLEAN_DATA
 
 if (!ethPrivateKey) {
   throw new Error('ETH_PRIVATE_KEY is not set!')
@@ -21,31 +21,31 @@ if (!processId) {
   throw new Error('PROCESS_ID is not set!')
 }
 
-if (!updateConfigData) {
-  throw new Error('UPDATE_CONFIG_DATA is not set!')
+if (!initCleanData) {
+  throw new Error('INIT_CLEAN_DATA is not set!')
 }
 
 const signer = new EthereumSigner(ethPrivateKey)
 
-async function updateRoles() {
+async function initClean() {
   logger.info(
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
-  logger.info(`Calling Update-Configuration on Relay Rewards AO Process ${processId}`)
-  logger.info(`With Data: `, JSON.stringify(updateConfigData))
+  logger.info(`Calling Init on AO Process ${processId}`)
+  logger.info(`With Data: `, JSON.stringify(initCleanData))
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
     signer: await createEthereumDataItemSigner(signer) as any,
     tags: [
-      { name: 'Action', value: 'Update-Configuration' },
-      { name: 'Update-Configuration-Timestamp', value: new Date().toISOString() }
+      { name: 'Action', value: 'Init' },
+      { name: 'Init-Timestamp', value: new Date().toISOString() }
     ],
-    data: updateConfigData
+    data: initCleanData
   })
 
   logger.info(`Got reply with messageId: ${messageId}`)
-  logger.info(`Update-Configuration Result:`, JSON.stringify(result))
+  logger.info(`Init Result:`, JSON.stringify(result))
 }
 
-updateRoles().catch(e => { logger.error(e); process.exit(1); })
+initClean().catch(e => { logger.error(e); process.exit(1); })

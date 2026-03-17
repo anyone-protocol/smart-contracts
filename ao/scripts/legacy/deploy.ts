@@ -5,13 +5,13 @@ import { join, resolve } from 'path'
 import { EthereumSigner } from '@ardrive/turbo-sdk'
 import { spawn } from '@permaweb/aoconnect'
 
-import { logger as utilLogger } from './util/logger'
+import { logger as utilLogger } from '../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosDryRun,
   sendAosMessage
 } from './send-aos-message'
-import HardhatKeys from './test-keys/hardhat.json'
+import HardhatKeys from '../test-keys/hardhat.json'
 
 dotenv.config()
 

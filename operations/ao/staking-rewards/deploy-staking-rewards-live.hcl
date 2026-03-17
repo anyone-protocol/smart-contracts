@@ -4,8 +4,8 @@ job "staking-rewards-live" {
   namespace = "live-protocol"
 
   constraint {
-      attribute = "${meta.pool}"
-      value = "live-protocol"
+    attribute = "${meta.pool}"
+    value = "live-protocol"
   }
 
   reschedule { attempts = 0 }
@@ -25,7 +25,7 @@ job "staking-rewards-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:94dbaf9c050604df219a33a67a53a24875755c0a"
       entrypoint = ["npm"]
       command = "run"
       args = ["deploy"]
@@ -44,11 +44,13 @@ job "staking-rewards-live" {
 
     env {
       PHASE = "live"
+      CONTRACT_NAME = "staking-rewards"
+      CU_URL="https://cu.anyone.tech"
+
+      ## NB: Update consul with deployed contract address
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
-      CONTRACT_NAME = "staking-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/staking-rewards-address"
-      CU_URL="https://cu.anyone.tech"
 
       ## NB: Spawn a new process & migrate state from an existing one
       ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
@@ -62,7 +64,7 @@ job "staking-rewards-live" {
     template {
       data = <<-EOF
       # MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/live/staking-rewards-address" }}
-      MIGRATION_SOURCE_PROCESS_ID="Vu4y80CQMkTojXy-bi1TDHF1yG1TAwpWjpvES2j4Yh4"
+      MIGRATION_SOURCE_PROCESS_ID="ecV-ZmFNK35TV4Lgi2Bu_eBSiI1MqAl5WtTWZ-D0l-I"
       EOF
       destination = "local/config.env"
       env = true

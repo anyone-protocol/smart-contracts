@@ -1,7 +1,7 @@
 import { EthereumSigner } from '@ardrive/turbo-sdk'
 import dotenv from 'dotenv'
 
-import { logger } from '../util/logger'
+import { logger } from '../../util/logger'
 import {
   createEthereumDataItemSigner,
   sendAosMessage
@@ -31,13 +31,14 @@ async function updateRoles() {
   logger.info(
     `Signing using wallet with public key ${signer.publicKey.toString('hex')}`
   )
-  logger.info(`Calling Update-Configuration on Staking Rewards AO Process ${processId}`)
+  logger.info(`Calling Update-Configuration on Relay Rewards AO Process ${processId}`)
   logger.info(`With Data: `, JSON.stringify(updateConfigData))
 
   const { messageId, result } = await sendAosMessage({
     processId: processId!,
     signer: await createEthereumDataItemSigner(signer) as any,
-    tags: [{ name: 'Action', value: 'Update-Configuration' },
+    tags: [
+      { name: 'Action', value: 'Update-Configuration' },
       { name: 'Update-Configuration-Timestamp', value: new Date().toISOString() }
     ],
     data: updateConfigData
