@@ -44,6 +44,7 @@ async function spawn() {
       { name: 'Authority', value: authority }
     ],
     signer: ethereumDataItemSigner,
+    authority,
     scheduler,
     module,
     data: 'Anyone Protocol'
