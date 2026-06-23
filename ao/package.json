@@ -1,29 +1,17 @@
 {
   "name": "@anyone/smart-contracts-ao",
   "version": "0.1.0",
-  "contributors": [
-    "Anyone Labs",
-    "Jim Toth <jim@memeticblock.com>",
-    "Andrzej Tuchołka <kanshi@memeticblock.com>"
-  ],
-  "license": "AGPL-3.0-only",
-  "description": "ANyONe Protocol AO Modules & Processes (Smart Contracts)",
-  "keywords": [],
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/anyone-protocol/smart-contracts"
   },
-  "scripts": {
-    "build": "npm run process:build",
-    "deploy": "tsx scripts/deploy.ts",
-    "process:build": "npm run process:clean && tsx scripts/bundle.ts",
-    "process:clean": "rimraf [ dist ]",
-    "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
-  },
   "devDependencies": {
     "@ardrive/turbo-sdk": "^1.30.0",
+    "@dha-team/arbundles": "^1.0.3",
+    "@permaweb/ao-core-libs": "^0.0.9",
     "@permaweb/ao-loader": "^0.0.43",
-    "@permaweb/aoconnect": "^0.0.93",
+    "@permaweb/aoconnect": "^0.0.98",
     "@types/chai": "^4.3.19",
     "@types/consul": "^0.40.3",
     "@types/mocha": "^10.0.7",
@@ -38,9 +26,23 @@
     "typescript": "^5.5.4",
     "winston": "^3.17.0"
   },
+  "contributors": [
+    "Anyone Labs",
+    "Jim Toth <jim@memeticblock.com>",
+    "Andrzej Tuchołka <kanshi@memeticblock.com>"
+  ],
+  "description": "ANyONe Protocol AO Modules & Processes (Smart Contracts)",
+  "keywords": [],
+  "license": "AGPL-3.0-only",
   "overrides": {
-    "@permaweb/aoconnect": "$@permaweb/aoconnect",
     "elliptic": "^6.6.1",
     "ws": "^7.5.10"
+  },
+  "scripts": {
+    "build": "npm run process:build",
+    "deploy": "bun run scripts/spawn.ts",
+    "process:build": "npm run process:clean && tsx scripts/bundle.ts",
+    "process:clean": "rimraf [ dist ]",
+    "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
   }
 }
