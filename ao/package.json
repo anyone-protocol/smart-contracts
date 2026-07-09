@@ -39,10 +39,13 @@
     "ws": "^7.5.10"
   },
   "scripts": {
-    "build": "npm run process:build",
+    "build": "bun run process:build",
     "deploy": "bun run scripts/spawn.ts",
-    "process:build": "npm run process:clean && tsx scripts/bundle.ts",
+    "e2e": "bun run process:build && bun run test/e2e/acl-test.e2e.ts && bun run test/e2e/operator-registry.e2e.ts",
+    "e2e:acl-test": "bun run process:build && bun run test/e2e/acl-test.e2e.ts",
+    "e2e:operator-registry": "bun run process:build && bun run test/e2e/operator-registry.e2e.ts",
+    "process:build": "bun run process:clean && bun run scripts/bundle.ts",
     "process:clean": "rimraf [ dist ]",
-    "test": "npm run process:build && mocha \"test/spec/**/*.spec.ts\""
+    "test": "bun run process:build && bun run mocha \"test/spec/**/*.spec.ts\""
   }
 }
