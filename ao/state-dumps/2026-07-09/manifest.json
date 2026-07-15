@@ -1,0 +1,120 @@
+{
+  "startedAt": "2026-07-09T02:21:15.549Z",
+  "dumps": [
+    {
+      "network": "live",
+      "name": "operator-registry",
+      "processId": "W5XIwvQ6pJBtL_Hhvx9KH4fj4LNoyHDLtbAILMM_lCs",
+      "processOwner": "0xD2ef195d86FC9a7AA8889D163b143d5DA0d7bE65",
+      "cuUrl": "https://cu.anyone.tech",
+      "stateGlobal": "OperatorRegistry",
+      "dumpedAt": "2026-07-09T02:21:19.280Z",
+      "state": {
+        "file": "live-operator-registry.state.json",
+        "bytes": 1009225,
+        "sha256": "a4cbaa76c8c2fa7d7110fdda3e591c19b90d1331c5f95b727ca50151865cfdd9"
+      },
+      "roles": {
+        "file": "live-operator-registry.roles.json",
+        "bytes": 261,
+        "sha256": "15eaa7e012f2426986548badabfe5a7e007a8d7e22ae2b7c36eae3f0bf74ce0d"
+      }
+    },
+    {
+      "network": "live",
+      "name": "relay-rewards",
+      "processId": "uEtOd6F1Yv0Fg_Ym161taXFjIokBgDUNEBDcgGWA6aA",
+      "processOwner": "0xbB232BC269B0F3aB57e5907F414a2b30421fac07",
+      "cuUrl": "https://cu.anyone.tech",
+      "stateGlobal": "RelayRewards",
+      "dumpedAt": "2026-07-09T02:21:23.205Z",
+      "state": {
+        "file": "live-relay-rewards.state.json",
+        "bytes": 4143394,
+        "sha256": "504ddeb32bcd5a89fa6b92553391669786070f138411f89988568d8b93334bfd"
+      },
+      "roles": {
+        "file": "live-relay-rewards.roles.json",
+        "bytes": 213,
+        "sha256": "5adf7b71711fee6898e0be5dc58414ebea2223bbd58a3537969af6f70dbce50b"
+      }
+    },
+    {
+      "network": "live",
+      "name": "staking-rewards",
+      "processId": "eg3xbZ_Br_rPVaMhdzeMUImS1whZhOZXgdaVgWY0AWs",
+      "processOwner": "0xc540958396d16533705B4903b990BFFB742Caeb2",
+      "cuUrl": "https://cu.anyone.tech",
+      "stateGlobal": "StakingRewards",
+      "dumpedAt": "2026-07-09T02:21:24.558Z",
+      "state": {
+        "file": "live-staking-rewards.state.json",
+        "bytes": 330182,
+        "sha256": "ded1417a1763c9e93ce05068ed45092c5bc5d9bc5fa8a0b2fd6119446ef4a434"
+      },
+      "roles": {
+        "file": "live-staking-rewards.roles.json",
+        "bytes": 213,
+        "sha256": "c403a730b2647abb20e8b115e85effe0eaff92bd4ed8f582a12e4232f4980ab9"
+      }
+    },
+    {
+      "network": "stage",
+      "name": "operator-registry",
+      "processId": "hvDrJZWwTjAI7Li38biqu1D9FCUT1q6sAUKNDKaH-xc",
+      "processOwner": "0xFC995EDe0DEE85203DB143314A35468d91583a52",
+      "cuUrl": "https://cu-stage.anyone.tech",
+      "stateGlobal": "OperatorRegistry",
+      "dumpedAt": "2026-07-09T02:21:28.138Z",
+      "state": {
+        "file": "stage-operator-registry.state.json",
+        "bytes": 2117800,
+        "sha256": "9a0da94eddc44b84dba8bf5550508d956b44c3ccec9819416ed09ec05c28472a"
+      },
+      "roles": {
+        "file": "stage-operator-registry.roles.json",
+        "bytes": 261,
+        "sha256": "1e38ef2169122d78214e737178bd27728a3a19d3317e02f1207587705981e98b"
+      }
+    },
+    {
+      "network": "stage",
+      "name": "relay-rewards",
+      "processId": "74JFIXlX_W4gldyrU6hckHU8-zpMSWEbnk9q_XZrHwg",
+      "processOwner": "0xc84f421658dabC69Ee0440649f2f17b98D284CCC",
+      "cuUrl": "https://cu-stage.anyone.tech",
+      "stateGlobal": "RelayRewards",
+      "dumpedAt": "2026-07-09T02:21:29.412Z",
+      "state": {
+        "file": "stage-relay-rewards.state.json",
+        "bytes": 91869,
+        "sha256": "7c51d0da760f73af44b366ebfbbd3ea8d885ff64c6d915fd94c10c0330d6b74d"
+      },
+      "roles": {
+        "file": "stage-relay-rewards.roles.json",
+        "bytes": 213,
+        "sha256": "ac8e57ae2828fe4fce23ea583b06244a28a973f9ab801ab3205cfc7983c8c336"
+      }
+    },
+    {
+      "network": "stage",
+      "name": "staking-rewards",
+      "processId": "WyHZzCYO3tP2tRq1i2L8vnsgxahqGLLZ0H7aWfPLMwY",
+      "processOwner": "0xc84f421658dabC69Ee0440649f2f17b98D284CCC",
+      "cuUrl": "https://cu-stage.anyone.tech",
+      "stateGlobal": "StakingRewards",
+      "dumpedAt": "2026-07-09T02:21:31.369Z",
+      "state": {
+        "file": "stage-staking-rewards.state.json",
+        "bytes": 17163,
+        "sha256": "3ccca8064dbfe4ad58166f84718cc96bfbb4e86a3f1d519e647d4979cfc48ab2"
+      },
+      "roles": {
+        "file": "stage-staking-rewards.roles.json",
+        "bytes": 213,
+        "sha256": "40e8e22bfdb5a11b1362e821de4852ad8ca04298dd6c8584079f8d0975ce8b9a"
+      }
+    }
+  ],
+  "failures": []
+}

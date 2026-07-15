@@ -1,0 +1,29 @@
+{
+  "processId": "W5XIwvQ6pJBtL_Hhvx9KH4fj4LNoyHDLtbAILMM_lCs",
+  "fetchedAt": "2026-07-09T22:41:22.891Z",
+  "count": 2,
+  "messages": [
+    {
+      "nonce": 13071,
+      "timestamp": 1783048910579,
+      "timestampIso": "2026-07-03T03:21:50.579Z",
+      "id": "xkkwzfcJfAVwa9zCMYWrO2iiFIZZfAKSi5QbiVjuymo",
+      "action": "Renounce-Fingerprint-Certificate",
+      "sender": "0x819EF222D0bC95Ff8FC5727a747709161C13dc72",
+      "dataBytes": 1,
+      "resultError": null,
+      "resultMessages": 2
+    },
+    {
+      "nonce": 13072,
+      "timestamp": 1783060501463,
+      "timestampIso": "2026-07-03T06:35:01.463Z",
+      "id": "3QefwF0X7HHFk0_auySMjGa1FTZuoUNhp-kr3JJrVgw",
+      "action": "Renounce-Fingerprint-Certificate",
+      "sender": "0xf058f64d2b74c7DF161C237e81356E57328B3813",
+      "dataBytes": 1,
+      "resultError": null,
+      "resultMessages": 2
+    }
+  ]
+}
