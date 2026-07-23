@@ -75,7 +75,7 @@ RelayRewards = RelayRewards or {
 function RelayRewards._updateConfiguration(config, request)
   local ErrorMessages = require('.common.errors')
   local AnyoneUtils = require('.common.utils')
-  local bint = require('.bint')(256)
+  local bint = require('.common.bigint')(256)
 
   if request.TokensPerSecond then
     assert(type(request.TokensPerSecond) == 'string', 'TokensPerSecond must be a string number')
@@ -118,7 +118,7 @@ function RelayRewards._updateConfiguration(config, request)
         assert(type(request.Modifiers.Uptime.Tiers) == 'table', 'Table type required for Modifiers.Uptime.Tiers')
         local tierCount = 0
         for days, weight in pairs(request.Modifiers.Uptime.Tiers) do
-          local daysInt = tonumber(days)
+          local daysInt = AnyoneUtils.parseInt(days)
           AnyoneUtils.assertInteger(daysInt, 'Modifiers.Uptime.Tiers days')
           assert(daysInt >= 0, 'Modifiers.Uptime.Tiers days has to be >= 0')
           local weightFloat = tonumber(weight)
@@ -196,7 +196,7 @@ function RelayRewards._updateConfiguration(config, request)
 end
 
 function RelayRewards.init()
-  local bint = require('.bint')(256)
+  local bint = require('.common.bigint')(256)
   local json = require('json')
 
   local ErrorMessages = require('.common.errors')
@@ -267,7 +267,7 @@ function RelayRewards.init()
       assert(status, 'Failed to parse input data')
       assert(request, 'Failed to parse data')
 
-      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      local timestamp = AnyoneUtils.parseInt(msg.Tags['Round-Timestamp'])
       assert(timestamp, 'Round-Timestamp tag must be a number')
       AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       assert(timestamp > 0, 'Round-Timestamp has to be > 0')
@@ -336,7 +336,7 @@ function RelayRewards.init()
         { 'owner', 'admin', 'Complete-Round' }
       )
 
-      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      local timestamp = AnyoneUtils.parseInt(msg.Tags['Round-Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
 
@@ -611,7 +611,7 @@ function RelayRewards.init()
         { 'owner', 'admin', 'Cancel-Round' }
       )
 
-      local timestamp = tonumber(msg.Tags['Round-Timestamp'])
+      local timestamp = AnyoneUtils.parseInt(msg.Tags['Round-Timestamp'])
       AnyoneUtils.assertInteger(timestamp, 'Round-Timestamp tag')
       if timestamp then
         assert(RelayRewards.PendingRounds[timestamp], 'No pending round for ' .. timestamp)
