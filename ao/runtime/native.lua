@@ -457,6 +457,17 @@ function native.compute(base, req)
     base.acl.roles = base.acl.roles or {}
   end)
 
+  -- Hand handlers a metadata-CLEAN state, symmetric with the view read path. On every reload
+  -- HyperBEAM re-injects `ao-types`/`commitments` onto each nested map; a handler that POINT-reads
+  -- (operator-registry) is unaffected, but one that ITERATES a persisted map (relay-rewards
+  -- Complete-Round over `Configuration.Modifiers.Uptime.Tiers` / `PendingRounds`) would hit those
+  -- metadata keys as data. Strip in place so ctx.state stays the tree we mutate + persist. Done
+  -- BEFORE the snapshot so revert restores clean state too. See UPSTREAM-ISSUES A18.
+  pcall(function()
+    base.state = stripMeta(base.state)
+    base.acl   = stripMeta(base.acl)
+  end)
+
   local snapok, snapshot = pcall(snapshotState, base)
   if not snapok then
     base.results = { outbox = {}, output = { data = 'error: snapshot failed: ' .. tostring(snapshot) } }

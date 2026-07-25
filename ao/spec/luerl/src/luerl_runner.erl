@@ -131,7 +131,8 @@ build_native_program(Root, ContractRel, ScenarioPath) ->
         {<<"json">>,           P("runtime/vendor/json.lua")},
         {<<".common.errors">>, P("src/contracts/common/errors.lua")},
         {<<".common.utils">>,  P("src/contracts/common/utils.lua")},
-        {<<".common.eip55">>,  P("src/contracts/common/eip55.lua")}
+        {<<".common.eip55">>,  P("src/contracts/common/eip55.lua")},
+        {<<".common.bigint">>, P("src/contracts/common/bigint.lua")}
     ],
     PreloadSrc = [preload(Name, read(Path)) || {Name, Path} <- Preloads],
     Parts = [

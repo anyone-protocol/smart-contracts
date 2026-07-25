@@ -15,6 +15,7 @@ const LIB_PRELOADS = (): string[] => [
   `package.loaded['.common.errors'] = ${wrap(rd('src/contracts/common/errors.lua'))}`,
   `package.loaded['.common.utils'] = ${wrap(rd('src/contracts/common/utils.lua'))}`,
   `package.loaded['.common.eip55'] = ${wrap(rd('src/contracts/common/eip55.lua'))}`,
+  `package.loaded['.common.bigint'] = ${wrap(rd('src/contracts/common/bigint.lua'))}`,
   `native = ${wrap(rd('runtime/native.lua'))}`,
   `native.install()`,
 ]
