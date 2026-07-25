@@ -405,6 +405,21 @@ local function protectedCompute(base, req)
   -- (`scripts/probe/timestamp-probe.lua`: timestamp=1784989059945, block-timestamp=0). A 0 here
   -- would permanently satisfy any `requested + delay <= now` gate. hyper-aos maps `os.time` to
   -- `block-timestamp`; we deliberately do not. See D8 "os.time / message time — RESOLVED".
+  --
+  -- ⚠ PROVENANCE / ORDERING — read before using this for temporal logic. This is the SCHEDULER'S
+  -- LOCAL WALL CLOCK ("Note: Local time on the SU, not Arweave" — dev_scheduler_server.erl:231).
+  -- It is NOT the data item's timestamp (ANS-104 items carry none, so a sender cannot forge it),
+  -- and NOT Arweave block time.
+  --   * SAFE: it is committed into the SIGNED assignment, so it is fixed at assignment time and
+  --     identical for every CU replaying the schedule → execution stays DETERMINISTIC.
+  --   * UNSAFE: it is NOT MONOTONIC. `erlang:system_time` follows the OS clock and an NTP
+  --     correction can step it BACKWARDS, and the scheduler performs no ordering validation on
+  --     it whatsoever. Two messages' timestamps therefore do not reliably order those messages.
+  -- For contract logic that needs a monotonic clock, prefer the round timestamp
+  -- (`Tags['Round-Timestamp']`), which the reward contracts enforce strictly increasing via their
+  -- backdating assert. Comparing this wall clock against a round timestamp mixes two independent
+  -- clocks (SU host vs controller host), so host skew shifts the result — accepted deliberately in
+  -- staking-rewards to keep that port faithful to legacynet; see its header.
   local timestamp = tonumber(req['timestamp'])
 
   local ctx = {

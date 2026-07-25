@@ -32,6 +32,22 @@
 ---   * Message time comes from `ctx.timestamp` (assignment `timestamp`, MILLISECONDS — the same unit
 ---     legacynet `msg.Timestamp` used). NEVER `block-timestamp` (Arweave seconds; 0 on a debug node).
 ---     See D8 "os.time / message time — RESOLVED".
+---
+--- ⚠ ACCEPTED LIMITATION — the share-delay clock (decision 2026-07-25, deliberate).
+--- `RequestedTimestamp` is the SCHEDULER'S LOCAL WALL CLOCK (`erlang:system_time(millisecond)`;
+--- "Local time on the SU, not Arweave"). It is signed into the assignment, so it is deterministic on
+--- replay and cannot be forged by the sender — but it is NOT MONOTONIC (an NTP correction can step it
+--- backwards, and the scheduler validates no ordering), and the delay gate in `Complete-Round`
+--- compares it against `Round-Timestamp`, which comes from the CONTROLLER'S clock. So the gate spans
+--- two independent clocks and host skew shifts the effective delay.
+---
+--- This is inherited from legacynet (which compared `msg.Timestamp` against `Round-Timestamp` the
+--- same way), and it is kept ON PURPOSE to keep this a faithful port. The alternative — start the
+--- delay at the first `Complete-Round` after the request and measure purely in round time, which the
+--- backdating assert guarantees strictly increasing — was considered and NOT taken.
+--- Why the residual risk is acceptable: we self-host the SU; a sender cannot influence the stamp;
+--- the 7-day delay dwarfs any plausible host skew; and the feature is dormant today
+--- (`SetSharesEnabled=false`). REVISIT the round-time design before enabling `SetSharesEnabled`.
 ---   * Dropped: Handlers registry + tag-matching, all `patch@1.0` sends, all `*-Response` sends,
 ---     `View-State` (base-addressing + `dump`), `Init` (migrate-on-spawn). Update-Roles/View-Roles
 ---     are runtime built-ins.
@@ -223,7 +239,10 @@ return {
 
       local changeDelaySeconds = state.Configuration.Shares.ChangeDelaySeconds or 0
       if changeDelaySeconds > 0 then
-        -- Queue the change, stamped with the assignment time (ms — see header/D8).
+        -- Queue the change, stamped with the assignment time (ms — see header/D8). NB: this is the
+        -- SU's non-monotonic wall clock, and Complete-Round gates it against the controller's
+        -- Round-Timestamp — two clocks. Faithful to legacynet, accepted deliberately; see the
+        -- "ACCEPTED LIMITATION" note in the header before enabling SetSharesEnabled.
         state.PendingShareChanges[operatorAddress] = {
           Share = request.Share,
           RequestedTimestamp = ctx.timestamp,
