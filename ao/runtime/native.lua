@@ -394,12 +394,26 @@ local function protectedCompute(base, req)
 
   local tags = foldTags(body)
   local action = body.action or tags['Action']
+
+  -- MESSAGE TIME (ms). The scheduler stamps the ASSIGNMENT (req level, NOT req.body) with
+  -- `timestamp` = erlang:system_time(millisecond) — the exact unit legacynet `msg.Timestamp`
+  -- used, so contracts that recorded message time port over unchanged (staking-rewards
+  -- `Set-Share` → `RequestedTimestamp`).
+  --
+  -- NEVER source this from `block-timestamp`: that is Arweave block time (unix SECONDS, 1000x
+  -- off) and it is literally 0 whenever the node runs `mode: debug` — verified on hb-tier3
+  -- (`scripts/probe/timestamp-probe.lua`: timestamp=1784989059945, block-timestamp=0). A 0 here
+  -- would permanently satisfy any `requested + delay <= now` gate. hyper-aos maps `os.time` to
+  -- `block-timestamp`; we deliberately do not. See D8 "os.time / message time — RESOLVED".
+  local timestamp = tonumber(req['timestamp'])
+
   local ctx = {
     from   = from,
     owner  = Owner,
     action = action,
     tags   = tags,
     data   = body.data,
+    timestamp = timestamp,                       -- ms, or nil if unassigned (read path/harness)
     state  = base.state,                         -- the mutable contract state tree
     send   = function(m) table.insert(ao.outbox.Messages, m); return m end,
   }
