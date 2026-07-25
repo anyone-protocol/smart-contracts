@@ -1,23 +1,26 @@
 --- Tier-1 busted spec — native relay-rewards (D26 shape) on the native runtime, under Lua 5.3.
 ---
---- Parity with the legacynet WASM harness (test/spec/contracts/relay-rewards/*.spec.ts),
+--- FULL PARITY with the legacynet WASM harness (test/spec/contracts/relay-rewards/*.spec.ts),
 --- re-expressed native:
----   · state is read from `base.state` (single source of truth) — not patch@1.0 tags
----   · a successful WRITE's reply is the compute output ('OK', or the JSON snapshot for
----     Complete-Round / the claimed value for Claim-Rewards) — not a `*-Response` message
----   · reads are `native.view(base, <name>, <params>)` — not messages
----   · an assert failure surfaces as `output.data = 'error: <msg>'` and reverts state atomically
+---   · state read from `base.state` (single source of truth) — not patch@1.0 tags
+---   · a WRITE's reply is the compute output ('OK'; Complete-Round returns the JSON snapshot;
+---     Claim-Rewards returns the claimed value) — not a `*-Response` message
+---   · reads (Get-Rewards / Get-Claimed / Get-Delegate / Last-Round-*) are `native.view(...)` or
+---     direct base.state — not messages. Last-Round-Data (per-fingerprint Details) rides the
+---     Complete-Round OUTPUT (Details are never persisted — see the contract header / D27).
+---   · an assert failure surfaces as `output.data = 'error: <msg>'` and reverts state atomically.
 ---
---- SCOPE: this spec is the per-behavior net — ACL gating, per-field validation + atomicity,
---- round lifecycle, delegate/claim behaviour, the native invariants (Details off-persist), the
---- views, and the D8 runtime-safety axes. The heavy reward-MATH is proven byte-identical elsewhere
---- (Tier-2 bint golden `spec/luerl/scenarios/native-relay-rewards.lua`, Tier-3 real-seed round, and
---- the legacy⇄native cross-check `scripts/tier2-relay-legacy-crosscheck.ts`), so the giant
---- staging/init-state data scenarios are NOT re-ported here; instead one test re-anchors the exact
---- bint golden values in real Lua 5.3, and the accumulation/delegate paths are asserted structurally.
+--- Reward MAGNITUDE cases are recreated with the harness's SMALL TokensPerSecond (100/123/1000) so the
+--- exact expected integers (110, 70, 700, 2240, 558, …) stay within 64-bit — `common/bigint` is a
+--- native-int wrapper (exact only where ints are arbitrary-precision, i.e. luerl/device). FULL
+--- token-scale magnitudes are the Tier-2 concern (spec/luerl golden + tier2-relay-legacy-crosscheck).
+---
+--- The Init import/reimport cases (WASM view-init-state) map to migrate-on-spawn: a native process is
+--- SEEDED by a module carrying `base.state` (no Init action), so those are recreated as seeded-base
+--- view round-trips. Plus D8 runtime-safety axes the WASM harness never exercised.
 ---
 --- OWNER=0x11..1; ALICE/BOB/CHARLS are real mixed-case EIP-55 addresses stored VERBATIM.
---- FINGERPRINT_A..F = 'A'..'F' × 40.
+--- FINGERPRINT_A..C = 'A'..'C' × 40.
 
 local HERE = debug.getinfo(1, 'S').source:match('^@(.*/)') or './'
 local AO = HERE .. '../..'
@@ -51,12 +54,10 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
   local BOB    = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
   local CHARLS = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
   local FP_A, FP_B, FP_C = string.rep('A', 40), string.rep('B', 40), string.rep('C', 40)
-  local FP_D = string.rep('D', 40)
 
   local function commit(committer)
     return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
   end
-  --- assign(action, committer, data, tags?) → device request `{ body = ... }`.
   local function assign(action, committer, data, tags)
     local taglist = { { name = 'Action', value = action } }
     if tags then for k, v in pairs(tags) do taglist[#taglist + 1] = { name = k, value = v } end end
@@ -83,6 +84,11 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
   local function completeRound(base, ts, from)
     return compute(base, assign('Complete-Round', from or OWNER, nil, { ['Round-Timestamp'] = tostring(ts) }))
   end
+  -- add + complete one round; return the decoded Complete-Round snapshot (Timestamp/Period/Summary/Details)
+  local function completeR(base, ts, scores, from)
+    addScores(base, scores, ts, from)
+    return json.decode(outData(completeRound(base, ts, from)))
+  end
   local function cancelRound(base, ts, from)
     return compute(base, assign('Cancel-Round', from or OWNER, nil, { ['Round-Timestamp'] = tostring(ts) }))
   end
@@ -101,382 +107,760 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
   local function grantRole(base, addr, roles)
     return compute(base, assign('Update-Roles', OWNER, json.encode({ Grant = { [addr] = roles } })))
   end
+  -- full modifier/multiplier config (Network .56 / Uptime .14 / Hardware .2 / ExitBonus .1) at a small
+  -- token scale — the shared fixture behind score-rewards / claim-rewards.
+  local function fullConfig(extra)
+    local c = {
+      TokensPerSecond = '1000',
+      Modifiers = {
+        Network  = { Share = 0.56 },
+        Uptime   = { Enabled = true, Share = 0.14, Tiers = { ['0'] = 0, ['3'] = 1, ['14'] = 3 } },
+        Hardware = { Enabled = true, Share = 0.2 },
+        ExitBonus = { Enabled = true, Share = 0.1 },
+      },
+      Multipliers = {
+        Family   = { Enabled = true, Offset = 0.01, Power = 1 },
+        Location = { Enabled = true, Offset = 0.003, Power = 2, Divider = 1 },
+      },
+      Delegates = {},
+    }
+    if extra then for k, v in pairs(extra) do c[k] = v end end
+    return c
+  end
 
   before_each(function() native = freshEnv(); json = require('json') end)
 
   -- =========================================================================
+  -- acl.spec.ts — role gating for the four gated writes (admin + named role)
+  -- =========================================================================
   describe('ACL enforcement', function()
-    local function stageOne(base) return addScores(base, { [FP_A] = score(ALICE) }, 1000) end
-
-    it('Update-Configuration: allows admin role, denies a roleless address', function()
-      local base = newBase()
-      grantRole(base, ALICE, { 'admin' })
+    it('Update-Configuration: allows Admin role', function()
+      local base = newBase(); grantRole(base, ALICE, { 'admin' })
       assert.are.equal('OK', outData(updateConfig(base, { TokensPerSecond = '123' }, ALICE)))
-      assert.are.equal('123', base.state.Configuration.TokensPerSecond)
-      compute(base, assign('Update-Configuration', BOB, json.encode({ TokensPerSecond = '9' })))
-      assert.is_true(has(outData(base), 'Permission Denied'))
     end)
-
     it('Update-Configuration: allows the named Update-Configuration role', function()
-      local base = newBase()
-      grantRole(base, ALICE, { 'Update-Configuration' })
-      assert.are.equal('OK', outData(updateConfig(base, { TokensPerSecond = '7' }, ALICE)))
+      local base = newBase(); grantRole(base, BOB, { 'Update-Configuration' })
+      assert.are.equal('OK', outData(updateConfig(base, { TokensPerSecond = '123' }, BOB)))
     end)
-
-    it('Add-Scores: allows admin + named role, denies roleless', function()
-      local base = newBase()
-      grantRole(base, ALICE, { 'admin' })
-      grantRole(base, BOB, { 'Add-Scores' })
+    it('Add-Scores: allows Admin role', function()
+      local base = newBase(); grantRole(base, ALICE, { 'admin' })
       assert.are.equal('OK', outData(addScores(base, { [FP_A] = score(ALICE) }, 1000, ALICE)))
-      assert.are.equal('OK', outData(addScores(base, { [FP_B] = score(BOB) }, 1000, BOB)))
-      addScores(base, { [FP_C] = score(CHARLS) }, 1000, CHARLS)
-      assert.is_true(has(outData(base), 'Permission Denied'))
     end)
-
-    it('Complete-Round: allows admin, denies roleless', function()
-      local base = newBase()
-      grantRole(base, ALICE, { 'admin' })
-      stageOne(base)
-      assert.is_true(has(outData(completeRound(base, 1000, CHARLS)), 'Permission Denied'))
-      -- state untouched by the denied call: round still pending, completes for admin
-      local snap = json.decode(outData(completeRound(base, 1000, ALICE)))
-      assert.are.equal(1000, snap.Timestamp)
+    it('Add-Scores: allows the named Add-Scores role', function()
+      local base = newBase(); grantRole(base, BOB, { 'Add-Scores' })
+      assert.are.equal('OK', outData(addScores(base, { [FP_A] = score(ALICE) }, 1000, BOB)))
     end)
-
-    it('Cancel-Round: allows the named Cancel-Round role, denies roleless', function()
-      local base = newBase()
-      grantRole(base, ALICE, { 'Cancel-Round' })
-      stageOne(base)
-      assert.is_true(has(outData(cancelRound(base, 1000, BOB)), 'Permission Denied'))
-      assert.are.equal('OK', outData(cancelRound(base, 1000, ALICE)))
+    it('Complete-Round: allows Admin role', function()
+      local base = newBase(); grantRole(base, ALICE, { 'admin' })
+      addScores(base, { [FP_A] = score(ALICE) }, 2000)
+      assert.are.equal(2000, json.decode(outData(completeRound(base, 2000, ALICE))).Timestamp)
+    end)
+    it('Complete-Round: allows the named Complete-Round role', function()
+      local base = newBase(); grantRole(base, BOB, { 'Complete-Round' })
+      addScores(base, { [FP_A] = score(ALICE) }, 2000)
+      assert.are.equal(2000, json.decode(outData(completeRound(base, 2000, BOB))).Timestamp)
+    end)
+    it('Cancel-Round: allows Admin role', function()
+      local base = newBase(); grantRole(base, ALICE, { 'admin' })
+      addScores(base, { [FP_A] = score(ALICE) }, 2000)
+      assert.are.equal('OK', outData(cancelRound(base, 2000, ALICE)))
+    end)
+    it('Cancel-Round: allows the named Cancel-Round role', function()
+      local base = newBase(); grantRole(base, BOB, { 'Cancel-Round' })
+      addScores(base, { [FP_A] = score(ALICE) }, 2000)
+      assert.are.equal('OK', outData(cancelRound(base, 2000, BOB)))
     end)
   end)
 
   -- =========================================================================
-  describe('Update-Configuration validation', function()
-    it('Requires message data', function()
+  -- configuration.spec.ts
+  -- =========================================================================
+  describe('Update-Configuration', function()
+    it('Blocks non-owners from doing updates', function()
+      local base = newBase()
+      compute(base, assign('Update-Configuration', ALICE, json.encode({ TokensPerSecond = '1' })))
+      assert.is_true(has(outData(base), 'Permission Denied'))
+    end)
+    it('Requires message data (JSON)', function()
       local base = newBase()
       compute(base, assign('Update-Configuration', OWNER, nil))
       assert.is_true(has(outData(base), 'Message data is required'))
     end)
-
-    it('TokensPerSecond must be a positive integer string', function()
+    it('Ensures TokensPerSecond is an integer string and >= 0', function()
       local base = newBase()
-      assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = 1000 })), 'must be a string number'))
+      assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = 100 })), 'must be a string number'))
       assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = 'abc' })), 'must be an integer'))
-      assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = '-5' })), 'must be a positive value'))
+      assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = '-100' })), 'must be a positive value'))
       assert.are.equal('OK', outData(updateConfig(base, { TokensPerSecond = '42' })))
       assert.are.equal('42', base.state.Configuration.TokensPerSecond)
-    end)
-
-    it('Modifier shares must be numbers in [0,1]', function()
-      local base = newBase()
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = 2 } } })), 'has to be <= 1'))
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = -1 } } })), 'has to be >= 0'))
-    end)
-
-    it('Hardware/Uptime/ExitBonus Enabled must be boolean', function()
-      local base = newBase()
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = 'yes', Share = 0.2 } } })), 'Boolean value required'))
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = 1, Share = 0.14 } } })), 'Boolean value required'))
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { ExitBonus = { Enabled = 0, Share = 0.1 } } })), 'Boolean value required'))
-    end)
-
-    it('Uptime Tiers must be a table; keys parse to ints, weights to numbers; max 42', function()
-      local base = newBase()
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = 5 } } })), 'Table type required'))
-      local big = {}
-      for i = 0, 42 do big[tostring(i)] = 1 end   -- 43 tiers
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = big } } })), 'Too many'))
-    end)
-
-    it('Enforces sum of enabled-modifier shares == 1', function()
-      local base = newBase()
-      -- default: Network .56 + Hardware .2 + Uptime .14 + ExitBonus .1 == 1. Nudge Network only → .94.
-      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = 0.5 } } })), 'Sum of shares'))
-      -- a balanced set is accepted
-      assert.are.equal('OK', outData(updateConfig(base, { Modifiers = {
-        Network = { Share = 0.5 }, Hardware = { Enabled = true, Share = 0.26, UptimeInfluence = 0.35 },
-        Uptime = { Enabled = true, Share = 0.14 }, ExitBonus = { Enabled = true, Share = 0.1 } } })))
-      assert.are.equal(0.5, base.state.Configuration.Modifiers.Network.Share)
-    end)
-
-    it('Multipliers: Family/Location Enabled boolean, Offset in [0,1], Power >= 0, Divider >= 1', function()
-      local base = newBase()
-      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = 'x', Offset = 0.01, Power = 1 } } })), 'Boolean value required'))
-      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = 2, Power = 1 } } })), 'has to be <= 1'))
-      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = true, Offset = 0.001, Power = 2, Divider = 0 } } })), 'has to be >= 1'))
-      assert.are.equal('OK', outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = 0.02, Power = 1.0 } } })))
-      assert.are.equal(0.02, base.state.Configuration.Multipliers.Family.Offset)
-    end)
-
-    it('Delegates: table of valid operator→{valid address, share in [0,1]}', function()
-      local base = newBase()
-      assert.is_true(has(outData(updateConfig(base, { Delegates = { [ALICE] = { Address = BOB, Share = 2 } } })), 'has to be <= 1'))
-      assert.is_true(has(outData(updateConfig(base, { Delegates = { [ALICE] = { Address = 'nope', Share = 0.5 } } })), 'Invalid Address'))
-      assert.are.equal('OK', outData(updateConfig(base, { Delegates = { [ALICE] = { Address = BOB, Share = 0.25 } } })))
-      assert.are.equal(0.25, base.state.Configuration.Delegates[ALICE].Share)
     end)
   end)
 
   -- =========================================================================
-  describe('Add-Scores validation', function()
-    it('Requires JSON message data', function()
+  -- modifiers.spec.ts — Update-Configuration Modifiers validation
+  -- =========================================================================
+  describe('Update-Configuration Modifiers', function()
+    it('Network share must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = 'abc' } } })), 'Modifiers.Network.Share'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = 2 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = -2 } } })), 'has to be >= 0'))
+    end)
+    it('Hardware Enabled must be boolean', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = 'asd', Share = 0.2 } } })), 'Boolean value required'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = 1, Share = 0.2 } } })), 'Boolean value required'))
+    end)
+    it('Hardware Share must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = true, Share = 'x' } } })), 'Modifiers.Hardware.Share'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = true, Share = 2 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = true, Share = -2 } } })), 'has to be >= 0'))
+    end)
+    it('UptimeInfluence on Hardware must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = true, Share = 0.2, UptimeInfluence = 'x' } } })), 'UptimeInfluence'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = true, Share = 0.2, UptimeInfluence = 2 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Hardware = { Enabled = true, Share = 0.2, UptimeInfluence = -1 } } })), 'has to be >= 0'))
+    end)
+    it('Uptime Enabled must be boolean', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = 'asd', Share = 0.14 } } })), 'Boolean value required'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = 1, Share = 0.14 } } })), 'Boolean value required'))
+    end)
+    it('Uptime Share must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 'x' } } })), 'Modifiers.Uptime.Share'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 2 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = -2 } } })), 'has to be >= 0'))
+    end)
+    it('Uptime Tiers must be a table', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = 123 } } })), 'Table type required'))
+    end)
+    it('Uptime Tiers keys must be integers >= 0', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = { ['a'] = 1 } } } })), 'Modifiers.Uptime.Tiers days'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = { ['-10'] = 1 } } } })), 'has to be >= 0'))
+    end)
+    it('Uptime Tiers values must be numbers >= 0', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = { ['3'] = 'a' } } } })), 'Modifiers.Uptime.Tiers weight'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = { ['3'] = -10 } } } })), 'has to be >= 0'))
+    end)
+    it('Allows a maximum of 42 Uptime Tiers', function()
+      local base = newBase()
+      local big = {}
+      for i = 0, 42 do big[tostring(i)] = 1 end   -- 43 tiers
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Uptime = { Enabled = true, Share = 0.14, Tiers = big } } })), 'Too many'))
+    end)
+    it('ExitBonus Enabled must be boolean', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { ExitBonus = { Enabled = 'asd', Share = 0.1 } } })), 'Boolean value required'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { ExitBonus = { Enabled = 1, Share = 0.1 } } })), 'Boolean value required'))
+    end)
+    it('ExitBonus Share must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { ExitBonus = { Enabled = true, Share = 'x' } } })), 'Modifiers.ExitBonus.Share'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { ExitBonus = { Enabled = true, Share = 2 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { ExitBonus = { Enabled = true, Share = -2 } } })), 'has to be >= 0'))
+    end)
+    it('Sum of enabled-modifier shares must equal 1', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Modifiers = { Network = { Share = 0.5 } } })), 'Sum of shares'))
+      -- only Network enabled at share 1 is accepted
+      assert.are.equal('OK', outData(updateConfig(base, { Modifiers = {
+        Network = { Share = 1 }, Hardware = { Enabled = false, Share = 0 },
+        Uptime = { Enabled = false, Share = 0 }, ExitBonus = { Enabled = false, Share = 0 } } })))
+    end)
+  end)
+
+  -- =========================================================================
+  -- multipliers.spec.ts — Update-Configuration Multipliers validation
+  -- =========================================================================
+  describe('Update-Configuration Multipliers', function()
+    it('Family Enabled must be boolean', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = 'asd', Offset = 0.01, Power = 1 } } })), 'Multipliers.Family.Enabled'))
+    end)
+    it('Family Offset must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = 'x', Power = 1 } } })), 'Multipliers.Family.Offset'))
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = 2, Power = 1 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = -2, Power = 1 } } })), 'has to be >= 0'))
+    end)
+    it('Family Power must be a number >= 0', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = 0.01, Power = 'x' } } })), 'Multipliers.Family.Power'))
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Family = { Enabled = true, Offset = 0.01, Power = -1 } } })), 'has to be >= 0'))
+    end)
+    it('Location Enabled must be boolean', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = 'asd', Offset = 0.001, Power = 2, Divider = 20 } } })), 'Multipliers.Location.Enabled'))
+    end)
+    it('Location Offset must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = true, Offset = 'x', Power = 2, Divider = 20 } } })), 'Multipliers.Location.Offset'))
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = true, Offset = 2, Power = 2, Divider = 20 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = true, Offset = -2, Power = 2, Divider = 20 } } })), 'has to be >= 0'))
+    end)
+    it('Location Power must be a number >= 0', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = true, Offset = 0.001, Power = 'x', Divider = 20 } } })), 'Multipliers.Location.Power'))
+      assert.is_true(has(outData(updateConfig(base, { Multipliers = { Location = { Enabled = true, Offset = 0.001, Power = -1, Divider = 20 } } })), 'has to be >= 0'))
+    end)
+  end)
+
+  -- =========================================================================
+  -- delegates.spec.ts — Update-Configuration Delegates + Set-Delegate
+  -- =========================================================================
+  describe('Update-Configuration Delegates', function()
+    it('Delegate share must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Delegates = { [ALICE] = { Address = BOB, Share = 'abc' } } })), 'Share'))
+      assert.is_true(has(outData(updateConfig(base, { Delegates = { [ALICE] = { Address = BOB, Share = 2 } } })), 'has to be <= 1'))
+      assert.is_true(has(outData(updateConfig(base, { Delegates = { [ALICE] = { Address = BOB, Share = -2 } } })), 'has to be >= 0'))
+    end)
+    it('Delegate address is validated', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Delegates = { [ALICE] = { Address = 'fail-address', Share = 0.5 } } })), 'Invalid Address'))
+    end)
+    it('Operator address is validated', function()
+      local base = newBase()
+      assert.is_true(has(outData(updateConfig(base, { Delegates = { ['fail-address'] = { Address = BOB, Share = 0.5 } } })), 'Invalid Address'))
+    end)
+  end)
+
+  describe('Set-Delegate', function()
+    it('Delegate share must be a number in [0,1]', function()
+      local base = newBase()
+      assert.is_true(has(outData(setDelegate(base, ALICE, BOB, 'asd')), 'Delegate.Share'))
+      assert.is_true(has(outData(setDelegate(base, ALICE, BOB, 2)), 'has to be <= 1'))
+      assert.is_true(has(outData(setDelegate(base, ALICE, BOB, -2)), 'has to be >= 0'))
+    end)
+    it('Delegate address is validated', function()
+      local base = newBase()
+      assert.is_true(has(outData(setDelegate(base, ALICE, 'fail-address', 0.2)), 'Invalid Address'))
+    end)
+    it('keys the delegate by the verified committer (operator identity is node-verified, D6)', function()
+      -- DEVIATION: native trusts ctx.from (the node-verified, EIP-55 committer) as the operator and
+      -- does NOT re-validate it in-contract (address-type-agnostic runtime), unlike legacynet which
+      -- asserted msg.From. So an operator can only ever set a delegate for their OWN verified address.
+      local base = newBase()
+      setDelegate(base, ALICE, BOB, 0.2)
+      assert.are.same({ Address = BOB, Share = 0.2 }, base.state.Configuration.Delegates[ALICE])
+      assert.is_nil(base.state.Configuration.Delegates[BOB])
+    end)
+    it('Allows users to set and clear the Delegate', function()
+      local base = newBase()
+      assert.are.equal('OK', outData(setDelegate(base, ALICE, BOB, 0.2)))
+      assert.are.same({ Address = BOB, Share = 0.2 }, base.state.Configuration.Delegates[ALICE])
+      assert.are.same({ Address = BOB, Share = 0.2 }, view(base, 'delegate', { address = ALICE }))
+      assert.are.equal('RESET', outData(setDelegate(base, ALICE, nil, nil)))
+      assert.is_nil(base.state.Configuration.Delegates[ALICE])
+      assert.are.same({ Address = '', Share = 0 }, view(base, 'delegate', { address = ALICE }))
+    end)
+  end)
+
+  -- =========================================================================
+  -- add-scores.spec.ts
+  -- =========================================================================
+  describe('Add-Scores', function()
+    it('Blocks non-owners from doing updates', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE) }, 1000, ALICE)
+      assert.is_true(has(outData(base), 'Permission Denied'))
+    end)
+    it('Requires message data (JSON)', function()
       local base = newBase()
       compute(base, assign('Add-Scores', OWNER, nil, { ['Round-Timestamp'] = '1000' }))
       assert.is_true(has(outData(base), 'Message data is required'))
     end)
-
-    it('Round-Timestamp must be numeric, > 0, and not backdated', function()
+    it('Ensures provided timestamp is numeric', function()
       local base = newBase()
-      addScores(base, { [FP_A] = score(ALICE) }, 'abc')
-      assert.is_true(has(outData(base), 'Round-Timestamp tag must be a number'))
+      compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = {} }), { ['Round-Timestamp'] = 'bad-stamp' }))
+      assert.is_true(has(outData(base), 'Round-Timestamp tag'))
+    end)
+    it('Ensures timestamp is > 0', function()
+      local base = newBase()
       compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = { [FP_A] = score(ALICE) } }), { ['Round-Timestamp'] = '0' }))
       assert.is_true(has(outData(base), 'has to be > 0'))
-      -- settle round 1000, then a backdated 500 is rejected
-      addScores(base, { [FP_A] = score(ALICE) }, 1000); completeRound(base, 1000)
-      addScores(base, { [FP_B] = score(BOB) }, 500)
-      assert.is_true(has(outData(base), 'backdated'))
+      compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = { [FP_A] = score(ALICE) } }), { ['Round-Timestamp'] = '-100' }))
+      assert.is_true(has(outData(base), 'Round-Timestamp'))
     end)
-
+    it('Ensures timestamp is not backdated to previous round', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE) }, 10000); completeRound(base, 10000)
+      addScores(base, { [FP_A] = score(ALICE) }, 10000)
+      assert.is_true(has(outData(base), 'backdated'))
+      assert.are.equal('OK', outData(addScores(base, { [FP_A] = score(ALICE) }, 20000)))
+    end)
     it('Scores must be a table', function()
       local base = newBase()
-      compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = 'nope' }), { ['Round-Timestamp'] = '1000' }))
+      compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = 'some scores' }), { ['Round-Timestamp'] = '1000' }))
       assert.is_true(has(outData(base), 'Scores have to be a table'))
     end)
-
-    it('Each score is validated: fingerprint, address, numeric/boolean fields', function()
+    it('Each score - Fingerprint has valid format', function()
       local base = newBase()
-      addScores(base, { ['bad-fp'] = score(ALICE) }, 1000)
+      addScores(base, { ['asd'] = score(ALICE) }, 1000)
       assert.is_true(has(outData(base), 'Invalid Fingerprint'))
-      addScores(base, { [FP_A] = score('not-an-address') }, 1000)
-      assert.is_true(has(outData(base), 'Invalid Address'))
-      addScores(base, { [FP_A] = { Address = ALICE, Network = -1, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 } }, 1000)
-      assert.is_true(has(outData(base), 'Network has to be >= 0'))
-      addScores(base, { [FP_A] = { Address = ALICE, Network = 1, IsHardware = 'x', UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 } }, 1000)
-      assert.is_true(has(outData(base), 'IsHardware'))
-      addScores(base, { [FP_A] = { Address = ALICE, Network = 1, IsHardware = false, UptimeStreak = 0, ExitBonus = 1, FamilySize = 0, LocationSize = 0 } }, 1000)
-      assert.is_true(has(outData(base), 'ExitBonus'))
-      -- nothing was staged by any failed batch
-      assert.is_nil(base.state.PendingRounds['1000'])
     end)
-
-    it('Rejects a duplicate fingerprint within the same round', function()
+    it('Each score - Fingerprint was not already set during the round', function()
       local base = newBase()
       assert.are.equal('OK', outData(addScores(base, { [FP_A] = score(ALICE) }, 1000)))
       addScores(base, { [FP_A] = score(BOB) }, 1000)
       assert.is_true(has(outData(base), 'Duplicated score for'))
     end)
-
-    it('validate-before-mutate: a bad item in a batch stages NOTHING (atomic)', function()
+    it('Each score - Address must be a valid EVM address', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score('not-an-address') }, 1000)
+      assert.is_true(has(outData(base), 'Invalid Address'))
+    end)
+    it('Each score - Network must be an integer >= 0', function()
+      local base = newBase()
+      local s = score(ALICE); s.Network = -100
+      addScores(base, { [FP_A] = s }, 1000)
+      assert.is_true(has(outData(base), 'Network'))
+    end)
+    it('Each score - IsHardware must be boolean', function()
+      local base = newBase()
+      local s = score(ALICE); s.IsHardware = 12
+      addScores(base, { [FP_A] = s }, 1000)
+      assert.is_true(has(outData(base), 'IsHardware'))
+    end)
+    it('Each score - UptimeStreak must be an integer >= 0', function()
+      local base = newBase()
+      local s = score(ALICE); s.UptimeStreak = -100
+      addScores(base, { [FP_A] = s }, 1000)
+      assert.is_true(has(outData(base), 'UptimeStreak'))
+    end)
+    it('Each score - ExitBonus must be boolean', function()
+      local base = newBase()
+      local s = score(ALICE); s.ExitBonus = 12
+      addScores(base, { [FP_A] = s }, 1000)
+      assert.is_true(has(outData(base), 'ExitBonus'))
+    end)
+    it('Each score - FamilySize must be an integer >= 0', function()
+      local base = newBase()
+      local s = score(ALICE); s.FamilySize = -100
+      addScores(base, { [FP_A] = s }, 1000)
+      assert.is_true(has(outData(base), 'FamilySize'))
+    end)
+    it('Each score - LocationSize must be an integer >= 0', function()
+      local base = newBase()
+      local s = score(ALICE); s.LocationSize = -100
+      addScores(base, { [FP_A] = s }, 1000)
+      assert.is_true(has(outData(base), 'LocationSize'))
+    end)
+    it('validate-before-mutate: a bad item stages NOTHING; a good batch stages under the string key', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE), [FP_B] = score('bad') }, 1000)
       assert.is_true(has(outData(base), 'Invalid Address'))
-      assert.is_nil(base.state.PendingRounds['1000'])   -- FP_A not staged either
-    end)
-
-    it('Owner Add-Scores stages a pending round keyed by the string timestamp (A17)', function()
-      local base = newBase()
+      assert.is_nil(base.state.PendingRounds['1000'])
       assert.are.equal('OK', outData(addScores(base, { [FP_A] = score(ALICE, { Network = 7 }) }, 1000)))
-      assert.are.equal(ALICE, base.state.PendingRounds['1000'][FP_A].Address)
       assert.are.equal(7, base.state.PendingRounds['1000'][FP_A].Score.Network)
-      assert.is_nil(base.state.PendingRounds[1000])      -- NOT the integer key
+      assert.is_nil(base.state.PendingRounds[1000])   -- A17: string key only
     end)
   end)
 
   -- =========================================================================
-  describe('Set-Delegate (permissionless, keyed by committer)', function()
-    it('Sets, validates share/address, and clears the delegate for the caller', function()
-      local base = newBase()
-      assert.are.equal('OK', outData(setDelegate(base, ALICE, BOB, 0.25)))
-      assert.are.same({ Address = BOB, Share = 0.25 }, base.state.Configuration.Delegates[ALICE])
-      assert.is_true(has(outData(setDelegate(base, ALICE, BOB, 2)), 'has to be <= 1'))
-      assert.is_true(has(outData(setDelegate(base, ALICE, 'bad-addr', 0.1)), 'Invalid Address'))
-      -- clear (no Address tag) → RESET
-      assert.are.equal('RESET', outData(setDelegate(base, ALICE, nil, nil)))
-      assert.is_nil(base.state.Configuration.Delegates[ALICE])
-    end)
-  end)
-
+  -- round-cancel.spec.ts
   -- =========================================================================
   describe('Cancel-Round', function()
-    it('Requires a numeric timestamp with an existing pending round, then removes it', function()
+    it('Blocks non-owners from doing updates', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE) }, 1000)
-      cancelRound(base, 'x')
-      assert.is_true(has(outData(base), 'Number value required'))
-      cancelRound(base, 2000)
+      cancelRound(base, 1000, ALICE)
+      assert.is_true(has(outData(base), 'Permission Denied'))
+    end)
+    it('Ensures provided timestamp is numeric', function()
+      local base = newBase()
+      compute(base, assign('Cancel-Round', OWNER, nil, { ['Round-Timestamp'] = 'bad-stamp' }))
+      assert.is_true(has(outData(base), 'Round-Timestamp tag'))
+    end)
+    it('Confirms a pending round exists for the timestamp', function()
+      local base = newBase()
+      cancelRound(base, 1234567890)
       assert.is_true(has(outData(base), 'No pending round for'))
-      assert.are.equal('OK', outData(cancelRound(base, 1000)))
-      assert.is_nil(base.state.PendingRounds['1000'])
+    end)
+    it('Removes the pending round for the timestamp', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE) }, 1234567890)
+      assert.are.equal('OK', outData(cancelRound(base, 1234567890)))
+      assert.is_nil(base.state.PendingRounds['1234567890'])
     end)
   end)
 
   -- =========================================================================
+  -- round-complete.spec.ts
+  -- =========================================================================
   describe('Complete-Round', function()
-    it('Requires an existing pending round for the timestamp', function()
+    it('Blocks non-owners from doing updates', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE) }, 1000)
+      completeRound(base, 1000, ALICE)
+      assert.is_true(has(outData(base), 'Permission Denied'))
+    end)
+    it('Ensures provided timestamp is numeric', function()
+      local base = newBase()
+      compute(base, assign('Complete-Round', OWNER, nil, { ['Round-Timestamp'] = 'bad-stamp' }))
+      assert.is_true(has(outData(base), 'Round-Timestamp tag'))
+    end)
+    it('Confirms a pending round exists for the timestamp', function()
       local base = newBase()
       completeRound(base, 1000)
-      assert.is_true(has(outData(base), 'No pending round for'))
+      assert.is_true(has(outData(base), 'No pending round for 1000'))
     end)
-
-    it('Removes pending rounds dated at/before the completed timestamp', function()
+    it('Removes rounds dated at/before the completed timestamp', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE) }, 1000)
       addScores(base, { [FP_B] = score(BOB) }, 2000)
-      addScores(base, { [FP_C] = score(CHARLS) }, 3000)
       completeRound(base, 2000)
-      assert.is_nil(base.state.PendingRounds['1000'])   -- older cleared
-      assert.is_nil(base.state.PendingRounds['2000'])   -- settled cleared
-      assert.is_not_nil(base.state.PendingRounds['3000'])   -- future kept
+      assert.is_nil(base.state.PendingRounds['1000'])   -- older pruned
+      assert.is_nil(base.state.PendingRounds['2000'])   -- settled pruned
+      cancelRound(base, 1000)
+      assert.is_true(has(outData(base), 'No pending round for 1000'))
     end)
-
-    it('Persists the last-round SUMMARY only; Details ride the compute output', function()
+    it('Tracks data and metadata of the last round (TokensPerSecond 123, Network share 1)', function()
       local base = newBase()
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1000)
-      completeRound(base, 1000)   -- bootstrap: Period 0
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 61000)
-      local snap = json.decode(outData(completeRound(base, 61000)))
-      -- persisted PreviousRound has NO Details (off-persist invariant)
-      assert.is_nil(base.state.PreviousRound.Details)
-      assert.is_not_nil(base.state.PreviousRound.Summary)
-      assert.are.equal(60, base.state.PreviousRound.Period)
-      -- the compute OUTPUT carries the full per-fingerprint Details
-      assert.is_not_nil(snap.Details[FP_A])
-      assert.are.equal(61000, snap.Timestamp)
-      assert.are.equal(60, snap.Period)
+      updateConfig(base, { TokensPerSecond = '123', Modifiers = {
+        Network = { Share = 1 }, Hardware = { Enabled = false, Share = 0 },
+        Uptime = { Enabled = false, Share = 0 }, ExitBonus = { Enabled = false, Share = 0 } } })
+      completeR(base, 1000, { [FP_A] = score(ALICE, { Network = 0 }) })                  -- Period 0
+      local snap = completeR(base, 2000, {                                              -- Period 1
+        [FP_A] = score(ALICE, { Network = 0 }), [FP_B] = score(BOB, { Network = 100 }) })
+      -- Complete-Round output (Details ride the output; last-round metadata persists as SUMMARY)
+      assert.are.equal(2000, snap.Timestamp)
+      assert.are.equal(1, snap.Period)
+      assert.are.equal('123', snap.Details[FP_B].Reward.OperatorTotal)
+      assert.are.equal(100, snap.Details[FP_B].Rating.Network)
+      local lr = view(base, 'last_round')
+      assert.are.equal(2000, lr.Timestamp)
+      assert.are.equal(1, lr.Period)
+      assert.are.equal('123', lr.Summary.Rewards.Total)
+      assert.are.equal('123', lr.Summary.Rewards.Network)
+      assert.are.equal('100', lr.Summary.Ratings.Network)
+      -- cumulative maps
+      assert.are.equal('123', base.state.TotalAddressReward[BOB])
+      assert.are.equal('0', base.state.TotalAddressReward[ALICE])
+      assert.are.equal('123', base.state.TotalFingerprintReward[FP_B])
+      assert.are.equal('0', base.state.TotalFingerprintReward[FP_A])
+      assert.is_nil(base.state.PreviousRound.Details)   -- Details NOT persisted
     end)
   end)
 
   -- =========================================================================
-  describe('Reward math — relationships at a non-overflowing token scale', function()
-    -- `.common.bigint` is a NATIVE-INTEGER wrapper: exact only where ints are arbitrary-precision
-    -- (luerl / the device). Real Lua 5.3 here is 64-bit, so full-token-scale intermediates OVERFLOW
-    -- and reward MAGNITUDES are a Tier-2 concern — reproduced exactly against the bint golden in
-    -- spec/luerl/scenarios/native-relay-rewards.lua, and cross-checked vs legacy in
-    -- scripts/tier2-relay-legacy-crosscheck.ts. At Tier-1 we shrink TokensPerSecond so intermediates
-    -- stay in 64-bit and assert the reward RELATIONSHIPS: ratings, period, accumulation, delegate split.
-    local FP, ADDR = string.rep('A', 40), '0x' .. string.rep('a', 40)
-    local function goldenScore() return score(ADDR, { Network = 1000, UptimeStreak = 5, FamilySize = 1, LocationSize = 1 }) end
-    local function smallScale(base) updateConfig(base, { TokensPerSecond = '1000000' }) end
+  -- score-processing.spec.ts — network score + reference multiplier formulas
+  -- =========================================================================
+  describe('Score processing', function()
+    local score0 = score(ALICE, { Network = 0 })
+    local score1 = score(BOB, { Network = 100 })
+    local score1WithMul = score(BOB, { Network = 100, IsHardware = true, FamilySize = 10, LocationSize = 10 })
 
-    it('derives ratings and period from score + config (overflow-safe)', function()
-      local base = newBase(); smallScale(base)
-      addScores(base, { [FP] = goldenScore() }, 1000000); completeRound(base, 1000000)   -- Period 0
-      addScores(base, { [FP] = goldenScore() }, 1060000)
-      local snap = json.decode(outData(completeRound(base, 1060000)))                     -- Period 60
-      assert.are.equal(60, base.state.PreviousRound.Period)
-      -- floor(1000 * family 1.01 * location ~0.9999975) = 1009; uptime tier for streak 5 → weight 1
-      assert.are.equal(1009, snap.Details[FP].Rating.Network)
-      assert.are.equal(1, snap.Details[FP].Rating.Uptime)
+    it('Verify base network score assignment', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '123', Modifiers = {
+        Network = { Share = 1 }, Hardware = { Enabled = false, Share = 0, UptimeInfluence = 0 },
+        Uptime = { Enabled = false, Share = 0 }, ExitBonus = { Enabled = false, Share = 0 } },
+        Multipliers = { Location = { Enabled = false, Offset = 1, Power = 1, Divider = 1 } } })
+      completeR(base, 1000, { [FP_A] = score0, [FP_B] = score1 })   -- Period 0
+      completeR(base, 2000, { [FP_A] = score0, [FP_B] = score1 })   -- Period 1 → Bob 123
+      assert.are.equal('123', base.state.TotalAddressReward[BOB])
+      assert.are.equal('0', base.state.TotalAddressReward[ALICE])
+      completeR(base, 3000, { [FP_A] = score0, [FP_B] = score1 })   -- cumulative → Bob 246
+      assert.are.equal('246', view(base, 'rewards', { address = BOB }).reward)
+      assert.are.equal('0', view(base, 'rewards', { address = ALICE }).reward)
+      assert.are.equal('246', view(base, 'rewards', { fingerprint = FP_B }).reward)
+      assert.are.equal('0', view(base, 'rewards', { fingerprint = FP_A }).reward)
     end)
 
-    it('accumulates rewards by fingerprint AND (EIP-55) address', function()
-      local eip55 = require('.common.eip55')
-      local base = newBase(); smallScale(base)
-      addScores(base, { [FP] = goldenScore() }, 1000000); completeRound(base, 1000000)   -- Period 0 → 0
-      addScores(base, { [FP] = goldenScore() }, 1060000)
-      local snap = json.decode(outData(completeRound(base, 1060000)))
-      local total = snap.Details[FP].Reward.Total
-      assert.is_true(total ~= '0')
-      -- cumulative maps accrue the round total; address keyed by canonical EIP-55 (not ALLCAPS)
-      assert.are.equal(total, base.state.TotalFingerprintReward[FP])
-      local key = eip55.checksum(ADDR)
-      assert.are.equal(total, base.state.TotalAddressReward[key])
-      assert.is_nil(base.state.TotalAddressReward[string.upper(ADDR)])
+    it('Validate reference family multiplier formula (1.1 → Rating.Network 110)', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '100', Modifiers = {
+        Network = { Share = 1 }, Hardware = { Enabled = false, Share = 0, UptimeInfluence = 0 },
+        Uptime = { Enabled = false, Share = 0 }, ExitBonus = { Enabled = false, Share = 0 } },
+        Multipliers = { Family = { Enabled = true, Offset = 0.01, Power = 1 },
+                        Location = { Enabled = false, Offset = 1, Power = 1, Divider = 1 } } })
+      completeR(base, 1000, { [FP_A] = score0, [FP_B] = score1 })
+      completeR(base, 2000, { [FP_A] = score0, [FP_B] = score1 })
+      local snap = completeR(base, 3000, { [FP_A] = score0, [FP_B] = score1WithMul })
+      assert.are.equal(1.1, snap.Details[FP_B].Variables.FamilyMultiplier)
+      assert.are.equal(110, snap.Details[FP_B].Rating.Network)
     end)
 
-    it('splits the reward with a delegate (Total == Operator + Delegate)', function()
-      local bint = require('.common.bigint')(256)
-      local base = newBase(); smallScale(base)
-      setDelegate(base, ALICE, BOB, 0.25)   -- ALICE delegates 25% to BOB
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1000000); completeRound(base, 1000000)
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1060000)
-      local snap = json.decode(outData(completeRound(base, 1060000)))
-      local d = snap.Details[FP_A].Reward
-      assert.is_true(d.DelegateTotal ~= '0')
-      assert.are.equal(d.Total, tostring(bint(d.OperatorTotal) + bint(d.DelegateTotal)))
-      -- cumulative address maps: ALICE gets the operator cut, BOB the delegate cut
-      assert.are.equal(d.OperatorTotal, base.state.TotalAddressReward[ALICE])
-      assert.are.equal(d.DelegateTotal, base.state.TotalAddressReward[BOB])
+    it('Validate reference location multiplier formula (0.7 → Rating.Network 70)', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '100', Modifiers = {
+        Network = { Share = 1 }, Hardware = { Enabled = false, Share = 0, UptimeInfluence = 0 },
+        Uptime = { Enabled = false, Share = 0 }, ExitBonus = { Enabled = false, Share = 0 } },
+        Multipliers = { Location = { Enabled = true, Offset = 0.003, Power = 2, Divider = 1 },
+                        Family = { Enabled = false, Offset = 1, Power = 1 } } })
+      completeR(base, 1000, { [FP_A] = score0, [FP_B] = score1 })
+      completeR(base, 2000, { [FP_A] = score0, [FP_B] = score1 })
+      local snap = completeR(base, 3000, { [FP_A] = score0, [FP_B] = score1WithMul })
+      assert.are.equal(0.7, snap.Details[FP_B].Variables.LocationMultiplier)
+      assert.are.equal(70, snap.Details[FP_B].Rating.Network)
     end)
   end)
 
+  -- =========================================================================
+  -- score-ratings.spec.ts — uptime tiers, hardware 65/35 split, exit bonus
+  -- =========================================================================
+  describe('Score ratings', function()
+    it('Calculate uptime ratings with uptime streak tiers', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '1000', Modifiers = {
+        Network = { Share = 0.9 }, Hardware = { Enabled = true, Share = 0 },
+        Uptime = { Enabled = true, Share = 0.1, Tiers = { ['0'] = 0, ['3'] = 1, ['14'] = 3 } },
+        ExitBonus = { Enabled = false, Share = 0 } } })
+      completeR(base, 1000, { [FP_A] = score(ALICE, { Network = 100 }) })                 -- Period 0
+      local s2 = completeR(base, 2000, {                                                  -- Period 1
+        [FP_A] = score(ALICE, { Network = 100, IsHardware = true }),
+        [FP_B] = score(BOB, { Network = 200, UptimeStreak = 3 }) })
+      assert.are.equal('100', s2.Summary.Rewards.Uptime)
+      assert.are.equal('1.0', s2.Summary.Ratings.Uptime)
+      assert.are.equal(0, s2.Details[FP_A].Rating.Uptime)
+      assert.are.equal('0', s2.Details[FP_A].Reward.Uptime)
+      assert.are.equal(1, s2.Details[FP_B].Rating.Uptime)
+      assert.are.equal('100', s2.Details[FP_B].Reward.Uptime)
+      assert.are.equal('600', s2.Details[FP_B].Reward.Network)
+      assert.are.equal('700', s2.Details[FP_B].Reward.Total)
+      local s3 = completeR(base, 3000, {                                                  -- Period 1
+        [FP_A] = score(ALICE, { Network = 100, IsHardware = true, UptimeStreak = 3 }),
+        [FP_B] = score(BOB, { Network = 200, UptimeStreak = 14 }) })
+      assert.are.equal('4.0', s3.Summary.Ratings.Uptime)
+      assert.are.equal('100', s3.Summary.Rewards.Uptime)
+      assert.are.equal(1, s3.Details[FP_A].Rating.Uptime)
+      assert.are.equal('25', s3.Details[FP_A].Reward.Uptime)
+      assert.are.equal(3, s3.Details[FP_B].Rating.Uptime)
+      assert.are.equal('75', s3.Details[FP_B].Reward.Uptime)
+      assert.are.equal('600', s3.Details[FP_B].Reward.Network)
+      assert.are.equal('675', s3.Details[FP_B].Reward.Total)
+    end)
+
+    it('Calculate hardware bonus (65% network + 35% uptime)', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '1000', Modifiers = {
+        Network = { Share = 0.56 },
+        Uptime = { Enabled = true, Share = 0.14, Tiers = { ['0'] = 0, ['3'] = 1, ['14'] = 3 } },
+        Hardware = { Enabled = true, Share = 0.3 }, ExitBonus = { Enabled = false, Share = 0 } } })
+      completeR(base, 1000, { [FP_A] = score(ALICE, { Network = 100 }) })                 -- Period 0
+      local s2 = completeR(base, 2000, { [FP_A] = score(ALICE, { Network = 100 }) })      -- no hw/uptime
+      assert.are.equal('0', s2.Summary.Rewards.Uptime)
+      assert.are.equal('0', s2.Summary.Rewards.Hardware)
+      assert.are.equal('0.0', s2.Summary.Ratings.Uptime)
+      assert.are.equal(0, s2.Details[FP_A].Rating.Uptime)
+      assert.are.equal('0', s2.Details[FP_A].Reward.Uptime)
+      assert.are.equal('0', s2.Details[FP_A].Reward.Hardware)
+      assert.are.equal('560', s2.Details[FP_A].Reward.Network)
+      local s3 = completeR(base, 3000, { [FP_A] = score(ALICE, { Network = 100, IsHardware = true, UptimeStreak = 3 }) })
+      assert.are.equal('140', s3.Summary.Rewards.Uptime)
+      assert.are.equal('300', s3.Summary.Rewards.Hardware)
+      assert.are.equal('1.0', s3.Summary.Ratings.Uptime)
+      assert.are.equal(1, s3.Details[FP_A].Rating.Uptime)
+      assert.are.equal('140', s3.Details[FP_A].Reward.Uptime)
+      assert.are.equal('300', s3.Details[FP_A].Reward.Hardware)
+      assert.are.equal('560', s3.Details[FP_A].Reward.Network)
+      assert.are.equal('1000', s3.Details[FP_A].Reward.Total)
+      local s4 = completeR(base, 4000, {                                                  -- Alice hw uptime14, Bob uptime3 no hw
+        [FP_A] = score(ALICE, { Network = 100, IsHardware = true, UptimeStreak = 14 }),
+        [FP_B] = score(BOB, { Network = 200, UptimeStreak = 3 }) })
+      assert.are.equal('4.0', s4.Summary.Ratings.Uptime)
+      assert.are.equal('140', s4.Summary.Rewards.Uptime)
+      assert.are.equal('300', s4.Summary.Rewards.Hardware)
+      assert.are.equal(3, s4.Details[FP_A].Rating.Uptime)
+      assert.are.equal('105', s4.Details[FP_A].Reward.Uptime)
+      assert.are.equal('186', s4.Details[FP_A].Reward.Network)   -- floor(560 * 100/300)
+      assert.are.equal('300', s4.Details[FP_A].Reward.Hardware)
+      assert.are.equal('591', s4.Details[FP_A].Reward.Total)
+      assert.are.equal(1, s4.Details[FP_B].Rating.Uptime)
+      assert.are.equal('35', s4.Details[FP_B].Reward.Uptime)
+      assert.are.equal('0', s4.Details[FP_B].Reward.Hardware)
+      assert.are.equal('373', s4.Details[FP_B].Reward.Network)   -- floor(560 * 200/300)
+      assert.are.equal('408', s4.Details[FP_B].Reward.Total)
+    end)
+
+    it('Calculate exit bonus', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '1000', Modifiers = {
+        Network = { Share = 0.56 },
+        Uptime = { Enabled = true, Share = 0.14, Tiers = { ['0'] = 0, ['3'] = 1, ['14'] = 3 } },
+        Hardware = { Enabled = true, Share = 0.2 }, ExitBonus = { Enabled = true, Share = 0.1 } } })
+      completeR(base, 1000, { [FP_A] = score(ALICE, { Network = 100 }) })                 -- Period 0
+      local s2 = completeR(base, 2000, { [FP_A] = score(ALICE, { Network = 100, ExitBonus = true }) })
+      assert.are.equal('100', s2.Summary.Rewards.ExitBonus)
+      assert.are.equal('100', s2.Summary.Ratings.ExitBonus)
+      assert.are.equal(100, s2.Details[FP_A].Rating.ExitBonus)
+      assert.are.equal('100', s2.Details[FP_A].Reward.ExitBonus)
+      assert.are.equal('560', s2.Details[FP_A].Reward.Network)
+      assert.are.equal('660', s2.Details[FP_A].Reward.Total)
+    end)
+  end)
+
+  -- =========================================================================
+  -- score-rewards.spec.ts — period, proportional split, delegate, accumulation
+  -- =========================================================================
+  describe('Score rewards', function()
+    local score1 = score(ALICE, { Network = 100 })
+    local score2 = score(BOB, { Network = 200, IsHardware = true, UptimeStreak = 3, ExitBonus = true, LocationSize = 2 })
+    local score3 = score(CHARLS, { Network = 300, IsHardware = true, UptimeStreak = 14, ExitBonus = true, FamilySize = 2, LocationSize = 1 })
+
+    it('Calculates a correct period since the last round', function()
+      local base = newBase()
+      updateConfig(base, { TokensPerSecond = '1000' })
+      completeR(base, 1000, { [FP_A] = score1 })                        -- Period 0
+      local s2 = completeR(base, 2345, { [FP_A] = score1 })
+      assert.are.equal(2345, s2.Timestamp)
+      assert.are.equal(math.floor((2345 - 1000) / 1000), s2.Period)     -- 1
+      local s3 = completeR(base, 40000, { [FP_A] = score1 })
+      assert.are.equal(40000, s3.Timestamp)
+      assert.are.equal(math.floor((40000 - 2345) / 1000), s3.Period)    -- 37
+    end)
+
+    it('Proportionally rewards relays based on their rating', function()
+      local base = newBase()
+      updateConfig(base, fullConfig())
+      completeR(base, 1000, { [FP_A] = score1 })                        -- Period 0
+      local snap = completeR(base, 11000, { [FP_A] = score1, [FP_B] = score2, [FP_C] = score3 })
+      assert.are.equal(11000, snap.Timestamp)
+      assert.are.equal(10, snap.Period)
+      local sum = base.state.PreviousRound.Summary.Ratings
+      local sumNet, sumUp, sumExit = tonumber(sum.Network), tonumber(sum.Uptime), tonumber(sum.ExitBonus)
+      -- reference formula (matches the WASM harness): Total = floor(5600·ratNet/sumNet) +
+      -- floor(1400·ratUp/sumUp) + Reward.Hardware + floor(1000·ratExit/sumExit)
+      local function refTotal(d)
+        local t = math.floor(5600 * d.Rating.Network / sumNet)
+        if sumUp > 0 then t = t + math.floor(1400 * d.Rating.Uptime / sumUp) end
+        t = t + tonumber(d.Reward.Hardware)
+        if sumExit > 0 then t = t + math.floor(1000 * d.Rating.ExitBonus / sumExit) end
+        return tostring(t)
+      end
+      assert.are.equal(refTotal(snap.Details[FP_A]), snap.Details[FP_A].Reward.Total)
+      assert.are.equal(refTotal(snap.Details[FP_B]), snap.Details[FP_B].Reward.Total)
+      assert.are.equal(refTotal(snap.Details[FP_C]), snap.Details[FP_C].Reward.Total)
+    end)
+
+    it('Assigns a shared reward to the Delegate (5600 → 2240 / 3360)', function()
+      local base = newBase()
+      updateConfig(base, fullConfig({ Delegates = { [ALICE] = { Address = BOB, Share = 0.4 } } }))
+      completeR(base, 1000, { [FP_A] = score1 })                        -- Period 0
+      local snap = completeR(base, 11000, { [FP_A] = score1 })          -- Alice sole relay → Network 5600
+      assert.are.equal('5600', snap.Details[FP_A].Reward.Total)
+      assert.are.equal('2240', snap.Details[FP_A].Reward.DelegateTotal)   -- 5600 * 0.4
+      assert.are.equal('3360', snap.Details[FP_A].Reward.OperatorTotal)   -- 5600 * 0.6
+    end)
+
+    it('Accumulates rewards by address and by fingerprint', function()
+      local base = newBase()
+      updateConfig(base, fullConfig({ Delegates = { [ALICE] = { Address = BOB, Share = 0.4 } } }))
+      completeR(base, 1000, { [FP_A] = score1 })                        -- Period 0
+      completeR(base, 11000, { [FP_A] = score1, [FP_B] = score2, [FP_C] = score3 })
+      assert.are.equal('558', base.state.TotalAddressReward[ALICE])     -- 930 * 0.6
+      assert.are.equal('930', base.state.TotalFingerprintReward[FP_A])
+      assert.are.equal('3631', base.state.TotalAddressReward[BOB])      -- own 3259 + Alice delegate 372
+      assert.are.equal('3259', base.state.TotalFingerprintReward[FP_B])
+      assert.are.equal('5808', base.state.TotalAddressReward[CHARLS])
+      assert.are.equal('5808', base.state.TotalFingerprintReward[FP_C])
+      completeR(base, 21000, { [FP_A] = score1 })                       -- only Alice scored
+      assert.are.equal('3918', base.state.TotalAddressReward[ALICE])
+      assert.are.equal('6530', base.state.TotalFingerprintReward[FP_A])
+      assert.are.equal('5871', base.state.TotalAddressReward[BOB])
+      assert.are.equal('3259', base.state.TotalFingerprintReward[FP_B])
+    end)
+  end)
+
+  -- =========================================================================
+  -- claim-rewards.spec.ts
   -- =========================================================================
   describe('Claim-Rewards', function()
-    it('Tracks Claimed as the current rewarded total; errors when nothing is owed', function()
+    local score1 = score(ALICE, { Network = 100 })
+    local score2 = score(BOB, { Network = 200, IsHardware = true, UptimeStreak = 3, ExitBonus = true, LocationSize = 2 })
+    local score3 = score(CHARLS, { Network = 300, IsHardware = true, UptimeStreak = 14, ExitBonus = true, FamilySize = 2, LocationSize = 1 })
+
+    it('Errors when nothing is owed', function()
       local base = newBase()
-      updateConfig(base, { TokensPerSecond = '1000000' })   -- small scale (Tier-1 64-bit safe)
       claimRewards(base, ALICE)
       assert.is_true(has(outData(base), 'No rewards for'))
-      -- earn something for ALICE
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1000000); completeRound(base, 1000000)
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1060000); completeRound(base, 1060000)
-      local owed = base.state.TotalAddressReward[ALICE]
-      assert.is_not_nil(owed)
-      claimRewards(base, ALICE)
-      assert.are.equal(owed, base.state.Claimed[ALICE])
+    end)
+
+    it('Tracks Claimed vs rewarded tokens across rounds', function()
+      local base = newBase()
+      updateConfig(base, fullConfig({ Delegates = { [ALICE] = { Address = BOB, Share = 0.4 } } }))
+      completeR(base, 1000, { [FP_A] = score1 })                        -- Period 0
+      completeR(base, 11000, { [FP_A] = score1, [FP_B] = score2, [FP_C] = score3 })
+      assert.are.equal('558', view(base, 'rewards', { address = ALICE }).reward)
+      assert.are.equal('3631', view(base, 'rewards', { address = BOB }).reward)
+      assert.are.equal('5808', view(base, 'rewards', { address = CHARLS }).reward)
+      -- claim Alice + Bob
+      assert.are.equal('558', json.decode(outData(claimRewards(base, ALICE))))
+      assert.are.equal('558', base.state.Claimed[ALICE])
+      assert.are.equal('3631', json.decode(outData(claimRewards(base, BOB))))
+      assert.are.equal('3631', base.state.Claimed[BOB])
+      assert.are.equal('558', view(base, 'claimed', { address = ALICE }).claimed)
+      assert.are.equal('3631', view(base, 'claimed', { address = BOB }).claimed)
+      assert.is_nil(view(base, 'claimed', { address = CHARLS }).claimed)   -- never claimed
+      -- second round (cumulative doubles)
+      completeR(base, 21000, { [FP_A] = score1, [FP_B] = score2, [FP_C] = score3 })
+      assert.are.equal('1116', view(base, 'rewards', { address = ALICE }).reward)
+      assert.are.equal('7262', view(base, 'rewards', { address = BOB }).reward)
+      assert.are.equal('11616', view(base, 'rewards', { address = CHARLS }).reward)
+      assert.are.equal('1116', json.decode(outData(claimRewards(base, ALICE))))
+      assert.are.equal('11616', json.decode(outData(claimRewards(base, CHARLS))))
+      assert.are.equal('1116', view(base, 'claimed', { address = ALICE }).claimed)
+      assert.are.equal('3631', view(base, 'claimed', { address = BOB }).claimed)   -- unchanged (not re-claimed)
+      assert.are.equal('11616', view(base, 'claimed', { address = CHARLS }).claimed)
     end)
   end)
 
   -- =========================================================================
-  describe('Views', function()
-    local function earnedBase()
-      local base = newBase()
-      updateConfig(base, { TokensPerSecond = '1000000' })   -- small scale (Tier-1 64-bit safe)
-      setDelegate(base, ALICE, BOB, 0.25)
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1000000); completeRound(base, 1000000)
-      addScores(base, { [FP_A] = score(ALICE, { Network = 1000 }) }, 1060000); completeRound(base, 1060000)
-      return base
+  -- view-init-state.spec.ts → migrate-on-spawn: a SEEDED base (module carries base.state, no Init
+  -- action) exposes the imported state through views. Reimport = seed a fresh base from a dump.
+  -- =========================================================================
+  describe('Seeded state (migrate-on-spawn ≙ Init import/reimport)', function()
+    local function seed()
+      return {
+        Claimed = {},
+        TotalAddressReward = { [ALICE] = '970102674393447307014' },
+        TotalFingerprintReward = { [FP_A] = '46721406387021560357' },
+        Configuration = fullConfig({ TokensPerSecond = '40509259200000000' }),
+        PreviousRound = { Timestamp = 1741948079386, Period = 3600,
+          Summary = { Ratings = { Network = '0', Uptime = '0', ExitBonus = '0' },
+            Rewards = { Total = '0', Network = '0', Hardware = '0', Uptime = '0', ExitBonus = '0' } },
+          Configuration = {} },
+        PendingRounds = {},
+      }
+    end
+    local function seededBase(state)
+      return { process = { id = 'PID', commitments = commit(OWNER) }, state = state, acl = { roles = {} } }
     end
 
-    it('rewards: by fingerprint and by address', function()
-      local base = earnedBase()
-      assert.are.equal(base.state.TotalFingerprintReward[FP_A], view(base, 'rewards', { fingerprint = FP_A }).reward)
-      local r = view(base, 'rewards', { address = ALICE })
-      assert.are.equal(ALICE, r.address)
-      assert.are.equal(base.state.TotalAddressReward[ALICE], r.reward)
+    it('exposes imported reward + round state through views (import)', function()
+      local base = seededBase(seed())
+      assert.are.equal(1741948079386, view(base, 'last_round').Timestamp)
+      assert.are.equal(3600, view(base, 'last_round').Period)
+      assert.are.equal('40509259200000000', view(base, 'dump').Configuration.TokensPerSecond)
+      assert.are.equal('970102674393447307014', view(base, 'rewards', { address = ALICE }).reward)
+      assert.are.equal('46721406387021560357', view(base, 'rewards', { fingerprint = FP_A }).reward)
+      assert.are.equal('40509259200000000', view(base, 'status').tokensPerSecond)
+      assert.are.equal(1741948079386, view(base, 'status').lastRoundTimestamp)
     end)
 
-    it('claimed: reflects a claim', function()
-      local base = earnedBase()
-      claimRewards(base, ALICE)
-      assert.are.equal(base.state.Claimed[ALICE], view(base, 'claimed', { address = ALICE }).claimed)
-    end)
-
-    it('delegate: set value, and default for an operator with none', function()
-      local base = earnedBase()
-      assert.are.same({ Address = BOB, Share = 0.25 }, view(base, 'delegate', { address = ALICE }))
-      assert.are.same({ Address = '', Share = 0 }, view(base, 'delegate', { address = CHARLS }))
-    end)
-
-    it('last_round: summary + metadata, no Details', function()
-      local base = earnedBase()
-      local lr = view(base, 'last_round')
-      assert.are.equal(1060000, lr.Timestamp)
-      assert.are.equal(60, lr.Period)
-      assert.is_not_nil(lr.Summary)
-      assert.is_nil(lr.Details)
-    end)
-
-    it('status: counts + tokensPerSecond + runtime identity', function()
-      local base = earnedBase()
-      local s = view(base, 'status')
-      assert.are.equal(1060000, s.lastRoundTimestamp)
-      assert.are.equal(1, s.counts.fingerprints)
-      assert.are.equal(2, s.counts.addresses)   -- ALICE (operator) + BOB (delegate)
-      assert.are.equal(1, s.counts.delegates)
-      assert.are.equal('relay-rewards', s.name)
-    end)
-
-    it('dump: full state snapshot', function()
-      local base = earnedBase()
-      local d = view(base, 'dump')
-      assert.are.equal(base.state.TotalFingerprintReward[FP_A], d.TotalFingerprintReward[FP_A])
-      assert.is_not_nil(d.Configuration)
+    it('a further round continues on top of the seeded (migrated) balances (reimport-equivalent)', function()
+      local base = seededBase(seed())
+      -- dump → reseed a fresh base (the native analog of View-State → Init reimport)
+      local dumped = view(base, 'dump')
+      local base2 = seededBase({
+        Claimed = dumped.Claimed, TotalAddressReward = dumped.TotalAddressReward,
+        TotalFingerprintReward = dumped.TotalFingerprintReward, Configuration = dumped.Configuration,
+        PreviousRound = dumped.PreviousRound, PendingRounds = {} })
+      assert.are.equal('970102674393447307014', view(base2, 'rewards', { address = ALICE }).reward)
+      assert.are.equal(1741948079386, view(base2, 'last_round').Timestamp)
+      assert.are.equal(3600, view(base2, 'last_round').Period)
     end)
   end)
 
+  -- =========================================================================
+  -- Runtime safety (D8 axes) — the WASM harness never exercised these
   -- =========================================================================
   describe('Runtime safety (D8 axes)', function()
     it('Rejects an unsigned message (no committer)', function()
@@ -485,18 +869,15 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.is_true(has(outData(base), 'unsigned or unresolved committer'))
       assert.is_nil(base.state.PendingRounds['1000'])
     end)
-
     it('Rejects an unknown action', function()
       local base = newBase()
       compute(base, assign('Frobnicate', OWNER, nil))
       assert.is_true(has(outData(base), 'unknown action'))
     end)
-
-    it('Reverts state atomically when a handler errors mid-batch', function()
+    it('Reverts state atomically when a handler errors', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE) }, 1000); completeRound(base, 1000)
       local tfrBefore = json.encode(base.state.TotalFingerprintReward)
-      -- a Complete-Round for a non-existent round must not perturb the cumulative maps
       completeRound(base, 999999)
       assert.is_true(has(outData(base), 'No pending round for'))
       assert.are.equal(tfrBefore, json.encode(base.state.TotalFingerprintReward))
