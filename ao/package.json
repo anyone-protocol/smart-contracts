@@ -7,6 +7,7 @@
     "url": "git+https://github.com/anyone-protocol/smart-contracts"
   },
   "devDependencies": {
+    "@anyone-protocol/ao-client": "github:anyone-protocol/ao-client#v0.1.1",
     "@ardrive/turbo-sdk": "^1.30.0",
     "@dha-team/arbundles": "^1.0.3",
     "@permaweb/ao-core-libs": "^0.0.9",
@@ -40,7 +41,8 @@
   },
   "scripts": {
     "build": "bun run process:build",
-    "deploy": "bun run scripts/spawn.ts",
+    "deploy": "bun run scripts/deploy.ts",
+    "deploy:legacy-genesis-wasm": "bun run scripts/legacy/spawn.ts",
     "e2e": "bun run process:build && bun run test/e2e/acl-test.e2e.ts && bun run test/e2e/operator-registry.e2e.ts",
     "e2e:acl-test": "bun run process:build && bun run test/e2e/acl-test.e2e.ts",
     "e2e:operator-registry": "bun run process:build && bun run test/e2e/operator-registry.e2e.ts",

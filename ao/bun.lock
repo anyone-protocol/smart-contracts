@@ -5,6 +5,7 @@
     "": {
       "name": "@anyone/smart-contracts-ao",
       "devDependencies": {
+        "@anyone-protocol/ao-client": "github:anyone-protocol/ao-client#v0.1.1",
         "@ardrive/turbo-sdk": "^1.30.0",
         "@dha-team/arbundles": "^1.0.3",
         "@permaweb/ao-core-libs": "^0.0.9",
@@ -32,6 +33,8 @@
   },
   "packages": {
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.10.1", "", {}, "sha512-96Z2IP3mYmF1Xg2cDm8f1gWGf/HUVedQ3FMifV4kG/PQ4yEP51xDtRAEfhVNt5f/uzpNkZHwWQuUcu6D6K+Ekw=="],
+
+    "@anyone-protocol/ao-client": ["@anyone-protocol/ao-client@github:anyone-protocol/ao-client#987449d", { "peerDependencies": { "@dha-team/arbundles": "^1.0.3" } }, "anyone-protocol-ao-client-987449d", "sha512-kG00M5uenyIfb4Ik7wsvD30lxaIToJOhlpOtSrrdSDoniLnGs1K9REmh/CaAP/L2xgnzDOY0X0Hi6U/DdpAwFA=="],
 
     "@ardrive/turbo-sdk": ["@ardrive/turbo-sdk@1.41.1", "", { "dependencies": { "@cosmjs/proto-signing": "^0.33.1", "@cosmjs/stargate": "^0.33.1", "@dha-team/arbundles": "^1.0.1", "@ethersproject/signing-key": "^5.7.0", "@permaweb/aoconnect": "0.0.57", "@solana/web3.js": "^1.91.7", "arweave": "^1.15.1", "bignumber.js": "^9.1.2", "bs58": "^5.0.0", "cli-progress": "^3.12.0", "commander": "^12.1.0", "ethers": "^6.12.0", "eventemitter3": "^5.0.1", "mime-types": "^2.1.35", "plimit-lit": "^3.0.1", "prompts": "^2.4.2", "tweetnacl": "^1.0.3", "x402-fetch": "^1.0.0" }, "bin": { "turbo": "lib/esm/cli/cli.js" } }, "sha512-uuzwpv4MzkxSRZS38y5KmUh5pk3tZddNUznkfwlmQ4rjaJBPFXhD1UapyWumry6iB8SnAsXSEs/XYA+hESWR9g=="],
 
