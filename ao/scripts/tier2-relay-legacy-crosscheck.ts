@@ -185,15 +185,40 @@ const s0 = legDetails[fps[0]]
 console.log(`  sample Details[${fps[0].slice(0, 8)}…]: Rating.Network=${s0?.Rating?.Network} Reward.Total=${s0?.Reward?.Total} Reward.Hardware=${s0?.Reward?.Hardware}`)
 let detBad = present < fps.length ? 1 : 0, checked = 0, delegatedSeen = 0
 if (present < fps.length) console.log(`  FAIL  ${fps.length - present} fingerprints missing/empty on one side (would be a false-pass)`)
+// BRANCH COVERAGE, asserted rather than assumed. The score generator varies hardware /
+// exit / uptime-tier, but "both sides agree" stays true even if a branch stopped firing
+// entirely — a config change (Modifiers.Hardware.Enabled=false), a different tier table,
+// or an edit to the generator would silently shrink what this proves while still
+// reporting 300/300. Same trap that made the staking cross-check's share run look green
+// while exercising only half its share values.
+const coverage = { hardware: 0, exit: 0, uptime: 0, tiers: new Set<number>() }
 for (const fp of fps) {
   const d = diff(legDetails[fp], natDetails[fp], `Details[${fp.slice(0, 8)}…]`)
   checked++
   if (d) { detBad++; if (detBad <= 5) console.log(`  FAIL  ${d}`) }
+  const r = legDetails[fp]?.Reward
+  if (r?.Hardware && r.Hardware !== '0') coverage.hardware++
+  if (r?.ExitBonus && r.ExitBonus !== '0') coverage.exit++
+  if (r?.Uptime && r.Uptime !== '0') coverage.uptime++
+  const tier = legDetails[fp]?.Score?.UptimeStreak
+  if (typeof tier === 'number') coverage.tiers.add(tier)
   // sanity: confirm the delegate branch actually fired (DelegateTotal != '0') for delegated fps
   if (delegates[legDetails[fp]?.Address] && legDetails[fp]?.Reward?.DelegateTotal !== '0') delegatedSeen++
 }
 console.log(`  ${checked - (detBad - (present < fps.length ? 1 : 0))}/${checked} fingerprint Details byte-identical (legacy ⇄ native)`)
 console.log(`  ${delegatedSeen}/${NDELEG} delegated fingerprints exercised the delegate split (DelegateTotal>0)`)
+console.log(`  branches exercised in-round: hardware ${coverage.hardware}, exit ${coverage.exit}, ` +
+  `uptime ${coverage.uptime}, tiers {${[...coverage.tiers].sort((a, b) => a - b).join(',')}}`)
+const uncovered = [
+  coverage.hardware === 0 && 'hardware pool split',
+  coverage.exit === 0 && 'exit distribution',
+  coverage.uptime === 0 && 'uptime bonus',
+  coverage.tiers.size < TIERS.length && `uptime tiers (${coverage.tiers.size}/${TIERS.length})`,
+].filter(Boolean) as string[]
+if (uncovered.length) {
+  console.log(`  FAIL  branch(es) never fired: ${uncovered.join(', ')} — the agreement above ` +
+    'proves less than it appears to')
+}
 
 console.log('\nB) round Summary (aggregate ratings + rewards):')
 report('PreviousRound.Summary', diff(legSummary, natSummary, 'Summary'))
@@ -210,5 +235,6 @@ console.log(`  ${movedOff}/${fps.length} accumulated onto the migrated prior (fi
 
 fails += detBad + tfrBad
 const ok = fails === 0 && detBad === 0 && tfrBad === 0 && delegatedSeen === NDELEG
+  && uncovered.length === 0
 console.log(`\n${ok ? 'ALL PASS' : fails + ' mismatch(es)'}  —  LEGACY ⇄ NATIVE reward math, ${K} fingerprints, real config, all branches.`)
 process.exit(ok ? 0 : 1)
