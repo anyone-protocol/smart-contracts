@@ -78,23 +78,10 @@ jobs:
           TIMEOUT: '600'
         run: ./spec/run-tier2.sh
 
-  legacy-mocha:
-    name: Legacy mocha (reference coverage — non-blocking)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # The legacy WASM-harness specs are kept as a COVERAGE REFERENCE for the native
-    # suites, not as a gate: the aos-WASM harness is obsolete under the Lua device, and
-    # the legacy contracts now carry luerl workarounds their specs were never updated for.
-    # Reported, never blocking. If you are adding behaviour to a native contract, read
-    # these to see what the legacy suite asserted — that is what they are for.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      # Pinned, not `latest`: an upstream bun release should not be able to turn CI red (or
-      # green) on its own, and on a PR this toolchain runs over contributed code.
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.14'
-      - run: bun install --frozen-lockfile
-      - run: bun run test
+# The legacy mocha suite (`bun run test`, test/spec/**) is deliberately NOT run here.
+# It drives the obsolete aos-WASM harness against the legacynet contracts, which now carry
+# luerl workarounds their specs were never updated for. It is retained in the repo purely
+# as a COVERAGE REFERENCE — when adding behaviour to a native contract, read those specs to
+# see what the legacy suite asserted — but it is not executed by CI and is not a gate.
+# A coverage comparison against it was done in D10 (legacy 262 assertions vs native 285;
+# the gaps it surfaced are closed), so it has already served that purpose once.
