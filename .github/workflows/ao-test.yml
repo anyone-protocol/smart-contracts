@@ -14,13 +14,37 @@ on:
     paths: ['ao/**', '.github/workflows/ao-test.yml']
   workflow_dispatch:
 
+# Least privilege, stated explicitly rather than inherited. These jobs only read the
+# checkout — unlike the image-publish workflows, which need `packages: write`. Setting it
+# here means a change to the org or repo default cannot silently widen this workflow's
+# token. A `pull_request` from a fork already gets a read-only token with no access to
+# secrets (which is exactly why this uses `pull_request` and never `pull_request_target`);
+# this makes that explicit for same-repo runs too.
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: ao
 
+# Fork pull requests execute the contributor's code: two container builds plus a
+# `bun install` that runs whatever lifecycle scripts their package.json declares. With a
+# read-only token and no secrets that is not a credential risk, but it is free compute on
+# our runners — and it would become remote code execution the day any of this moves to a
+# self-hosted runner. Outside contributions are not expected in this repo, so every job
+# below carries the same guard: run unless this is a PR from a different repository.
+# Branch pushes and workflow_dispatch are unaffected — the condition is only false for
+# fork PRs. (The guard is repeated per job rather than hoisted into `env:` because the
+# `env` context is not available to a job-level `if:`.)
+#
+# Belt and braces with Settings > Actions > "Require approval for all outside
+# collaborators": that setting is invisible from the repo and easy to lose to an org
+# policy change, whereas this guard shows up in the diff.
+
 jobs:
   tier1:
     name: Tier-1 — busted on Lua 5.3
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -37,6 +61,7 @@ jobs:
 
   tier2:
     name: Tier-2 — luerl 1.3.0 (device VM)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -55,6 +80,7 @@ jobs:
 
   legacy-mocha:
     name: Legacy mocha (reference coverage — non-blocking)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The legacy WASM-harness specs are kept as a COVERAGE REFERENCE for the native
@@ -65,8 +91,10 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+      # Pinned, not `latest`: an upstream bun release should not be able to turn CI red (or
+      # green) on its own, and on a PR this toolchain runs over contributed code.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.3.14'
       - run: bun install --frozen-lockfile
       - run: bun run test
