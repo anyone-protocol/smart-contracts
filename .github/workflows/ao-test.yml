@@ -1,0 +1,72 @@
+name: AO Contracts — Tests
+
+# CI has historically been manual in this repo; the two existing workflows only build and
+# publish images. This one runs the contract suites. The tiers are deliberately separate
+# jobs so a failure names the layer it happened in — Tier-1 is contract/runtime logic,
+# Tier-2 is the same code through the real device VM (luerl), and they fail for different
+# reasons. See docs/hyperbeam-migration/D8-port-safety-checklist.md.
+
+on:
+  push:
+    branches: [main, dev-hyper-aos-migration]
+    paths: ['ao/**', '.github/workflows/ao-test.yml']
+  pull_request:
+    paths: ['ao/**', '.github/workflows/ao-test.yml']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: ao
+
+jobs:
+  tier1:
+    name: Tier-1 — busted on Lua 5.3
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lua 5.3 specifically, not LuaJIT: LuaJIT is 5.1 and would diverge from luerl's 5.3
+      # semantics (integers, //, math.type) — which is the whole point of this tier.
+      - name: Build the Tier-1 toolchain image
+        run: docker build -t anyone-lua-spec:5.3 spec/
+
+      - name: Run specs
+        run: |
+          docker run --rm -v "$PWD":/work -w /work anyone-lua-spec:5.3 spec/
+
+  tier2:
+    name: Tier-2 — luerl 1.3.0 (device VM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # luerl 1.3.0 is pinned on purpose — it is what HyperBEAM v0.9-FINAL vendors in its
+      # rebar.lock. Bumping it here would stop this tier from testing what the node runs.
+      - name: Build the luerl runner image
+        run: docker build -t anyone-luerl:1.3.0 spec/luerl/
+
+      - name: Run scenarios
+        env:
+          CONTAINER_ENGINE: docker
+          TIMEOUT: '600'
+        run: ./spec/run-tier2.sh
+
+  legacy-mocha:
+    name: Legacy mocha (reference coverage — non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The legacy WASM-harness specs are kept as a COVERAGE REFERENCE for the native
+    # suites, not as a gate: the aos-WASM harness is obsolete under the Lua device, and
+    # the legacy contracts now carry luerl workarounds their specs were never updated for.
+    # Reported, never blocking. If you are adding behaviour to a native contract, read
+    # these to see what the legacy suite asserted — that is what they are for.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run test
