@@ -361,6 +361,47 @@ for (const env of targets) {
       check(res.headers.get('process') === null, 'denied request created no process')
     }
 
+    // D3 requires that arbitrary operator wallets CAN still message our processes —
+    // authorization is the contract's ACL, not the node's job — while everything else is
+    // refused. That is the p4 carve-out's whole purpose, and it is per-path, so it is
+    // testable without a live contract: the same non-allow-listed signer must be admitted
+    // past faff for a carved-out id and refused for a foreign one. A 500 here means the
+    // request got past faff and died later (the legacy ids are not hosted); what matters
+    // is only that it is NOT faff's 400 refusal.
+    if (usable && pids.length === 3) {
+      const probe = async (pid: string) => {
+        const it = createData(new Uint8Array(0) as never, signer, {
+          tags: [{ name: 'action', value: 'carveout-probe' }],
+        })
+        await it.sign(signer)
+        const r = await fetch(`https://${host}/${pid}~process@1.0/push`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/ans104' },
+          body: it.getRaw() as unknown as BodyInit,
+          signal: AbortSignal.timeout(30_000),
+        })
+        const b = (await r.text()).replace(/\s+/g, ' ')
+        return {
+          faffDenied: r.status === 400 && /will not service/i.test(b),
+          edgeDenied: r.status === 403,
+          status: r.status,
+        }
+      }
+      const carved = await Promise.all(pids.map(probe))
+      check(carved.every(c => !c.faffDenied && !c.edgeDenied),
+        'arbitrary wallet is admitted past faff for whitelisted process ids',
+        `${carved.filter(c => !c.faffDenied && !c.edgeDenied).length}/3 admitted`)
+
+      // Coverage assertion: without this, a node admitting EVERYTHING would pass the line
+      // above while enforcing nothing. WHICH layer refuses depends on the environment —
+      // on a locked edge nginx 403s the foreign id before faff ever sees it, so expecting
+      // faff's 400 there would fail for the wrong reason. Assert refusal, name the layer.
+      const foreign = await probe(FOREIGN_PID)
+      check(edgeLocked ? foreign.edgeDenied : foreign.faffDenied,
+        `the same wallet is refused for a foreign process id (${edgeLocked ? 'at the edge' : 'by faff'})`,
+        `HTTP ${foreign.status}`)
+    }
+
     // dev_faff:is_admissible is `lists:all` over the signer list, so an EMPTY signer list
     // passes vacuously — unsigned requests are admitted by faff. Documented upstream
     // behaviour; what matters for D3 is that it is not an authorization bypass, i.e. the
