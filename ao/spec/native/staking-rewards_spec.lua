@@ -204,6 +204,12 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.is_true(has(outData(base), 'Timestamp tag'))
       compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = REF }), { ['Round-Timestamp'] = 'bad-stamp' }))
       assert.is_true(has(outData(base), 'Timestamp tag'))
+      -- Numeric but FRACTIONAL. `utils.parseInt` (the A12 workaround) rejects any non-digit
+      -- byte, which is what keeps this out; plain `tonumber` would return 1000.5 and let a
+      -- fractional round timestamp into state. The legacy suite asserted integer-ness; no
+      -- native spec covered this case until now.
+      compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = REF }), { ['Round-Timestamp'] = '1000.5' }))
+      assert.is_true(has(outData(base), 'Timestamp tag'))
     end)
     it('Ensures timestamp is > 0', function()
       local base = newBase()

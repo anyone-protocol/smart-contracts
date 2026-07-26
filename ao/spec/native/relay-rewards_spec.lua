@@ -376,10 +376,23 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       compute(base, assign('Add-Scores', OWNER, nil, { ['Round-Timestamp'] = '1000' }))
       assert.is_true(has(outData(base), 'Message data is required'))
     end)
-    it('Ensures provided timestamp is numeric', function()
+    -- Brought to parity with the staking spec (missing tag / empty / non-numeric) and
+    -- extended with the FRACTIONAL case, which the legacy suite asserted as "timestamp is
+    -- integer" and neither native spec covered. It is the case that matters most here:
+    -- `utils.parseInt` is the A12 workaround (luerl's `tonumber` never yields the integer
+    -- subtype), and its strictness — rejecting anything with a non-digit byte, where
+    -- `tonumber` would happily return 1783067641960.5 — is the only thing keeping a
+    -- fractional round timestamp out of the state.
+    it('Ensures provided timestamp is an integer', function()
       local base = newBase()
-      compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = {} }), { ['Round-Timestamp'] = 'bad-stamp' }))
-      assert.is_true(has(outData(base), 'Round-Timestamp tag'))
+      local function reject(tags)
+        compute(base, assign('Add-Scores', OWNER, json.encode({ Scores = {} }), tags))
+        assert.is_true(has(outData(base), 'Round-Timestamp tag'))
+      end
+      reject(nil)                                          -- tag absent
+      reject({ ['Round-Timestamp'] = '' })                 -- empty
+      reject({ ['Round-Timestamp'] = 'bad-stamp' })        -- non-numeric
+      reject({ ['Round-Timestamp'] = '1783067641960.5' })  -- numeric but fractional
     end)
     it('Ensures timestamp is > 0', function()
       local base = newBase()
