@@ -32,6 +32,10 @@
 // Run: bun run scripts/verify-access-policy.ts [dev|stage|live]...   (default: all three)
 //      DEPLOYER_PRIVATE_KEY is required for the spawn-denial probe; without it that
 //      section is SKIPPED and the run reports as incomplete rather than passing.
+//      --dos  additionally exercise the DoS posture (D3's rate-limit + body-cap clause).
+//             OPT-IN because it deliberately generates load and trips the limiter for this
+//             source IP for a few seconds. Default target is dev only; naming stage or live
+//             with --dos is refused unless --dos-force is also given.
 import 'dotenv/config'
 import { EthereumSigner, createData } from '@dha-team/arbundles/web'
 import { computeAddress, getAddress, hexlify } from 'ethers'
@@ -96,7 +100,11 @@ if (PERTURB) {
 const FOREIGN_PID = 'Sa0iBLPNyJQrwpTTG-tWLQU-1QeUAJlxuTakXQhSPMU'
 
 const argv = process.argv.slice(2)
-const targets = (argv.length ? argv : Object.keys(ENVS)) as EnvName[]
+const dos = argv.includes('--dos')
+const dosForce = argv.includes('--dos-force')
+const targets = (argv.filter(a => !a.startsWith('--')).length
+  ? argv.filter(a => !a.startsWith('--'))
+  : Object.keys(ENVS)) as EnvName[]
 for (const t of targets) {
   if (!(t in ENVS)) {
     console.error(`usage: verify-access-policy.ts [${Object.keys(ENVS).join('|')}]...`)
@@ -268,6 +276,58 @@ for (const env of targets) {
     check(foreignStatus !== 403 && randomStatus !== 403,
       'dev edge is open by design (standing decision, not a regression)',
       `foreign ${foreignStatus}, unrouted ${randomStatus}`)
+  }
+
+  // --- DoS posture (opt-in: generates real load) ---------------------------
+  // D3 asks for "rate limiting and body-size caps as DoS posture". Both are edge
+  // controls, so both are probed from outside.
+  if (dos && (env === 'dev' || dosForce)) {
+    // Body cap: nginx `client_max_body_size 10m` and Traefik's 10MB buffering limit.
+    // 11MB must be refused by the edge; the node must never see it.
+    const big = new Uint8Array(11 * 1024 * 1024).fill(97)
+    const bigRes = await fetch(`https://${host}/push`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/ans104' },
+      body: big,
+      signal: AbortSignal.timeout(120_000),
+    }).catch(() => null)
+    check(bigRes?.status === 413, 'edge rejects an 11MB body with 413 (10MB cap)',
+      `HTTP ${bigRes?.status ?? 'connection reset'}`)
+
+    // Rate limit: Traefik `average=30, burst=60` per source. To exercise it the probe
+    // must actually EXCEED 30 req/s — measure the achieved rate and refuse to draw a
+    // conclusion below the threshold. An earlier version of this check silently
+    // "passed" while only reaching ~17 req/s, because the endpoint it hammered
+    // returned a large payload and the payload, not the limiter, was the bottleneck.
+    // Hence the tiny endpoint below, and the explicit rate assertion.
+    const N = 400
+    const t0 = Date.now()
+    const codes = await Promise.all(Array.from({ length: N }, () =>
+      fetch(`https://${host}/~meta@1.0/info/address`, { signal: AbortSignal.timeout(60_000) })
+        .then(r => r.status).catch(() => 0)
+    ))
+    const secs = (Date.now() - t0) / 1000
+    const rate = N / secs
+    const limited = codes.filter(c => c === 429).length
+    const served = codes.filter(c => c === 200).length
+
+    check(rate > 30, 'probe exceeded the 30 req/s limit (else the test proves nothing)',
+      `${rate.toFixed(1)} req/s over ${secs.toFixed(1)}s`)
+    if (rate > 30) {
+      check(limited > 0, 'edge rate-limits with 429 above the configured average',
+        `${limited} x 429, ${served} x 200`)
+      check(served > 0, 'rate limiting is a throttle, not an outage (some requests served)',
+        `${served} served`)
+    } else {
+      skip('edge rate-limits with 429', `only reached ${rate.toFixed(1)} req/s — inconclusive`)
+    }
+
+    // The bucket is per-source and short-lived; a brief idle must restore service.
+    await new Promise(r => setTimeout(r, 8000))
+    check(await statusOf(host, '/~meta@1.0/info/address') === 200,
+      'rate limiter recovers after a short idle')
+  } else if (dos) {
+    skip(`DoS posture on ${env}`, 'load test restricted to dev; pass --dos-force to override')
   }
 
   // --- spawn restriction --------------------------------------------------
