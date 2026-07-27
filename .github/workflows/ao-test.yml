@@ -6,24 +6,22 @@ name: AO Contracts — Tests
 # Tier-2 is the same code through the real device VM (luerl), and they fail for different
 # reasons. See docs/hyperbeam-migration/D8-port-safety-checklist.md.
 
+# `push` is main-only on purpose. Listing a working branch here as well means every commit on
+# it fires BOTH `push` and `pull_request` once a PR is open, and runs the whole workflow twice.
+# Branch coverage comes from the PR instead — which is where the result is actually needed.
 on:
   push:
-    branches: [main, dev-hyper-aos-migration]
+    branches: [main]
     paths: ['ao/**', '.github/workflows/ao-test.yml']
   pull_request:
     paths: ['ao/**', '.github/workflows/ao-test.yml']
   workflow_dispatch:
 
-# A long-lived branch with an open PR fires BOTH `push` and `pull_request` for the same commit,
-# so every job ran twice. Keying the group on the commit itself puts both runs in one group —
-# `github.sha` on a push and `pull_request.head.sha` on a PR are the same commit — so the second
-# cancels the first and the commit is tested once.
-#
-# This only works because every job below now behaves identically for both event types. An
-# event-dependent `if:` (as `e2e` used to have) would make coverage depend on which run happened
-# to win the race, which is worse than running twice.
+# Supersede an in-flight run when new commits land on the same PR or branch — pushing three
+# times in a minute should not leave three full runs racing. This is NOT what stops the workflow
+# running twice per commit; the main-only `push` trigger above does that.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Least privilege, stated explicitly rather than inherited. These jobs only read the
@@ -93,10 +91,10 @@ jobs:
   e2e:
     name: E2E — full suite on a local HyperBEAM node
     # Same fork guard as the tiers above, rather than the blanket `!= 'pull_request'` this used
-    # to carry. The original concern was that `bun install` re-introduces a contributor-controlled
-    # lifecycle-script surface — but that is a FORK problem, and the fork guard addresses it
-    # precisely. Excluding all PRs also meant same-repo PRs got no integration coverage, and it
-    # made this job's behaviour depend on the event type, which breaks the concurrency dedup above.
+    # to carry. That exclusion is not survivable now `push` is main-only: PRs would be the only
+    # event a working branch fires, so e2e would never run until merge. The original concern was
+    # that `bun install` re-introduces a contributor-controlled lifecycle-script surface — but
+    # that is a FORK problem, and the fork guard addresses it precisely.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
