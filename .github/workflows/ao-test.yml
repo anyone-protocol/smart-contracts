@@ -14,6 +14,18 @@ on:
     paths: ['ao/**', '.github/workflows/ao-test.yml']
   workflow_dispatch:
 
+# A long-lived branch with an open PR fires BOTH `push` and `pull_request` for the same commit,
+# so every job ran twice. Keying the group on the commit itself puts both runs in one group —
+# `github.sha` on a push and `pull_request.head.sha` on a PR are the same commit — so the second
+# cancels the first and the commit is tested once.
+#
+# This only works because every job below now behaves identically for both event types. An
+# event-dependent `if:` (as `e2e` used to have) would make coverage depend on which run happened
+# to win the race, which is worse than running twice.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 # Least privilege, stated explicitly rather than inherited. These jobs only read the
 # checkout — unlike the image-publish workflows, which need `packages: write`. Setting it
 # here means a change to the org or repo default cannot silently widen this workflow's
@@ -80,13 +92,12 @@ jobs:
 
   e2e:
     name: E2E — full suite on a local HyperBEAM node
-    # Deliberately NOT run on pull_request, unlike the two tiers above. It needs `bun install`,
-    # which re-introduces the contributor-controlled lifecycle-script surface that dropping the
-    # legacy mocha job removed from the PR path, and it is a ~5 minute job against a real node.
-    # Tier-1 and Tier-2 already gate contract logic on PRs; this catches integration regressions,
-    # which a contract-only PR is unlikely to introduce. Adding `pull_request` to `on:` above and
-    # the same fork guard here is a one-line change if that trade stops making sense.
-    if: github.event_name != 'pull_request'
+    # Same fork guard as the tiers above, rather than the blanket `!= 'pull_request'` this used
+    # to carry. The original concern was that `bun install` re-introduces a contributor-controlled
+    # lifecycle-script surface — but that is a FORK problem, and the fork guard addresses it
+    # precisely. Excluding all PRs also meant same-repo PRs got no integration coverage, and it
+    # made this job's behaviour depend on the event type, which breaks the concurrency dedup above.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
