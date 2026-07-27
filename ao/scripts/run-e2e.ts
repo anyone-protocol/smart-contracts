@@ -336,6 +336,16 @@ console.log(`\n[3] verticals`)
 for (const v of VERTICALS) {
   if (!selected(v.key)) { record(v.label, 'SKIP', `--only ${ONLY.join(',')}`); continue }
   if (!v.moduleId) { record(v.label, 'ERROR', 'no module id (registration failed)'); continue }
+  // If an artifact this vertical consumes never got built, say so. Running anyway produces an
+  // ENOENT stack trace from deep inside the vertical, which reads like a new problem rather
+  // than the downstream consequence of the artifact failure already reported above.
+  const missing = ARTIFACTS
+    .filter(a => a.needs.includes(v.key) && !fs.existsSync(path.join(AO, a.file)))
+    .map(a => a.file)
+  if (missing.length) {
+    record(v.label, 'ERROR', `prerequisite artifact missing: ${missing.join(', ')} — see the artifact stage above`)
+    continue
+  }
   await step(v.label, () => {
     const out = bun(v.script, [], { HB_URL: HB, MODULE_ID: v.moduleId!, DEPLOYER_PRIVATE_KEY: KEY }, v.timeoutS)
     // The verticals do not agree on how they print the pid: the seed ones use `pid=<id>`,

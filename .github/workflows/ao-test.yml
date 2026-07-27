@@ -108,6 +108,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # The suite's oracle stage shells out to this image (build-relay-probe.ts and
+      # build-staking-oracle.ts run the frozen round under luerl to produce the parity
+      # expectations). Tier-2 builds it too, but jobs get separate runners with separate
+      # docker daemons, so it has to be built here as well — it is local-only and cannot
+      # be pulled. Without it the oracles fail and both parity verticals then ENOENT.
+      - name: Build the luerl runner image
+        run: docker build -t anyone-luerl:1.3.0 spec/luerl/
+
       # v0.9-FINAL is what the cluster runs. The image is public (anonymous ghcr token works),
       # so no registry secret is needed. --network host so the suite can reach 8734 directly;
       # the ephemeral wallet is fine because nothing here is published to Arweave.
