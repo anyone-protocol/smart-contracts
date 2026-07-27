@@ -5,19 +5,45 @@
 //
 // Two phases, because they need different credentials:
 //
-//   1. PUBLISH the module — runs on the node host, signed by the NODE wallet, which
-//      writes it to the node's local cache (so the spawn resolves instantly) and
-//      uploads it to Arweave for durability. `--publish-cmd` prints the exact command.
+//   1. PUBLISH the module, producing a MODULE_ID.
 //   2. SPAWN from that module id — runs anywhere, signed by the DEPLOYER wallet, which
 //      must be in the node's faff allow-list.
 //
+// ─── There are TWO different module ids, and picking the wrong one is unrecoverable ─────
+//
+// A module can be made resolvable two ways, and they do NOT produce the same id:
+//
+//   * DURABLE (--publish): the module is signed client-side and posted to a bundler, so it
+//     lands on Arweave. Its id is the signed ans104 item id. ANY node resolves it by id via
+//     hb_store_gateway — verified: a cold node with an empty cache fetched and computed one
+//     in ~1.2s. This is the only id that is safe for a real deploy.
+//
+//   * NODE-LOCAL (--publish-cmd): `bin/hb eval` on the node host commits the module with the
+//     NODE wallet and hb_cache:write's it. Its id is hb_util:id(Msg) — a DIFFERENT value,
+//     and one that exists ONLY in that node's cache.
+//
+// Spawning a process against a node-local id means the module lives in exactly one cache.
+// A rebuilt node, a fresh Nomad alloc, or a second node in the redundancy pair CANNOT resolve
+// it, and the process can never compute another slot. That silently defeats D5's cold-start
+// guarantee, and it is not detectable from the process itself — which is why phase 2 refuses
+// to spawn against a module that is not on Arweave unless you say so explicitly.
+//
+// (The old flow also ran hb_client:upload inside that eval, ostensibly "for durability". It
+// did not do what it looked like: `bin/hb eval` starts a VM that never boots the hb
+// application, so it loads NO config and always resolves bundler-ans104 to the compiled-in
+// default — verified 2026-07-27. It has been removed rather than left as a false comfort.)
+//
 // Usage:
-//   bun run scripts/deploy.ts <contract> --seed <live|stage|none> [--publish-cmd]
+//   bun run scripts/deploy.ts <contract> --seed <live|stage|none> --publish
+//   bun run scripts/deploy.ts <contract> --seed <live|stage|none> --publish-cmd   # test only
 //   HB_URL=… DEPLOYER_PRIVATE_KEY=… MODULE_ID=… bun run scripts/deploy.ts <contract> --seed live
 //
 //   <contract>   operator-registry | relay-rewards | staking-rewards
 //   --seed       live|stage → migrate-on-spawn from that env's 2026-07-09 dump;
 //                none → empty declared state (a fresh process, not a migration)
+//   --publish    publish durably via BUNDLER (needs PUBLISH_KEY); prints the MODULE_ID
+//   --publish-cmd  print the node-host eval for a NODE-LOCAL id (fast, NOT cold-start safe)
+//   --allow-unpublished-module  spawn against a module that is not on Arweave (test only)
 //   --dry-run    build and report; touch nothing on the network
 import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
@@ -52,7 +78,11 @@ const opt = (name: string) => {
 
 const contract = argv[0] as ContractName
 if (!contract || !(contract in CONTRACTS)) {
-  console.error(`usage: deploy.ts <${Object.keys(CONTRACTS).join('|')}> --seed <live|stage|none> [--publish-cmd] [--dry-run]`)
+  console.error(`usage: deploy.ts <${Object.keys(CONTRACTS).join('|')}> --seed <live|stage|none>`)
+  console.error('       [--publish]                  publish durably via BUNDLER (needs PUBLISH_KEY)')
+  console.error('       [--publish-cmd]              node-host eval for a NODE-LOCAL id (test only)')
+  console.error('       [--allow-unpublished-module] spawn against a module not on Arweave (test only)')
+  console.error('       [--dry-run]')
   process.exit(2)
 }
 const seed = opt('seed')
@@ -115,8 +145,31 @@ const bundle = fs.readFileSync(bundlePath, 'utf8')
 console.log(`module bundle          ${(bundle.length / 1024).toFixed(1)}KB`)
 
 // ---------------------------------------------------------------------------
-// Phase 1 — publish (node-host command; the node wallet signs, not ours)
+// Phase 1 — publish
 // ---------------------------------------------------------------------------
+
+// 1a. DURABLE. Delegates to publish-module.ts so there is one implementation of signing,
+// posting and settlement verification rather than a second copy that can drift.
+if (flag('publish')) {
+  if (!process.env.BUNDLER) {
+    console.error('\nBUNDLER is required for --publish (e.g. https://up.arweave.net, or our own).')
+    console.error('  It has no default: which bundler carries our modules is not a question to guess at.')
+    process.exit(2)
+  }
+  console.log(`\npublishing durably via ${process.env.BUNDLER} …`)
+  execFileSync('bun', [
+    'run', path.join(AO, 'scripts', 'publish-module.ts'), bundlePath,
+    '--manifest', path.join(dist, `${contract}-publish.json`),
+    ...(dryRun ? ['--wait', '0'] : []),
+  ], { cwd: AO, stdio: 'inherit' })
+  console.log('\nUse the settled item id above as MODULE_ID for the spawn phase.')
+  process.exit(0)
+}
+
+// 1b. NODE-LOCAL. Fast, but the id exists only in this node's cache — see the header.
+// hb_client:upload is deliberately NOT called here: from `bin/hb eval` it always targets
+// the compiled-in default bundler regardless of node config, so it looked like durability
+// and was not.
 const publishErl = `
 {ok, Script} = file:read_file("/tmp/${contract}-module.lua"),
 Msg = hb_message:commit(
@@ -125,8 +178,6 @@ Msg = hb_message:commit(
      <<"name">> => <<"${contract}">>, <<"body">> => Script },
   #{ <<"priv-wallet">> => hb:wallet() }, <<"ans104@1.0">>),
 {ok, _} = hb_cache:write(Msg, #{}),
-Upload = (catch hb_client:upload(Msg, #{}, <<"ans104@1.0">>)),
-io:format("UPLOAD=~p~n", [Upload]),
 binary_to_list(hb_util:id(Msg)).
 `.trim().replace(/\n/g, ' ')
 
@@ -134,10 +185,11 @@ if (publishCmdOnly) {
   console.log('\n--- run these on the NODE HOST (the node wallet signs the module) ---')
   console.log(`podman cp ${bundlePath} <container>:/tmp/${contract}-module.lua`)
   console.log(`podman exec <container> ./bin/hb eval '${publishErl}'`)
-  console.log('\nThe printed id is MODULE_ID for the spawn phase.')
-  console.log('Publishing with the NODE wallet (not ours) is deliberate: it writes the')
-  console.log('module into the node\'s local cache, so the spawn resolves it immediately')
-  console.log('instead of waiting on Arweave gateway propagation.')
+  console.log('\n⚠️  The printed id is NODE-LOCAL. It exists only in that node\'s cache, is NOT')
+  console.log('    on Arweave, and no other node — including a rebuilt one — can resolve it.')
+  console.log('    Use this for local testing and fast iteration only.')
+  console.log('\n    For anything that must survive a node rebuild (i.e. any real deploy), use:')
+  console.log(`      BUNDLER=… PUBLISH_KEY=… bun run scripts/deploy.ts ${contract} --seed ${seed} --publish`)
   process.exit(0)
 }
 
@@ -165,8 +217,48 @@ if (!KEY) {
 const MODULE_ID = process.env.MODULE_ID
 if (!MODULE_ID) {
   console.error('MODULE_ID is required. Publish the module first:')
-  console.error(`  bun run scripts/deploy.ts ${contract} --seed ${seed} --publish-cmd`)
+  console.error(`  BUNDLER=… PUBLISH_KEY=… bun run scripts/deploy.ts ${contract} --seed ${seed} --publish`)
   process.exit(2)
+}
+
+/**
+ * Refuse to spawn a process whose module is not retrievable from Arweave.
+ *
+ * A module that exists only in one node's cache makes the process unrecoverable the moment
+ * that cache is lost — a rebuilt node cannot compute another slot, and nothing about the
+ * process says so. The failure appears at cold start, which is the worst possible time and
+ * exactly what D5 is supposed to guarantee against. Checked here because this is the last
+ * point where it is cheap to fix.
+ */
+async function assertModuleIsDurable (id: string) {
+  if (flag('allow-unpublished-module')) {
+    console.warn('  ! --allow-unpublished-module: NOT checking that the module is on Arweave.')
+    console.warn('  ! If this module is node-local, the process dies with that node\'s cache.')
+    return
+  }
+  const res = await fetch('https://arweave.net/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `{ transaction(id: "${id}") { id } }` }),
+    signal: AbortSignal.timeout(45_000),
+  }).catch(() => null)
+  const found = res?.ok && !!(await res.json().catch(() => null) as any)?.data?.transaction
+  if (found) {
+    console.log(`module durability      on Arweave (indexed)`)
+    return
+  }
+  console.error(`\nrefusing to spawn: module ${id} is not indexed on Arweave.`)
+  console.error('  A node-local module id (from --publish-cmd) exists in exactly one node\'s')
+  console.error('  cache. Spawning against it produces a process that a rebuilt node can never')
+  console.error('  compute — the D5 cold-start guarantee would be silently void.')
+  console.error('')
+  console.error('  Publish it durably first:')
+  console.error(`    BUNDLER=… PUBLISH_KEY=… bun run scripts/deploy.ts ${contract} --seed ${seed} --publish`)
+  console.error('  Settlement takes hours; re-check with:')
+  console.error(`    bun run scripts/publish-module.ts --check-only ${id}`)
+  console.error('')
+  console.error('  For a throwaway test deploy, pass --allow-unpublished-module.')
+  process.exit(1)
 }
 
 const deployer = new Wallet('0x' + KEY).address
@@ -190,6 +282,7 @@ const ao = createAoClient({
   console.log(`authority              ${authority}${process.env.AUTHORITY ? ' (explicit)' : ' (node)'}`)
   console.log(`deployer (Owner)       ${deployer}`)
   console.log(`module                 ${MODULE_ID}`)
+  await assertModuleIsDurable(MODULE_ID)
 
   if (scheduler !== nodeAddress) {
     console.warn('  ! scheduler-location is NOT this node — the node will not adopt the process')
