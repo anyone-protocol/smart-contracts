@@ -8,10 +8,11 @@
 //
 // Emits dist/staking-oracle-probe.json { Period, Summary, Details, Rewarded }.
 // Run: bun run scripts/build-staking-oracle.ts     (needs dist/staking-rewards-seed.lua)
-import { execFileSync } from 'node:child_process'
+// Env: CONTAINER_ENGINE (podman|docker, default podman), LUERL_IMAGE
 import fs from 'fs'
 import path from 'path'
 import { buildRound } from './util/staking-round'
+import { luerl } from './util/luerl'
 
 const AO = path.resolve(import.meta.dir, '..')
 const seedPath = path.join(AO, 'dist/staking-rewards-seed.lua')
@@ -53,10 +54,9 @@ console.log(`  prev=${round.prev}  t=${round.timestamp}  (13-digit ms — exerci
 console.log(`  ${round.withClaimedPrior} pairs with a Claimed prior, ${round.selfPairs} self-pairs, ${round.belowGate} below the Running gate, ${round.atGate} at it`)
 
 const t0 = performance.now()
-const raw = execFileSync('podman',
-  ['run', '--rm', '-v', `${AO}:/work:Z`, '-w', '/work', 'anyone-luerl:1.3.0',
-    'bundle', '/work/dist/staking-rewards-seed.lua', '/work/dist/staking-oracle-scen.lua'],
-  { encoding: 'utf8', timeout: 900000, maxBuffer: 512 * 1024 * 1024 })
+const raw = luerl(
+  ['bundle', '/work/dist/staking-rewards-seed.lua', '/work/dist/staking-oracle-scen.lua'],
+  { timeoutMs: 900_000 })
 const ms = Math.round(performance.now() - t0)
 
 const grep = (tag: string) => {

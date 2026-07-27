@@ -41,7 +41,7 @@
 //
 // Compares PARSED objects (deep-equal), never raw json bytes — Lua `pairs` key order isn't stable.
 // Run: [K=300] [PERTURB=1] bun run scripts/tier2-staking-legacy-crosscheck.ts
-import { execFileSync } from 'node:child_process'
+import { luerl } from './util/luerl'
 import { getAddress } from 'ethers'
 import fs from 'fs'
 import path from 'path'
@@ -194,9 +194,7 @@ return { pass = 1, fail = 0, failures = {} }
 `
 }
 
-const podman = (args: string[]) => execFileSync('podman',
-  ['run', '--rm', '-v', `${AO}:/work:Z`, '-w', '/work', 'anyone-luerl:1.3.0', ...args],
-  { encoding: 'utf8', timeout: 900000, maxBuffer: 512 * 1024 * 1024 })
+const podman = (args: string[]) => luerl(args, { timeoutMs: 900_000 })
 
 const grep = (raw: string, tag: string) => {
   const line = raw.split('\n').find(l => l.startsWith(tag + '='))

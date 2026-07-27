@@ -20,16 +20,12 @@
 // Prereq: bun run scripts/build-relay-seed.ts && bun run scripts/build-relay-oracle.ts
 // Run:    bun run scripts/build-relay-probe.ts
 // Env:    CONTAINER_ENGINE (podman|docker, default podman), LUERL_IMAGE, TIMEOUT (seconds)
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { luerl, ENGINE, IMAGE } from './util/luerl'
 
 const AO = path.resolve(import.meta.dir, '..')
-const ENGINE = process.env.CONTAINER_ENGINE || 'podman'
-const IMAGE = process.env.LUERL_IMAGE || 'anyone-luerl:1.3.0'
 const TIMEOUT_S = Number(process.env.TIMEOUT || 900)
-// SELinux relabelling is needed on Fedora-family hosts under podman; docker rejects :Z.
-const MOUNT = `${AO}:/work${ENGINE.includes('podman') ? ':Z' : ''}`
 
 const SEED = path.join(AO, 'dist/relay-oracle-min.lua')
 const SCEN = 'spec/luerl/scenarios/relay-round-probe.lua'
@@ -45,10 +41,9 @@ console.log(`${ENGINE} ${IMAGE} bundle ${path.basename(SEED)} ${path.basename(SC
 const t0 = performance.now()
 let raw: string
 try {
-  raw = execFileSync(
-    ENGINE,
-    ['run', '--rm', '-v', MOUNT, '-w', '/work', IMAGE, 'bundle', `/work/dist/${path.basename(SEED)}`, `/work/${SCEN}`],
-    { encoding: 'utf8', timeout: TIMEOUT_S * 1000, maxBuffer: 512 * 1024 * 1024 }
+  raw = luerl(
+    ['bundle', `/work/dist/${path.basename(SEED)}`, `/work/${SCEN}`],
+    { timeoutMs: TIMEOUT_S * 1000 }
   )
 } catch (e: any) {
   // A timeout here almost always means the scenario was run against the wrong bundle.

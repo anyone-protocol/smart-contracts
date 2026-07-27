@@ -27,7 +27,7 @@
 //
 // Compares PARSED objects (deep-equal), never raw json bytes — Lua `pairs` key order isn't stable.
 // Run: [K=300] bun run scripts/tier2-relay-legacy-crosscheck.ts
-import { execFileSync } from 'node:child_process'
+import { luerl } from './util/luerl'
 import fs from 'fs'
 import path from 'path'
 
@@ -137,9 +137,7 @@ const nativePath = path.join(AO, 'dist/relay-crosscheck-native-scen.lua')
 fs.writeFileSync(legacyPath, legacyScen)
 fs.writeFileSync(nativePath, nativeScen)
 
-const podman = (args: string[]) => execFileSync('podman',
-  ['run', '--rm', '-v', `${AO}:/work:Z`, '-w', '/work', 'anyone-luerl:1.3.0', ...args],
-  { encoding: 'utf8', timeout: 600000, maxBuffer: 256 * 1024 * 1024 })
+const podman = (args: string[]) => luerl(args, { timeoutMs: 600_000, maxBuffer: 256 * 1024 * 1024 })
 const grep = (raw: string, tag: string) => {
   const line = raw.split('\n').find(l => l.startsWith(tag + '='))
   if (!line) { console.error(`no ${tag}= line in output:\n` + raw.slice(0, 1200)); process.exit(2) }

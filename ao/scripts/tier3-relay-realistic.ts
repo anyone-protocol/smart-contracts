@@ -10,7 +10,7 @@
 import { EthereumSigner } from '@dha-team/arbundles'
 import { fetchNodeAddress, spawnLuaProcess, sendMessage, readState } from './util/hb-client'
 import { buildSeedBundle } from './util/native-bundle'
-import { execFileSync } from 'node:child_process'
+import { luerl } from './util/luerl'
 import fs from 'fs'
 import path from 'path'
 
@@ -66,9 +66,9 @@ return { pass = 1, fail = 0, failures = {} }
 `
 const scenPath = path.join(AO, 'dist/relay-realistic-oracle-scen.lua')
 fs.writeFileSync(scenPath, oracleScen)
-const raw = execFileSync('podman', ['run', '--rm', '-v', `${AO}:/work:Z`, '-w', '/work', 'anyone-luerl:1.3.0',
-  'bundle', '/work/dist/relay-oracle-min.lua', '/work/dist/relay-realistic-oracle-scen.lua'],
-  { encoding: 'utf8', timeout: 180000, maxBuffer: 64 * 1024 * 1024 })
+const raw = luerl(
+  ['bundle', '/work/dist/relay-oracle-min.lua', '/work/dist/relay-realistic-oracle-scen.lua'],
+  { timeoutMs: 180_000, maxBuffer: 64 * 1024 * 1024 })
 const line = raw.split('\n').find(l => l.startsWith('ORACLE='))
 if (!line) { console.error('oracle produced no ORACLE= line:\n' + raw.slice(0, 500)); process.exit(2) }
 const oracleDetails = JSON.parse(line.slice('ORACLE='.length))

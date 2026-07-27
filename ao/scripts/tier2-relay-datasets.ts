@@ -13,7 +13,7 @@ import { scores as staging1Scores } from '../test/spec/contracts/relay-rewards/s
 import { scores as staging2Scores } from '../test/spec/contracts/relay-rewards/staging2-scores.js'
 import { test1Config } from '../test/spec/contracts/relay-rewards/test1-config.js'
 import { test1Scores } from '../test/spec/contracts/relay-rewards/test1-scores.js'
-import { execFileSync } from 'node:child_process'
+import { luerl } from './util/luerl'
 import fs from 'fs'
 import path from 'path'
 
@@ -96,9 +96,9 @@ for (const ds of DATASETS) {
   process.stdout.write(`${ds.name}: ${nFps} fingerprints, ${ds.steps.filter(s => s.kind === 'round').length} round(s) … `)
   let raw = ''
   try {
-    raw = execFileSync('podman', ['run', '--rm', '-v', `${AO}:/work:Z`, '-w', '/work', 'anyone-luerl:1.3.0',
-      'native', '/work', 'src/contracts/native/relay-rewards.lua', `/work/dist/relay-dataset-${ds.name}-scen.lua`],
-      { encoding: 'utf8', timeout: 300000, maxBuffer: 256 * 1024 * 1024 })
+    raw = luerl(
+      ['native', '/work', 'src/contracts/native/relay-rewards.lua', `/work/dist/relay-dataset-${ds.name}-scen.lua`],
+      { timeoutMs: 300_000, maxBuffer: 256 * 1024 * 1024 })
   } catch (e: any) {
     raw = String(e?.stdout || '') + String(e?.stderr || '')
   }
