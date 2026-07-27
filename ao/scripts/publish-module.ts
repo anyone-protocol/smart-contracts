@@ -58,7 +58,7 @@ const files = argv.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes
 
 // ── verification ────────────────────────────────────────────────────────────────────────────
 
-/** The ONLY trustworthy settlement check. The data endpoint lies (optimistic cache). */
+/** Gateway index lookup. Necessary but NOT sufficient — see finality() below. */
 async function indexed (id: string): Promise<{ settled: boolean, bundledIn?: string }> {
   const res = await fetch(`${GATEWAY}/graphql`, {
     method: 'POST',
@@ -72,6 +72,50 @@ async function indexed (id: string): Promise<{ settled: boolean, bundledIn?: str
   const j: any = await res.json().catch(() => null)
   const tx = j?.data?.transaction
   return { settled: !!tx, bundledIn: tx?.bundledIn?.id }
+}
+
+/** L1 status of a transaction. Meaningful ONLY for a root bundle, never for a data item. */
+async function l1Status (id: string): Promise<{ height: number, confirmations: number } | null> {
+  try {
+    const res = await fetch(`${GATEWAY}/tx/${id}/status`, { signal: AbortSignal.timeout(30_000) })
+    if (!res.ok) return null
+    const j: any = await res.json().catch(() => null)
+    if (typeof j?.number_of_confirmations !== 'number') return null
+    return { height: j.block_height, confirmations: j.number_of_confirmations }
+  } catch { return null }
+}
+
+/**
+ * Real finality, as distinct from "a gateway has heard of it".
+ *
+ * ANS-104 data items are L2: they live INSIDE a bundle, and L1 knows nothing about them. So
+ * `/tx/<dataItemId>/status` returning Not Found is CORRECT and says nothing either way. Bundles
+ * also nest, so `bundledIn` may point at an intermediate bundle that is itself a data item. Only
+ * the ROOT of that chain is an L1 transaction, and only its confirmation count is evidence that
+ * anything was actually mined.
+ *
+ * Reference point: a legacynet item walked 2 levels to root oYcUSTh3… with 151,436 confirmations.
+ *
+ * Caveat this still does NOT prove: a confirmed L1 tx carries a data_root, but chunks are
+ * uploaded separately (dev_bundler's third phase, post_proof). A tx can be mined while its chunks
+ * were never seeded. Confirmations + repeated successful retrieval over days is the practical
+ * bar; a single check right after publishing proves neither.
+ */
+async function finality (id: string): Promise<{
+  root?: string, depth: number, confirmations?: number, chain: string[]
+}> {
+  const chain: string[] = []
+  let cur = id
+  for (let depth = 0; depth < 8; depth++) {
+    const { bundledIn } = await indexed(cur)
+    if (!bundledIn) {
+      const st = await l1Status(cur)
+      return { root: cur, depth, confirmations: st?.confirmations, chain }
+    }
+    chain.push(bundledIn)
+    cur = bundledIn
+  }
+  return { depth: 8, chain }
 }
 
 /** Reported alongside the real check purely to show the discrepancy when there is one. */
@@ -144,16 +188,25 @@ if (RECHECK) {
   let settledN = 0
   const rows: Array<{ e: ManifestEntry, settled: boolean, data: number }> = []
   for (const e of entries) {
-    const { settled, bundledIn } = await indexed(e.id)
+    const { settled } = await indexed(e.id)
     const data = await dataEndpoint(e.id)
     if (settled) settledN++
     rows.push({ e, settled, data })
     const age = ((Date.now() - Date.parse(e.publishedAt)) / 3600_000).toFixed(1)
+    let tail = ''
+    if (settled) {
+      // Indexed is not finality. Walk to the ROOT bundle and report ITS L1 confirmations —
+      // data items are L2 and have no L1 record of their own.
+      const f = await finality(e.id)
+      tail = f.confirmations !== undefined
+        ? `  root ${f.root!.slice(0, 12)}… depth ${f.depth} CONFIRMED x${f.confirmations}`
+        : `  root ${f.root ? f.root.slice(0, 12) + '…' : '?'} depth ${f.depth} NOT YET MINED`
+    } else if (data === 200) {
+      tail = '   [data 200 = optimistic cache only, NOT persistence]'
+    }
     console.log(
-      `  ${(settled ? 'SETTLED' : 'pending').padEnd(8)} ${String(Math.round(e.bytes / 1024)).padStart(6)}KB` +
-      `  age ${age.padStart(6)}h  ${e.file.padEnd(22)} ${e.id}` +
-      `${settled && bundledIn ? `  in ${bundledIn.slice(0, 12)}…` : ''}` +
-      `${!settled && data === 200 ? '   [data 200 = optimistic cache only]' : ''}`
+      `  ${(settled ? 'indexed' : 'pending').padEnd(8)} ${String(Math.round(e.bytes / 1024)).padStart(6)}KB` +
+      `  age ${age.padStart(6)}h  ${e.file.padEnd(22)} ${e.id}${tail}`
     )
   }
   // The free-tier boundary, if there is one, shows up as a size at which settlement stops.
@@ -174,8 +227,16 @@ if (CHECK_ONLY) {
   const { settled, bundledIn } = await indexed(CHECK_ONLY)
   const data = await dataEndpoint(CHECK_ONLY)
   console.log(`id       : ${CHECK_ONLY}`)
-  console.log(`graphql  : ${settled ? `SETTLED${bundledIn ? ` (bundled in ${bundledIn})` : ''}` : 'NOT INDEXED'}`)
+  console.log(`graphql  : ${settled ? `INDEXED${bundledIn ? ` (bundledIn ${bundledIn})` : ''}` : 'NOT INDEXED'}`)
   console.log(`data url : HTTP ${data}${data === 200 && !settled ? '  <-- optimistic cache only, NOT persistence' : ''}`)
+  if (settled) {
+    const f = await finality(CHECK_ONLY)
+    for (const [i, b] of f.chain.entries()) console.log(`bundle ${i + 1} : ${b}`)
+    console.log(`root     : ${f.root ?? '(unresolved)'}  depth ${f.depth}`)
+    console.log(`L1       : ${f.confirmations !== undefined
+      ? `CONFIRMED, ${f.confirmations} confirmation(s)`
+      : 'root not mined (or not yet visible) — data item is L2 and has no L1 record of its own'}`)
+  }
   if (VERIFY_SPAWN) await verifySpawnable(VERIFY_SPAWN, CHECK_ONLY)
   process.exit(settled ? 0 : 1)
 }
