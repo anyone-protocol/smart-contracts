@@ -8,7 +8,7 @@
 import { getAddress } from 'ethers'
 import fs from 'fs'
 import path from 'path'
-import { buildSeedBundle } from './util/native-bundle'
+import { buildSeedBundle, buildSeedEnvelope } from './util/native-bundle'
 
 const NET = (process.argv[2] || 'live') as 'live' | 'stage'
 const AO = path.resolve(import.meta.dir, '..')
@@ -88,6 +88,7 @@ fs.mkdirSync(dist, { recursive: true })
 const luaOut = path.join(dist, 'operator-registry-seed.lua')
 const expectedOut = path.join(dist, 'operator-registry-seed.expected.json')
 fs.writeFileSync(luaOut, bundle)
+fs.writeFileSync(path.join(dist, 'operator-registry-seed.envelope.json'), buildSeedEnvelope(stateJson, rolesJson))
 fs.writeFileSync(expectedOut, JSON.stringify({ state: migrated, roles }, null, 0))
 
 console.log(`=== seed built from ${NET} legacynet dump (2026-07-09) ===`)

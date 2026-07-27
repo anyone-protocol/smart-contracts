@@ -118,16 +118,23 @@ function assertOurNode (url: string) {
 const dist = path.join(AO, 'dist')
 fs.mkdirSync(dist, { recursive: true })
 
-const bundlePath = seed === 'none'
-  ? path.join(dist, `${contract}-native.lua`)
-  : path.join(dist, `${contract}-seed.lua`)
+// The published module is ALWAYS pure source — identical bytes whether this is a
+// migration or a fresh deploy. The seed rides the SPAWN MESSAGE instead of being
+// embedded, because a seeded module re-ran json.decode over the whole dump on every
+// READ (the module is reloaded per read; the declared state is consumed once, at
+// slot 0). Measured on the real registry: 2.60s/read embedded vs 0.43s, same state.
+// It also makes the module reusable across envs and reseeds instead of a per-migration
+// artifact. See runtime/native.lua and native-bundle.ts buildSeedEnvelope.
+const bundlePath = path.join(dist, `${contract}-native.lua`)
+const envelopePath = path.join(dist, `${contract}-seed.envelope.json`)
 const expectedPath = path.join(dist, `${contract}-seed.expected.json`)
 
 console.log(`=== deploy ${contract} (seed: ${seed}) ===`)
-if (seed === 'none') {
-  fs.writeFileSync(bundlePath, buildBundle(`src/contracts/native/${contract}.lua`))
-  console.log(`built fresh module     ${path.relative(AO, bundlePath)}`)
-} else {
+fs.writeFileSync(bundlePath, buildBundle(`src/contracts/native/${contract}.lua`))
+console.log(`built module (source)  ${path.relative(AO, bundlePath)}`)
+
+let seedEnvelope: string | undefined
+if (seed !== 'none') {
   // Reuse the seed builders verbatim rather than reimplementing the transform — they
   // are what the Tier-3 validations were run against, and they assert their own
   // totality (a dropped address fails the build rather than shrinking the migration).
@@ -136,10 +143,12 @@ if (seed === 'none') {
   execFileSync('bun', ['run', path.join(AO, 'scripts', script), seed], {
     cwd: AO, stdio: 'inherit',
   })
-  if (!fs.existsSync(bundlePath)) {
-    console.error(`seed builder produced no ${path.relative(AO, bundlePath)}`)
+  if (!fs.existsSync(envelopePath)) {
+    console.error(`seed builder produced no ${path.relative(AO, envelopePath)}`)
     process.exit(1)
   }
+  seedEnvelope = fs.readFileSync(envelopePath, 'utf8')
+  console.log(`seed envelope          ${(seedEnvelope.length / 1024).toFixed(1)}KB (spawn data)`)
 }
 const bundle = fs.readFileSync(bundlePath, 'utf8')
 console.log(`module bundle          ${(bundle.length / 1024).toFixed(1)}KB`)
@@ -298,6 +307,8 @@ const ao = createAoClient({
     moduleId: MODULE_ID,
     schedulerLocation: scheduler,
     authority,
+    // The migration seed. Consumed by the runtime at slot 0 and never again.
+    data: seedEnvelope,
     tags: [
       { name: 'app-name', value: 'anyone-protocol' },
       { name: 'name', value: `${contract}-${Date.now()}` },

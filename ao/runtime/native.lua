@@ -473,12 +473,35 @@ function native.compute(base, req)
   -- snapshot so a first-message handler error reverts to the initialized baseline.
   pcall(function()
     if base.state == nil then
-      base.state = native._contract and deepcopy(native._contract.state) or {}
+      -- MIGRATION SEED, supplied as the SPAWN MESSAGE data so the published module stays
+      -- PURE SOURCE. It used to be embedded in the module itself, which meant a json.decode
+      -- of the entire dump on EVERY READ -- the module is reloaded into a fresh luerl VM per
+      -- read, and `contract.state` is consumed only here, at slot 0, then discarded forever.
+      -- Measured on the real registry (~1MB dump): 2.60s/read embedded vs 0.43s seeded at
+      -- spawn, with byte-identical resulting state.
+      --
+      -- Envelope: { ["ao-migration-seed"] = 1, state = {...}, acl = { roles = {...} } }.
+      -- Marker-gated so ordinary spawn data is never mistaken for a seed. A MARKED but
+      -- malformed seed yields an EMPTY state rather than a half-initialized one; deploy
+      -- tooling diffs the spawned state against <contract>-seed.expected.json, so that
+      -- fails loudly at deploy instead of going live wrong.
+      local seed
+      if type(base.data) == 'string' and #base.data > 0 then
+        local ok, env = pcall(function() return require('json').decode(base.data) end)
+        if ok and type(env) == 'table' and env['ao-migration-seed'] ~= nil then
+          seed = (type(env.state) == 'table') and env or { state = {} }
+        end
+      end
+      base.state = (seed and seed.state)
+        or (native._contract and deepcopy(native._contract.state) or {})
+      -- ACL roles are migration state too, so they ride the same envelope.
+      if seed and type(seed.acl) == 'table' then base.acl = seed.acl end
     end
     -- ACL roles are migration state too: seed them from a module-declared `acl` at spawn,
-    -- symmetric with `state` above (migrate-on-spawn — no runtime bulk-load step). Seed builds
-    -- carry `acl = { roles = {...} }`; the base contract omits `acl`, so a normal deploy still
-    -- defaults to an empty role set. See D26 / scripts/util/native-bundle.ts buildSeedBundle.
+    -- symmetric with `state` above (migrate-on-spawn -- no runtime bulk-load step). The
+    -- luerl-only fixtures (Tier-2/Tier-3 oracles) still use embedded-seed bundles built by
+    -- native-bundle.ts buildSeedBundle, which declare `acl` on the contract; the base
+    -- contract omits `acl`, so a normal deploy still defaults to an empty role set. See D26.
     if base.acl == nil then
       base.acl = (native._contract and native._contract.acl and deepcopy(native._contract.acl))
         or { roles = {} }

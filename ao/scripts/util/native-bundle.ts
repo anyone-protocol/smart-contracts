@@ -29,6 +29,27 @@ export function buildBundle (contractRel = 'src/contracts/native/operator-regist
 }
 
 /**
+ * The migration seed as a SPAWN-DATA envelope — the deploy path.
+ *
+ * The published module stays PURE SOURCE (buildBundle, ~68KB) and the seed rides the spawn
+ * message. The runtime consumes it at slot 0 (runtime/native.lua, `base.state == nil`) and
+ * never again.
+ *
+ * This replaces buildSeedBundle for anything that SPAWNS. Embedding the dump in the module
+ * cost a json.decode of the whole thing on EVERY READ, because the module is reloaded into a
+ * fresh luerl VM per read while the declared `state` is consumed only once. Measured on the
+ * real operator-registry (~1MB dump): 2.60s/read embedded vs 0.43s seeded at spawn, with
+ * byte-identical resulting state. It also makes the module reusable — one published module
+ * per contract serves dev/stage/live and every reseed, instead of one artifact per migration.
+ *
+ * The `ao-migration-seed` marker is what the runtime gates on, so ordinary spawn data is
+ * never mistaken for a seed.
+ */
+export function buildSeedEnvelope (stateJson: string, rolesJson: string): string {
+  return `{"ao-migration-seed":1,"state":${stateJson},"acl":{"roles":${rolesJson}}}`
+}
+
+/**
  * A SEED bundle: the same contract, but its initial `state` (and ACL `roles`) overridden with
  * migrated legacynet data so the process materializes real state at spawn (migrate-on-spawn).
  * The domain contract source is untouched — we bind its returned table to a local and replace
@@ -38,6 +59,11 @@ export function buildBundle (contractRel = 'src/contracts/native/operator-regist
  * device at module load (JSON is far more compact in-source than a 12k-entry table literal, and
  * contains no `]==]` sequence, so the bracket is safe). `rolesJson` is the `acl.roles` map
  * ({ [roleName] = { [address] = true } }) — decode(...) yields {} for "{}", which is correct.
+ *
+ * ⚠️ NOT for anything that SPAWNS — use buildSeedEnvelope above. This exists for the
+ * luerl-only fixtures (the Tier-2/Tier-3 oracles and cross-checks), which load a .lua file
+ * directly under the runner and so have no spawn message to carry a seed. There the per-read
+ * decode cost does not apply: the bundle is loaded once per runner invocation.
  */
 export function buildSeedBundle (
   stateJson: string,
@@ -51,4 +77,17 @@ export function buildSeedBundle (
     `__seed.acl = { roles = package.loaded['json'].decode([==[${rolesJson}]==]) }`,
     `native.register(__seed)`,
   ].join('\n')
+}
+
+/**
+ * The built seed envelope for a contract, or `undefined` when none has been built.
+ *
+ * Spawn sites pass this as the spawn-message data so the process migrates at slot 0.
+ * Returning `undefined` (rather than throwing) is deliberate: a spawn with no seed is a
+ * legitimate fresh deploy, and the runtime then falls back to the contract's declared
+ * empty state.
+ */
+export function seedEnvelopeFor (contract: string): string | undefined {
+  const p = path.join(AO, 'dist', `${contract}-seed.envelope.json`)
+  return fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : undefined
 }

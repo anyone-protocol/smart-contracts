@@ -60,6 +60,13 @@ export interface SpawnLuaOptions {
   /** Extra tags (unique, lowercase names). Include something unique (e.g.
    *  `name`) to avoid pid collisions between identical spawns. */
   tags?: Tag[]
+  /**
+   * Spawn-message data — the migration seed envelope (native-bundle.ts
+   * buildSeedEnvelope). The runtime consumes it at slot 0 and never again, which
+   * is what lets the published module stay pure source. Only meaningful with
+   * `moduleId`; the `luaSource` path already uses `data` for the inline bundle.
+   */
+  spawnData?: string
 }
 
 export interface SendOptions {
@@ -230,7 +237,7 @@ export async function spawnLuaProcess (
     ...(opts.tags ?? []),
   ]
   let tags = processTags
-  let data: string | Buffer = ''
+  let data: string | Buffer = opts.spawnData ?? ''
   if (opts.luaSource) {
     const bundle = await encodeMapBundle({
       module: {

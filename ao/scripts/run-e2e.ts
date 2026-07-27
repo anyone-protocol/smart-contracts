@@ -50,6 +50,7 @@ import path from 'node:path'
 import { EthereumSigner } from '@dha-team/arbundles'
 import { Wallet } from 'ethers'
 import { fetchNodeAddress, spawnLuaProcess } from './util/hb-client'
+import { seedEnvelopeFor } from './util/native-bundle'
 
 const AO = path.resolve(import.meta.dir, '..')
 const argv = process.argv.slice(2)
@@ -64,11 +65,14 @@ const ENGINE = process.env.CONTAINER_ENGINE || 'podman'
 // `needs` is the VERTICAL key this module feeds, which is not always the module's own key —
 // the native operator-registry module backs the vertical called `surface`. Keying the --only
 // check off the module name instead silently skips a module its own vertical needs.
+// Modules are PURE SOURCE — the migration seed rides each spawn message instead (see
+// native-bundle.ts buildSeedEnvelope). So `surface` and `opreg` share ONE registration:
+// the same operator-registry module backs both, seeded or not.
 const MODULE_SPECS = [
   { key: 'native', needs: 'surface', env: 'MODULE_ID_NATIVE', label: 'native-opreg', file: 'dist/operator-registry-native.lua' },
-  { key: 'opreg', needs: 'opreg', env: 'MODULE_ID_OPREG', label: 'opreg-seed', file: 'dist/operator-registry-seed.lua' },
-  { key: 'relay', needs: 'relay', env: 'MODULE_ID_RELAY', label: 'relay-seed', file: 'dist/relay-rewards-seed.lua' },
-  { key: 'staking', needs: 'staking', env: 'MODULE_ID_STAKING', label: 'staking-seed', file: 'dist/staking-rewards-seed.lua' },
+  { key: 'opreg', needs: 'opreg', env: 'MODULE_ID_OPREG', label: 'opreg-src', file: 'dist/operator-registry-native.lua' },
+  { key: 'relay', needs: 'relay', env: 'MODULE_ID_RELAY', label: 'relay-src', file: 'dist/relay-rewards-native.lua' },
+  { key: 'staking', needs: 'staking', env: 'MODULE_ID_STAKING', label: 'staking-src', file: 'dist/staking-rewards-native.lua' },
 ] as const
 
 /**
@@ -214,24 +218,36 @@ const ARTIFACTS: Array<{ file: string, build: () => void, label: string, needs: 
   {
     label: 'native operator-registry bundle',
     file: 'dist/operator-registry-native.lua',
-    needs: ['surface'],
-    build: () => { bun('scripts/publish-native-module.ts', [], {}, 300) },
+    needs: ['surface', 'opreg'],
+    build: () => { bun('scripts/build-native-bundle.ts', ['operator-registry'], {}, 300) },
+  },
+  {
+    label: 'native relay-rewards bundle',
+    file: 'dist/relay-rewards-native.lua',
+    needs: ['relay'],
+    build: () => { bun('scripts/build-native-bundle.ts', ['relay-rewards'], {}, 300) },
+  },
+  {
+    label: 'native staking-rewards bundle',
+    file: 'dist/staking-rewards-native.lua',
+    needs: ['staking'],
+    build: () => { bun('scripts/build-native-bundle.ts', ['staking-rewards'], {}, 300) },
   },
   {
     label: 'operator-registry seed (live dump)',
-    file: 'dist/operator-registry-seed.lua',
+    file: 'dist/operator-registry-seed.envelope.json',
     needs: ['opreg'],
     build: () => { bun('scripts/build-seed.ts', ['live'], {}, 300) },
   },
   {
     label: 'relay-rewards seed (live dump)',
-    file: 'dist/relay-rewards-seed.lua',
+    file: 'dist/relay-rewards-seed.envelope.json',
     needs: ['relay'],
     build: () => { bun('scripts/build-relay-seed.ts', ['live'], {}, 300) },
   },
   {
     label: 'staking-rewards seed (live dump)',
-    file: 'dist/staking-rewards-seed.lua',
+    file: 'dist/staking-rewards-seed.envelope.json',
     needs: ['staking'],
     build: () => { bun('scripts/build-staking-seed.ts', ['live'], {}, 300) },
   },
@@ -285,11 +301,23 @@ function publishInContainer (container: string, rel: string, label: string): str
 
 console.log(`\n[2] module registration${PUBLISH_CONTAINER ? ` (publishing into ${PUBLISH_CONTAINER})` : ' (ids from MODULE_ID_* env)'}`)
 const MODULES: Record<string, string | null> = {}
+// Modules are pure source, so two specs can name the SAME file — `surface` and `opreg` both
+// run the operator-registry contract and differ only in whether their spawn carries a seed.
+// Register each distinct file once and share the id; registering twice would mint two module
+// ids for identical source, which is exactly the per-migration-artifact problem we removed.
+const byFile = new Map<string, string>()
 for (const m of MODULE_SPECS) {
   if (!selected(m.needs)) { record(`register ${m.label}`, 'SKIP', `--only ${ONLY.join(',')}`); MODULES[m.key] = null; continue }
+  const already = byFile.get(m.file)
+  if (already) {
+    MODULES[m.key] = already
+    record(`register ${m.label}`, 'PASS', `reused ${m.file} -> ${already.slice(0, 12)}…`)
+    continue
+  }
   const fromEnv = process.env[m.env]
   if (fromEnv) {
     MODULES[m.key] = fromEnv
+    byFile.set(m.file, fromEnv)
     record(`register ${m.label}`, 'PASS', `${m.env}=${fromEnv.slice(0, 12)}…`)
     continue
   }
@@ -307,6 +335,7 @@ for (const m of MODULE_SPECS) {
   await step(`register ${m.label}`, () => {
     const id = publishInContainer(PUBLISH_CONTAINER, m.file, m.label)
     MODULES[m.key] = id
+    byFile.set(m.file, id)
     return `${(fs.statSync(path.join(AO, m.file)).size / 1024).toFixed(0)}KB -> ${id.slice(0, 12)}…`
   })
 }
@@ -384,6 +413,9 @@ for (const v of VERTICALS) {
   await step(`verify-migration ${v.migrates}`, async () => {
     const fresh = await spawnLuaProcess(config, {
       moduleId,
+      // The module is pure source now, so the seed has to ride the spawn message —
+      // without it this would verify an EMPTY process and pass nothing meaningful.
+      spawnData: seedEnvelopeFor(v.migrates!),
       tags: [{ name: 'name', value: `e2e-verify-${v.key}-${stamp}` }],
     })
     bun('scripts/verify-migration.ts', [v.migrates!, '--seed', 'live'],

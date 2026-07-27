@@ -9,7 +9,7 @@
 // Run: HB_URL=... MODULE_ID=<seed id> [K=300] bun run scripts/tier3-relay-realistic.ts
 import { EthereumSigner } from '@dha-team/arbundles'
 import { fetchNodeAddress, spawnLuaProcess, sendMessage, readState } from './util/hb-client'
-import { buildSeedBundle } from './util/native-bundle'
+import { buildSeedBundle, seedEnvelopeFor } from './util/native-bundle'
 import { luerl } from './util/luerl'
 import fs from 'fs'
 import path from 'path'
@@ -80,7 +80,7 @@ const check = (ok: boolean, label: string, detail = '') => { if (!ok) { fails++;
 let pid: string
 ;(async () => {
   console.log(`node ${await fetchNodeAddress(HB)}  moduleId=${MODULE_ID}  K=${K}  T=${T}`)
-  const r = await spawnLuaProcess({ url: HB, signer }, { moduleId: MODULE_ID, tags: [{ name: 'name', value: `relay-real-${Date.now()}` }] })
+  const r = await spawnLuaProcess({ url: HB, signer }, { moduleId: MODULE_ID, spawnData: seedEnvelopeFor('relay-rewards'), tags: [{ name: 'name', value: `relay-real-${Date.now()}` }] })
   pid = r.pid
   console.log(`spawned pid=${pid}`)
 

@@ -9,7 +9,7 @@
 import { getAddress } from 'ethers'
 import fs from 'fs'
 import path from 'path'
-import { buildSeedBundle } from './util/native-bundle'
+import { buildSeedBundle, buildSeedEnvelope } from './util/native-bundle'
 
 const NET = (process.argv[2] || 'live') as 'live' | 'stage'
 const AO = path.resolve(import.meta.dir, '..')
@@ -84,6 +84,7 @@ const bundle = buildSeedBundle(stateJson, rolesJson, 'src/contracts/native/relay
 const dist = path.join(AO, 'dist')
 fs.mkdirSync(dist, { recursive: true })
 fs.writeFileSync(path.join(dist, 'relay-rewards-seed.lua'), bundle)
+fs.writeFileSync(path.join(dist, 'relay-rewards-seed.envelope.json'), buildSeedEnvelope(stateJson, rolesJson))
 fs.writeFileSync(path.join(dist, 'relay-rewards-seed.expected.json'), JSON.stringify({ state: migrated, roles }, null, 0))
 
 const counts = {

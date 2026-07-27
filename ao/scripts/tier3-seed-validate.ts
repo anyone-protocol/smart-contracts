@@ -10,6 +10,7 @@
 import { EthereumSigner } from '@dha-team/arbundles'
 import { Wallet, getAddress } from 'ethers'
 import { fetchNodeAddress, spawnLuaProcess, sendMessage } from './util/hb-client'
+import { seedEnvelopeFor } from './util/native-bundle'
 import fs from 'fs'
 import path from 'path'
 
@@ -54,7 +55,7 @@ let p: string
 ;(async () => {
   console.log(`node ${await fetchNodeAddress(HB)}  moduleId=${MODULE_ID}\n  owner(dev)=${DEV}`)
   const r = await spawnLuaProcess({ url: HB, signer },
-    { moduleId: MODULE_ID, tags: [{ name: 'name', value: `seed-${Date.now()}` }] })
+    { moduleId: MODULE_ID, spawnData: seedEnvelopeFor('operator-registry'), tags: [{ name: 'name', value: `seed-${Date.now()}` }] })
   p = r.pid
   console.log(`spawned pid=${p}\n`)
 

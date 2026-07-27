@@ -6,6 +6,7 @@
 // Run: HB_URL=http://localhost:8734 MODULE_ID=<seed id> bun run scripts/tier3-relay-durability.ts
 import { EthereumSigner } from '@dha-team/arbundles'
 import { fetchNodeAddress, spawnLuaProcess, sendMessage, readState } from './util/hb-client'
+import { seedEnvelopeFor } from './util/native-bundle'
 
 const HB = process.env.HB_URL || 'http://localhost:8734'
 const MODULE_ID = process.env.MODULE_ID
@@ -29,7 +30,7 @@ const mkScores = (n: number) => {
 let pid: string
 ;(async () => {
   console.log(`node ${await fetchNodeAddress(HB)}  moduleId=${MODULE_ID}`)
-  const r = await spawnLuaProcess({ url: HB, signer }, { moduleId: MODULE_ID, tags: [{ name: 'name', value: `relay-dura-${Date.now()}` }] })
+  const r = await spawnLuaProcess({ url: HB, signer }, { moduleId: MODULE_ID, spawnData: seedEnvelopeFor('relay-rewards'), tags: [{ name: 'name', value: `relay-dura-${Date.now()}` }] })
   pid = r.pid
   console.log(`spawned pid=${pid}\n`)
   console.log('  n      bytes    add-status(ms)   staged?   complete(ms)   settled?')
