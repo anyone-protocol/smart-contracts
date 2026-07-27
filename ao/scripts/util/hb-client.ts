@@ -275,11 +275,24 @@ export async function sendMessage (
 
 /**
  * Content-addressed id of the lua module child exactly as an inline (`luaSource`) spawn
- * embeds it — base64url(sha256(ans104 deep-hash segment)). After ANY inline spawn the node
- * has this child in its local cache, so a subsequent spawn can reference it by `moduleId`
- * (flat `module` tag) instead of re-embedding the ~120KB source. That keeps each scheduled
- * slot's stored state tiny (a 43-char ref) rather than growing ~120KB/slot — the inline form
- * bloats every slot and the node 400s the push once the cache crosses ~1MB (Arweave flush).
+ * embeds it — base64url(sha256(ans104 deep-hash segment)).
+ *
+ * ⚠️ This id is NOT usable as `moduleId` for a later by-id spawn. An earlier version of this
+ * comment claimed an inline spawn leaves the child in the node's cache so a subsequent spawn
+ * could reference it — that is FALSE, and it is an expensive thing to believe, because the
+ * by-id spawn is ACCEPTED (returns a pid) and only fails later at compute time with
+ * `{case_clause,{error,not_found}}` / HTTP 500 on the first `now/` read. Verified refuted
+ * 2026-07-26 against v0.9-FINAL, at both ~200B and 806KB module sizes, including after
+ * forcing a compute on the inline process first.
+ *
+ * A spawnable module must be a SIGNED ans104 module message written to the node's cache via
+ * `hb_message:commit` + `hb_cache:write` — i.e. the `bin/hb eval` path in
+ * scripts/publish-native-module.ts, which runs inside the node container. Its id differs from
+ * this one (signed message vs unsigned bundle child). scripts/run-e2e.ts automates that for a
+ * container we control and otherwise takes MODULE_ID_* explicitly.
+ *
+ * Kept because the unsigned child id is still the right thing for inspecting/deduping what an
+ * inline spawn embedded — just not for spawning.
  */
 export async function moduleIdFor (luaSource: string): Promise<string> {
   const item = await unsignedItem([{ name: 'content-type', value: 'application/lua' }], luaSource)
