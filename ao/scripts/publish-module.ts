@@ -49,11 +49,12 @@ const flag = (name: string) => {
 }
 const VERIFY_SPAWN = flag('--verify-spawn')
 const CHECK_ONLY = flag('--check-only')
+const MANIFEST = flag('--manifest')
+const RECHECK = flag('--recheck')
 const WAIT_S = Number(flag('--wait') ?? 2400)
 const GATEWAY = (process.env.GATEWAY || 'https://arweave.net').replace(/\/$/, '')
-const files = argv.filter((a, i) =>
-  !a.startsWith('--') && argv[i - 1] !== '--verify-spawn' &&
-  argv[i - 1] !== '--check-only' && argv[i - 1] !== '--wait')
+const VALUE_FLAGS = ['--verify-spawn', '--check-only', '--wait', '--manifest', '--recheck']
+const files = argv.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(argv[i - 1] ?? ''))
 
 // ── verification ────────────────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,46 @@ async function verifySpawnable (node: string, id: string): Promise<boolean> {
 
 // ── check-only mode ─────────────────────────────────────────────────────────────────────────
 
+// ── recheck mode ────────────────────────────────────────────────────────────────────────────
+//
+// Settlement takes hours, sometimes longer, so the useful workflow is publish-now / check-later
+// rather than blocking. A manifest makes that a single command days afterwards, and records the
+// SIZE against each id — which is what turns a batch into a free-tier measurement.
+
+interface ManifestEntry { file: string, id: string, bytes: number, publishedAt: string }
+
+if (RECHECK) {
+  const entries: ManifestEntry[] = JSON.parse(fs.readFileSync(RECHECK, 'utf8'))
+  console.log(`rechecking ${entries.length} item(s) from ${RECHECK}\n`)
+  let settledN = 0
+  const rows: Array<{ e: ManifestEntry, settled: boolean, data: number }> = []
+  for (const e of entries) {
+    const { settled, bundledIn } = await indexed(e.id)
+    const data = await dataEndpoint(e.id)
+    if (settled) settledN++
+    rows.push({ e, settled, data })
+    const age = ((Date.now() - Date.parse(e.publishedAt)) / 3600_000).toFixed(1)
+    console.log(
+      `  ${(settled ? 'SETTLED' : 'pending').padEnd(8)} ${String(Math.round(e.bytes / 1024)).padStart(6)}KB` +
+      `  age ${age.padStart(6)}h  ${e.file.padEnd(22)} ${e.id}` +
+      `${settled && bundledIn ? `  in ${bundledIn.slice(0, 12)}…` : ''}` +
+      `${!settled && data === 200 ? '   [data 200 = optimistic cache only]' : ''}`
+    )
+  }
+  // The free-tier boundary, if there is one, shows up as a size at which settlement stops.
+  const ok = rows.filter(r => r.settled).map(r => r.e.bytes)
+  const no = rows.filter(r => !r.settled).map(r => r.e.bytes)
+  console.log(`\n${settledN}/${entries.length} settled`)
+  if (ok.length) console.log(`  largest SETTLED : ${Math.round(Math.max(...ok) / 1024)}KB`)
+  if (no.length) console.log(`  smallest pending: ${Math.round(Math.min(...no) / 1024)}KB`)
+  if (ok.length && no.length && Math.max(...ok) < Math.min(...no)) {
+    console.log(`  => boundary is between ${Math.round(Math.max(...ok) / 1024)}KB and ${Math.round(Math.min(...no) / 1024)}KB`)
+  } else if (no.length) {
+    console.log(`  => no clean size boundary yet; pending items may simply not have settled (recheck later)`)
+  }
+  process.exit(settledN === entries.length ? 0 : 1)
+}
+
 if (CHECK_ONLY) {
   const { settled, bundledIn } = await indexed(CHECK_ONLY)
   const data = await dataEndpoint(CHECK_ONLY)
@@ -159,7 +200,7 @@ console.log(`signer  : ${new Wallet(KEY).address}`)
 console.log(`gateway : ${GATEWAY}`)
 console.log()
 
-interface Published { file: string, id: string }
+interface Published { file: string, id: string, bytes: number, publishedAt: string }
 const published: Published[] = []
 let failed = 0
 
@@ -209,16 +250,33 @@ for (const file of files) {
       continue
     }
     console.log(`  accepted by bundler (queued — NOT yet persisted)`)
-    published.push({ file: name, id: item.id })
+    published.push({
+      file: name, id: item.id, bytes: src.length,
+      publishedAt: new Date().toISOString(),
+    })
   } catch (e: any) {
     console.log(`  ERROR ${e.message.slice(0, 200)}`)
     failed++
   }
 }
 
+// Write the manifest BEFORE waiting. If the wait is interrupted — or skipped entirely with
+// --wait 0 — the ids must still be recoverable, or the upload is unverifiable and effectively
+// lost. This is the file `--recheck` reads days later.
+if (MANIFEST && published.length) {
+  fs.mkdirSync(path.dirname(path.resolve(MANIFEST)), { recursive: true })
+  fs.writeFileSync(MANIFEST, JSON.stringify(published, null, 2))
+  console.log(`\nmanifest -> ${MANIFEST}  (recheck later: --recheck ${MANIFEST})`)
+}
+
 if (published.length === 0) {
   console.log('\nnothing was accepted; not waiting on settlement.')
   process.exit(1)
+}
+
+if (WAIT_S === 0) {
+  console.log('\n--wait 0: not waiting. Nothing here is verified yet — recheck later.')
+  process.exit(0)
 }
 
 console.log(`\n=== settlement ===`)
