@@ -25,10 +25,11 @@ job "relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
-      entrypoint = ["npm"]
+      # TODO: pin the commit that built this image before running.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:REPLACE_WITH_COMMIT_SHA"
+      entrypoint = ["bun"]
       command = "run"
-      args = ["deploy"]
+      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage"]
       logging {
         type = "loki"
         config {
@@ -42,29 +43,26 @@ job "relay-rewards-stage" {
 
     consul {}
 
+    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
+    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
+    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
+    # rides the spawn message, selected by `--seed` above.
     env {
-      PHASE = "stage"
+      # Our own node. The client has no default — falling back to a public endpoint is the
+      # failure it exists to prevent.
+      HB_URL = "https://hb-stage.anyone.tech"
+
+      # TODO: the durable module id, from publishing this contract's module.
+      # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
+      # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
+      MODULE_ID = "REPLACE_WITH_PUBLISHED_MODULE_ID"
+
+      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
+      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
+      # template gated-processes from.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/relay-rewards-address"
-      CONTRACT_NAME = "relay-rewards"
-      CU_URL="https://cu-stage.anyone.tech"
-
-      ## NB: Spawn a new process & migrate state from an existing one
-      ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
-      ##     existing process ID to migrate from
-      IS_MIGRATION_DEPLOYMENT = "true"
-
-      ## NB: Call Init with data from file at INIT_DATA_PATH
-      # CALL_INIT_HANDLER="true"
-    }
-
-    template {
-      data = <<-EOF
-      MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/stage/relay-rewards-address" }}
-      EOF
-      destination = "local/config.env"
-      env = true
     }
 
     template {
