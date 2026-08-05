@@ -18,8 +18,21 @@ name: Build & Publish AO Mainnet Contracts Image
 on:
   push:
     branches: main
+    # Scoped to what the image is actually built from, so unrelated commits — including one
+    # that only touches this file — do not rebuild it.
+    paths:
+      - 'ao/**'
+      - 'Dockerfile-Mainnet'
+      - 'Dockerfile-Mainnet.dockerignore'
     tags:
       - v*
+  # Manual trigger, so a feature branch can be built for acceptance testing without
+  # merging to main first. Pick the branch in the "Run workflow" dropdown; the image is
+  # tagged by commit SHA either way, so a branch build cannot be mistaken for a main one.
+  #
+  # GitHub only offers this for workflows present on the DEFAULT branch, so the button
+  # appears once this file reaches main — after that it can target any branch.
+  workflow_dispatch:
 env:
   IMAGE_NAME: smart-contracts-ao-mainnet
 
