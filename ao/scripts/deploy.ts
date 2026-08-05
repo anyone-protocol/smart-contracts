@@ -470,8 +470,43 @@ const ao = createAoClient({
   const env = seed === 'none' ? '<env>' : seed
   console.log('\n=== DEPLOYED ===')
   console.log(`  ${processId}`)
-  console.log('\nRecord the PID (this is what the jobspecs template from):')
-  console.log(`  consul kv put smart-contracts/${env}/${contract}-address ${processId}`)
+
+  // Record the PID in Consul when the job supplies a key. Deliberately AFTER every check above:
+  // the jobspecs template `gated-processes` from this key, so an id the gate cannot read must
+  // never reach it. The exits above are what guarantee that.
+  //
+  // No dummy default. If a key is named, the write is required — a deploy that reports success
+  // while silently writing nowhere is worse than one that fails.
+  const consulKey = process.env.CONTRACT_CONSUL_KEY
+  if (consulKey) {
+    const { CONSUL_IP, CONSUL_PORT, CONSUL_TOKEN } = process.env
+    if (!CONSUL_IP || !CONSUL_PORT) {
+      console.error(`\nCONTRACT_CONSUL_KEY is set (${consulKey}) but CONSUL_IP/CONSUL_PORT are not.`)
+      console.error('Refusing to finish: the PID would go unrecorded and the deploy would still')
+      console.error(`look successful. Record it manually: consul kv put ${consulKey} ${processId}`)
+      process.exit(1)
+    }
+    const { default: Consul } = await import('consul')
+    const consul = new Consul({ host: CONSUL_IP, port: CONSUL_PORT })
+    // Omit the token rather than passing undefined: the client forwards it straight into the
+    // x-consul-token header, and `undefined` is rejected as an invalid header value. Omitting is
+    // also better than the legacy 'no-token' placeholder, which sends a real header that an
+    // ACL-enabled Consul then has to reject on its own terms.
+    const ok = await consul.kv.set({
+      key: consulKey,
+      value: processId,
+      ...(CONSUL_TOKEN ? { token: CONSUL_TOKEN } : {}),
+    })
+    if (!ok) {
+      console.error(`\nFAILED to write ${consulKey} to Consul. The process is deployed and`)
+      console.error(`verified, so this is safe to retry: consul kv put ${consulKey} ${processId}`)
+      process.exit(1)
+    }
+    console.log(`\n  consul: ${consulKey} = ${processId}`)
+  } else {
+    console.log('\nRecord the PID (this is what the jobspecs template from):')
+    console.log(`  consul kv put smart-contracts/${env}/${contract}-address ${processId}`)
+  }
   console.log('\nReads:')
   console.log(`  ${HB_URL}/${processId}~process@1.0/now/~lua@5.3a/status`)
   process.exit(0)
