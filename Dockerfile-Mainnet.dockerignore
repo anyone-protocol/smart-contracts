@@ -1,0 +1,56 @@
+# Build context for Dockerfile-Mainnet ONLY.
+#
+# BuildKit reads <dockerfile>.dockerignore in preference to a root .dockerignore, so this scopes
+# the mainnet image without touching legacy/Dockerfile-AO's context. The legacy image is being
+# retired, not maintained; it should not get a vote in what the mainnet deploy surface contains.
+#
+# Deny everything, then admit exactly what the Dockerfile COPYs — the same list, in the same
+# order. Written this way round on purpose: a denylist only excludes what someone remembered,
+# whereas nothing here is admitted unless it was named, so a secret, scratch dump or key file
+# added anywhere in the repo is outside this context the day it lands.
+#
+# That is why there is no "exclude .env / test-keys / node_modules" section. Those were never
+# admitted. ao/.env holds DEPLOYER_PRIVATE_KEY and is gitignored (CI never sees it), but a local
+# `docker build .` would otherwise ship it to the daemon; here it simply is not in the context.
+#
+# This cannot fail open. Drop a line and the matching COPY fails and the build stops; it can
+# never silently include more than is listed.
+
+*
+
+!ao/package.json
+!ao/bun.lock
+!ao/tsconfig.json
+
+!ao/runtime/native.lua
+!ao/runtime/write-gate.lua
+!ao/runtime/vendor/json.lua
+
+!ao/src/contracts/common/bigint.lua
+!ao/src/contracts/common/eip55.lua
+!ao/src/contracts/common/errors.lua
+!ao/src/contracts/common/utils.lua
+
+!ao/src/contracts/native/operator-registry.lua
+!ao/src/contracts/native/relay-rewards.lua
+!ao/src/contracts/native/staking-rewards.lua
+
+!ao/scripts/deploy.ts
+!ao/scripts/publish-module.ts
+!ao/scripts/build-seed.ts
+!ao/scripts/build-relay-seed.ts
+!ao/scripts/build-staking-seed.ts
+!ao/scripts/util/native-bundle.ts
+
+!ao/state-dumps/2026-07-09/live-operator-registry.state.json
+!ao/state-dumps/2026-07-09/live-operator-registry.roles.json
+!ao/state-dumps/2026-07-09/live-relay-rewards.state.json
+!ao/state-dumps/2026-07-09/live-relay-rewards.roles.json
+!ao/state-dumps/2026-07-09/live-staking-rewards.state.json
+!ao/state-dumps/2026-07-09/live-staking-rewards.roles.json
+!ao/state-dumps/2026-07-09/stage-operator-registry.state.json
+!ao/state-dumps/2026-07-09/stage-operator-registry.roles.json
+!ao/state-dumps/2026-07-09/stage-relay-rewards.state.json
+!ao/state-dumps/2026-07-09/stage-relay-rewards.roles.json
+!ao/state-dumps/2026-07-09/stage-staking-rewards.state.json
+!ao/state-dumps/2026-07-09/stage-staking-rewards.roles.json
