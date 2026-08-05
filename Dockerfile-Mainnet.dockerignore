@@ -40,6 +40,7 @@
 !ao/scripts/build-seed.ts
 !ao/scripts/build-relay-seed.ts
 !ao/scripts/build-staking-seed.ts
+!ao/scripts/build-native-bundle.ts
 !ao/scripts/util/native-bundle.ts
 
 !ao/state-dumps/2026-07-09/live-operator-registry.state.json

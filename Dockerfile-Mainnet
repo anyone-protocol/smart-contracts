@@ -81,6 +81,7 @@ COPY ao/scripts/publish-module.ts      ./scripts/publish-module.ts
 COPY ao/scripts/build-seed.ts          ./scripts/build-seed.ts
 COPY ao/scripts/build-relay-seed.ts    ./scripts/build-relay-seed.ts
 COPY ao/scripts/build-staking-seed.ts  ./scripts/build-staking-seed.ts
+COPY ao/scripts/build-native-bundle.ts ./scripts/build-native-bundle.ts
 COPY ao/scripts/util/native-bundle.ts  ./scripts/util/native-bundle.ts
 
 # ── migration input ─────────────────────────────────────────────────────────────────────────
@@ -105,6 +106,14 @@ COPY ao/state-dumps/2026-07-09/stage-staking-rewards.roles.json    ./state-dumps
 # runtime user ON PURPOSE: this container runs with a live signing key mounted, and a source
 # tree it cannot rewrite is a source tree that cannot be rewritten between the moment the bytes
 # are read and the moment they are signed.
+# Build the contract module bundles INTO the image. The bytes are identical across dev/stage/
+# live and across reseeds — the seed rides the spawn message, not the module — so one published
+# id serves every environment, and pinning them to the image digest means the bytes that get
+# signed are the bytes that were reviewed.
+RUN bun run scripts/build-native-bundle.ts operator-registry \
+ && bun run scripts/build-native-bundle.ts relay-rewards \
+ && bun run scripts/build-native-bundle.ts staking-rewards
+
 RUN mkdir -p dist && chown bun:bun dist
 
 USER bun
