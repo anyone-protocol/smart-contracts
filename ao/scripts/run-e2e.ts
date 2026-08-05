@@ -30,6 +30,9 @@
 //   bun run scripts/run-e2e.ts --print-publish-commands       # emit the eval commands, exit
 //   bun run scripts/run-e2e.ts --only relay,staking           # a subset (reports what it skipped)
 //   bun run scripts/run-e2e.ts --keep-artifacts               # do not rebuild existing dist/
+//   bun run scripts/run-e2e.ts --publish-container hb-e2e --sustained
+//                                                             # + the multi-round verticals
+//                                                             #   (minutes, not seconds)
 //
 // Env:
 //   HB_URL                node base url. REQUIRED — no default, on purpose (see below).
@@ -58,6 +61,12 @@ const onlyArg = argv.indexOf('--only')
 const ONLY = onlyArg >= 0 ? (argv[onlyArg + 1] ?? '').split(',').filter(Boolean) : []
 const KEEP = argv.includes('--keep-artifacts')
 const PRINT_CMDS = argv.includes('--print-publish-commands')
+// Opt-in, because it is minutes rather than seconds: the sustained verticals drive many rounds
+// at realistic width to exercise slot accumulation, claim semantics, the actions the parity
+// verticals never call, and (when we control the container) a mid-life node restart. The default
+// run stays fast so it remains usable as a pre-push check.
+const SUSTAINED = argv.includes('--sustained')
+const SUSTAINED_ROUNDS = process.env.SUSTAINED_ROUNDS || '10'
 const pubArg = argv.indexOf('--publish-container')
 const PUBLISH_CONTAINER = pubArg >= 0 ? (argv[pubArg + 1] ?? '') : ''
 const ENGINE = process.env.CONTAINER_ENGINE || 'podman'
@@ -350,6 +359,10 @@ interface Vertical {
   /** contract name for the verify-migration follow-up, if this vertical seeds one */
   migrates?: 'operator-registry' | 'relay-rewards' | 'staking-rewards'
   timeoutS: number
+  /** positional args for the script (the sustained vertical takes the contract name) */
+  args?: string[]
+  /** extra env on top of HB_URL / MODULE_ID / DEPLOYER_PRIVATE_KEY */
+  env?: Record<string, string>
 }
 
 const VERTICALS: Vertical[] = [
@@ -358,6 +371,24 @@ const VERTICALS: Vertical[] = [
   { key: 'relay', label: 'relay-rewards seed + score round parity', script: 'scripts/tier3-relay-validate.ts', moduleId: MODULES.relay, migrates: 'relay-rewards', timeoutS: 1800 },
   { key: 'staking', label: 'staking-rewards seed + score round parity', script: 'scripts/tier3-staking-validate.ts', moduleId: MODULES.staking, migrates: 'staking-rewards', timeoutS: 1800 },
 ]
+
+// No `migrates`: these mutate hard by design (many settled rounds, claims, a config round-trip),
+// so a verify-migration follow-up on their pid would fail as a migration defect when it is
+// nothing of the kind — the same trap already documented for the parity verticals.
+if (SUSTAINED) {
+  for (const c of ['relay', 'staking'] as const) {
+    VERTICALS.push({
+      key: `sustained-${c}`,
+      label: `${c}-rewards sustained (${SUSTAINED_ROUNDS} rounds, all actions, ACL, restart)`,
+      script: 'scripts/tier3-sustained.ts',
+      moduleId: c === 'relay' ? MODULES.relay : MODULES.staking,
+      timeoutS: 5400,
+      args: [c],
+      // Without a container we cannot restart the node, so section G self-skips.
+      env: { ROUNDS: SUSTAINED_ROUNDS, CONTAINER: PUBLISH_CONTAINER },
+    })
+  }
+}
 
 const pids: Record<string, string> = {}
 
@@ -376,7 +407,8 @@ for (const v of VERTICALS) {
     continue
   }
   await step(v.label, () => {
-    const out = bun(v.script, [], { HB_URL: HB, MODULE_ID: v.moduleId!, DEPLOYER_PRIVATE_KEY: KEY }, v.timeoutS)
+    const out = bun(v.script, v.args ?? [],
+      { HB_URL: HB, MODULE_ID: v.moduleId!, DEPLOYER_PRIVATE_KEY: KEY, ...(v.env ?? {}) }, v.timeoutS)
     // The verticals do not agree on how they print the pid: the seed ones use `pid=<id>`,
     // tier3-validate uses `pid = <id>` and later `pids: main=<id> views=<id>`. Tolerate all
     // three rather than silently failing to find one.
