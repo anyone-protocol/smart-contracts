@@ -1,12 +1,40 @@
-name: Build & Publish AO Contracts Image
+# Builds the AO MAINNET contracts image (Dockerfile-Mainnet) — the native contracts, their
+# HyperBEAM runtime, and the publish/deploy tooling.
+#
+# This workflow used to build legacy/Dockerfile-AO (the aos/genesis-wasm contracts). It now
+# builds the mainnet image INSTEAD, not alongside: the legacy contracts are what this migration
+# replaced, so continuing to publish them would mean two images that look interchangeable and
+# are not. legacy/Dockerfile-AO is kept for reference and simply no longer built by CI; the
+# images it already published stay where they are, under the old name, frozen.
+#
+# The image name changed with it, so nothing published before this point can be confused with
+# something built after.
+#
+# Tagged by commit SHA. That is what a Nomad publish/deploy job should pin, so the module ids it
+# produces trace back to an exact commit — module ids are content-addressed, which only means
+# something if the bytes that produced them do too.
+name: Build & Publish AO Mainnet Contracts Image
 
 on:
   push:
     branches: main
+    # Scoped to what the image is actually built from, so unrelated commits — including one
+    # that only touches this file — do not rebuild it.
+    paths:
+      - 'ao/**'
+      - 'Dockerfile-Mainnet'
+      - 'Dockerfile-Mainnet.dockerignore'
     tags:
       - v*
+  # Manual trigger, so a feature branch can be built for acceptance testing without
+  # merging to main first. Pick the branch in the "Run workflow" dropdown; the image is
+  # tagged by commit SHA either way, so a branch build cannot be mistaken for a main one.
+  #
+  # GitHub only offers this for workflows present on the DEFAULT branch, so the button
+  # appears once this file reaches main — after that it can target any branch.
+  workflow_dispatch:
 env:
-  IMAGE_NAME: smart-contracts-ao
+  IMAGE_NAME: smart-contracts-ao-mainnet
 
 jobs:
   push:
@@ -19,7 +47,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Build image
-        run: docker build . --file Dockerfile-AO --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
+        run: docker build . --file Dockerfile-Mainnet --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
@@ -30,14 +58,7 @@ jobs:
 
           # Change all uppercase to lowercase
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          # Strip git ref prefix from version
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          # Strip "v" prefix from tag name
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          # Use Docker `latest` tag convention
-          [ "$VERSION" == "main" ] && VERSION=stage
           echo IMAGE_ID=$IMAGE_ID
-          echo VERSION=$VERSION
 
           docker tag $IMAGE_NAME $IMAGE_ID:${GITHUB_SHA}
           docker push $IMAGE_ID:${GITHUB_SHA}
