@@ -40,6 +40,7 @@ fi
 # scenario | mode | contract | state-global (run mode only)
 SCENARIOS=(
   "native-operator-registry.lua|native|src/contracts/native/operator-registry.lua|"
+  "native-allowlist.lua|native|src/contracts/native/operator-registry.lua|"
   "native-relay-rewards.lua|native|src/contracts/native/relay-rewards.lua|"
   "native-staking-rewards.lua|native|src/contracts/native/staking-rewards.lua|"
   "operator-registry.lua|run|src/contracts/operator-registry.lua|OperatorRegistry"

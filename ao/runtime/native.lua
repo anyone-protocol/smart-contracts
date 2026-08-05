@@ -200,6 +200,217 @@ local function hasRole(from, roleList, base)
 end
 
 -- ===========================================================================
+-- Section AL — allowlist: who may WRITE to this contract (AXIS: ACL)
+-- ===========================================================================
+--
+-- The node-side write gate (`p4@1.0` pricing device) asks ONE question before a message is
+-- scheduled: may this address write here? Answering it from contract state is what stops a
+-- third party creating unbounded free slots — a rejection at the hook costs no slot and no
+-- state write, versus ~445ms and a full slot for an in-contract ACL denial.
+--
+-- Held as a `~trie@1.0` trie ADDRESSED BY ID, with the id at `base.allowlistId`, so the gate
+-- reads `compute/allowlistId/~trie@1.0/<addr>` in ONE request (~22ms measured, vs ~458ms for
+-- any view). A trie read never enters the contract's compute path, so it skips the
+-- `stripMeta(base.state)` materialization that puts a ~400ms floor under every view. Keeping it
+-- out of `base.state` also keeps it off the per-slot key count.
+--
+-- ⚠️ REFCOUNTS, NOT BOOLEANS. An address can be listed for several independent reasons at once
+-- — an ACL role, AND an operator fingerprint, AND being the owner. "Remove when it loses a role"
+-- would delist someone who is still an operator and silently lock them out of the contract.
+-- Only real transitions count: re-granting a role an address already holds must not increment.
+--
+-- ⚠️ ONE TRIE WRITE PER SLOT. `dev_trie:do_set/3` deep-commits the WHOLE trie on every `set`, so
+-- a handler touching N addresses must not write N times (715ms for a single key at 16k keys;
+-- batched amortizes to ~1.1ms/key). Deltas accumulate here during the slot and are flushed once,
+-- after the handler succeeds — which also makes the flush atomic with the slot's revert.
+native.allowlist = {}
+
+-- Deltas for the slot in flight. nil outside compute so a stray grant() cannot silently
+-- accumulate into the next message.
+local alPending = nil
+
+-- PURE — the refcount arithmetic, split from persistence on purpose. This is the part with the
+-- interesting failure mode, and it must be testable in Tier-1/Tier-2 where there is no node and
+-- no `ao.resolve`. Persistence is the `store` seam below.
+--- @param current table  addr -> existing count (nil/absent = not listed)
+--- @param deltas  table  addr -> signed delta
+--- @return table         addr -> new count, or false meaning DELETE
+--- @param blocks  table  addr -> true (block) | false (unblock)
+function native.allowlist.apply(current, deltas, blocks)
+  local out = {}
+  -- Existing value parses as `[B]<count>`; the B prefix is the block flag and survives
+  -- grant/revoke so unblocking restores the true reason count.
+  -- ⚠️ INTEGER-FORMAT every count. Under luerl (the VM the node runs) `tonumber('2')` yields a
+  -- FLOAT, so a stored count read back and decremented formats as '1.0', and a block as
+  -- 'B2.0'. The gate treats any non-empty value as allowed, so those are not merely ugly: a
+  -- count that has gone float can never be brought back to the empty/absent state the delete
+  -- path produces. Tier-1 (stock Lua 5.3) cannot see this; Tier-2 caught it.
+  local function int(n) return string.format('%d', math.floor(tonumber(n) or 0)) end
+  local function parse(v)
+    local s = tostring(v or '')
+    local blocked = s:sub(1, 1) == 'B'
+    return blocked, math.floor(tonumber(blocked and s:sub(2) or s) or 0)
+  end
+  local touched = {}
+  for addr in pairs(deltas or {}) do touched[addr] = true end
+  for addr in pairs(blocks or {}) do touched[addr] = true end
+
+  for addr in pairs(touched) do
+    local wasBlocked, n = parse(current and current[addr])
+    local d = (deltas and deltas[addr]) or 0
+    n = n + d
+    -- Clamp at zero. A double-revoke is a contract bug, not a reason to carry a negative that
+    -- would then need two grants to become visible again.
+    if n < 0 then n = 0 end
+
+    local blocked = wasBlocked
+    if blocks and blocks[addr] ~= nil then blocked = blocks[addr] end
+
+    if blocked then
+      -- Keep the count even at zero: an address can be blocked before it has any reason, and
+      -- the flag must survive so a later grant does not silently un-block it.
+      out[addr] = 'B' .. int(n)
+    elseif n < 1 then
+      out[addr] = false
+    elseif d ~= 0 or wasBlocked then
+      out[addr] = int(n)
+    end
+  end
+  return out
+end
+
+-- Persistence seam. The trie store needs `ao.resolve`, which exists only on a real node
+-- (Tier-3); Tier-1 clears the `ao` global outright. Rather than let the tested path differ from
+-- the running one, both tiers drive the SAME apply() above and differ only here.
+local function alIdOf(t)
+  if type(t) == 'table' and type(t.commitments) == 'table' then
+    for k in pairs(t.commitments) do return k end
+  end
+end
+
+native.allowlist.store = {
+  get = function(base, addr)
+    if type(base.allowlistId) ~= 'string' or ao == nil or ao.resolve == nil then
+      local tbl = base.allowlistTable
+      return tbl and tbl[addr] or nil
+    end
+    local ok, _st, v = pcall(function()
+      return ao.resolve({ 'as', 'trie@1.0', base.allowlistId }, { path = 'get', key = addr })
+    end)
+    if not ok then return nil end
+    return v
+  end,
+  -- `changes`: addr -> count, or false to delete. ONE resolve for the whole batch.
+  setMany = function(base, changes)
+    if next(changes) == nil then return end
+    -- ⚠️ Written as explicit `if`s, NOT the `cond and x or y` idiom. That idiom silently breaks
+    -- when the middle value is nil or false: `(v == false) and nil or tostring(v)` evaluates to
+    -- the STRING 'false' on the delete path, and the gate reads any non-empty value as allowed
+    -- — so a revoked address would stay allowed. Tier-1 catches it; do not "tidy" this back.
+    if ao == nil or ao.resolve == nil then
+      base.allowlistTable = base.allowlistTable or {}
+      for addr, v in pairs(changes) do
+        if v == false then base.allowlistTable[addr] = nil
+        else base.allowlistTable[addr] = tostring(v) end
+      end
+      return
+    end
+    local req = { path = 'set' }
+    for addr, v in pairs(changes) do
+      -- Trie values are strings. A deleted key is written as the empty string rather than
+      -- removed: `dev_trie` has no delete, and the gate treats '' as absent.
+      if v == false then req[addr] = '' else req[addr] = tostring(v) end
+    end
+    local base2 = (type(base.allowlistId) == 'string')
+      and { 'as', 'trie@1.0', base.allowlistId } or { device = 'trie@1.0' }
+    local ok, _st, res = pcall(function() return ao.resolve(base2, req) end)
+    if ok and type(res) == 'table' then base.allowlistId = alIdOf(res) or base.allowlistId end
+  end,
+}
+
+-- BLOCKED is a VETO, not a delta. A blocked address may still hold several live reasons to be
+-- listed (a role, fingerprints), so decrementing by one would leave it allowed — the exact
+-- lockout-in-reverse the refcount exists to prevent, pointed the wrong way. Instead the count is
+-- preserved and the value is prefixed 'B', so:
+--   * the gate denies on sight, with NO extra read — it already parses this value
+--   * unblocking restores the exact prior count, with no need to recount reasons
+-- Encoded in the value rather than checked as a separate `state/blocked/<addr>` read so blocking
+-- cannot be applied to the allowlist and forgotten in the gate, or vice versa.
+local alBlocks = nil    -- addr -> true (block) | false (unblock), for the slot in flight
+
+--- Deny `addr` regardless of how many reasons it holds.
+function native.allowlist.block(addr)
+  if type(addr) ~= 'string' or addr == '' or alBlocks == nil then return end
+  alBlocks[addr] = true
+end
+
+--- Lift a block, restoring the address's existing reason count.
+function native.allowlist.unblock(addr)
+  if type(addr) ~= 'string' or addr == '' or alBlocks == nil then return end
+  alBlocks[addr] = false
+end
+
+--- Record that `addr` gained one reason to be allowed. Safe to call repeatedly in a slot.
+function native.allowlist.grant(addr)
+  if type(addr) ~= 'string' or addr == '' or alPending == nil then return end
+  alPending[addr] = (alPending[addr] or 0) + 1
+end
+
+--- Record that `addr` lost one reason to be allowed.
+function native.allowlist.revoke(addr)
+  if type(addr) ~= 'string' or addr == '' or alPending == nil then return end
+  alPending[addr] = (alPending[addr] or 0) - 1
+end
+
+--- Build the initial allowlist from migrated state. Runs once, on the first slot, so a
+--- migrated contract is immediately writable by the people who were already entitled to write
+--- to it — otherwise every operator is locked out until they happen to trigger a grant.
+--- Uses the ordinary delta path, so the whole seed persists in ONE trie write.
+function native.allowlist.seed(base)
+  if base.allowlistSeeded then return end
+  base.allowlistSeeded = true
+  -- The process Owner. A compute-path global here, but on the read path the gate derives the
+  -- same address from the spawn commitment.
+  local owner = resolveCommitter(base.process)
+  if owner then native.allowlist.grant(owner) end
+  -- Every ACL role holder — our controller/admin wallets.
+  for _, holders in pairs((base.acl and base.acl.roles) or {}) do
+    if type(holders) == 'table' then
+      for addr in pairs(holders) do native.allowlist.grant(addr) end
+    end
+  end
+  -- Contract-declared writers implied by STATE. Optional: a contract with no state-derived
+  -- writers (the reward contracts) simply omits it.
+  local c = native._contract
+  if c and type(c.writers) == 'function' then
+    pcall(c.writers, base.state or {}, {
+      allow = native.allowlist.grant,
+      block = native.allowlist.block,
+    })
+  end
+end
+
+--- Persist the slot's accumulated deltas. Called once, after the handler succeeds.
+function native.allowlist.flush(base)
+  if alPending == nil then return end
+  if next(alPending) == nil and next(alBlocks or {}) == nil then return end
+  local current = {}
+  -- Skip the read-back entirely when there is nothing to read. This is not a micro-optimization:
+  -- the MIGRATION SEED touches ~830 distinct operator addresses in a single slot, and a
+  -- per-address round trip would be ~830 resolves (~16s) to learn that every one of them is
+  -- absent. With an empty trie they provably are.
+  local empty = (base.allowlistId == nil) and (base.allowlistTable == nil)
+  if not empty then
+    for addr in pairs(alPending) do current[addr] = native.allowlist.store.get(base, addr) end
+    for addr in pairs(alBlocks or {}) do
+      if current[addr] == nil then current[addr] = native.allowlist.store.get(base, addr) end
+    end
+  end
+  native.allowlist.store.setMany(
+    base, native.allowlist.apply(current, alPending, alBlocks))
+end
+
+-- ===========================================================================
 -- Section 5 — outbox (AXIS 5): inter-contract sends only
 -- ===========================================================================
 --
@@ -230,11 +441,17 @@ native.builtins = {
       local dto = require('json').decode(ctx.data)
       base.acl.roles = base.acl.roles or {}
       local roles = base.acl.roles
+      -- Allowlist refcounts track ACTUAL transitions only. Granting a role the address already
+      -- holds must not increment, or the matching revoke leaves a phantom count behind and the
+      -- address stays allowed forever.
       if dto.Grant ~= nil then
         for address, rs in pairs(dto.Grant) do
           for _, role in pairs(rs) do
             roles[role] = roles[role] or {}
-            roles[role][address] = true
+            if roles[role][address] == nil then
+              roles[role][address] = true
+              native.allowlist.grant(address)
+            end
           end
         end
       end
@@ -242,7 +459,10 @@ native.builtins = {
         for address, rs in pairs(dto.Revoke) do
           for _, role in pairs(rs) do
             roles[role] = roles[role] or {}
-            roles[role][address] = nil
+            if roles[role][address] ~= nil then
+              roles[role][address] = nil
+              native.allowlist.revoke(address)
+            end
           end
         end
       end
@@ -369,12 +589,25 @@ function native.installViews()
   end
 end
 
+-- The allowlist rides the same atomic revert as state and acl. `allowlistId` is a top-level
+-- base field, so without this a failed slot would leave the allowlist mutated while the state
+-- change that justified it was rolled back — an address allowed to write to a contract that has
+-- no record of why. `allowlistTable` is the no-node fallback store and reverts with it.
 local function snapshotState(base)
-  return { state = deepcopy(base.state), acl = deepcopy(base.acl) }
+  return {
+    state = deepcopy(base.state),
+    acl = deepcopy(base.acl),
+    allowlistId = base.allowlistId,
+    allowlistTable = deepcopy(base.allowlistTable),
+    allowlistSeeded = base.allowlistSeeded,
+  }
 end
 local function restoreState(base, snap)
   base.state = snap.state
   base.acl = snap.acl
+  base.allowlistId = snap.allowlistId
+  base.allowlistTable = snap.allowlistTable
+  base.allowlistSeeded = snap.allowlistSeeded
 end
 
 --- Everything fallible for a slot runs here, under the caller's pcall.
@@ -431,6 +664,15 @@ local function protectedCompute(base, req)
     timestamp = timestamp,                       -- ms, or nil if unassigned (read path/harness)
     state  = base.state,                         -- the mutable contract state tree
     send   = function(m) table.insert(ao.outbox.Messages, m); return m end,
+    -- Contract-side allowlist maintenance, for writers implied by STATE rather than by an ACL
+    -- role (an operator gaining a verified fingerprint, say). Deltas are batched and flushed
+    -- once per slot, so calling these per address inside a loop is cheap and correct.
+    allow  = function(addr) native.allowlist.grant(addr) end,
+    disallow = function(addr) native.allowlist.revoke(addr) end,
+    -- Blocking VETOES regardless of how many reasons the address holds; unblocking restores
+    -- the exact prior count. Not a revoke — see native.allowlist.block.
+    block  = function(addr) native.allowlist.block(addr) end,
+    unblock = function(addr) native.allowlist.unblock(addr) end,
   }
 
   -- AXIS 3 — Eval built-in: Owner-only, non-empty-identity guard.
@@ -526,12 +768,32 @@ function native.compute(base, req)
     return base
   end
 
+  -- Open a fresh delta set for this slot. Scoped here rather than globally so a grant recorded
+  -- by a handler that then throws cannot leak into the next message.
+  alPending = {}
+  alBlocks = {}
+  -- Seed before dispatch so the very first message already sees a populated list, and so the
+  -- seed shares that message's single trie write.
+  pcall(native.allowlist.seed, base)
+
   local ok, output = pcall(protectedCompute, base, req)
-  if not ok then
-    pcall(restoreState, base, snapshot)          -- AXIS 6: revert state + acl
+  if ok then
+    -- Persist the slot's allowlist deltas — ONE trie write, after the handler succeeded. A
+    -- failure to flush must not fail the slot (the trampoline is infallible by construction),
+    -- but it does mean the gate can lag the contract until the next write touches the address.
+    local flushed = pcall(native.allowlist.flush, base)
+    if not flushed then
+      pcall(restoreState, base, snapshot)
+      output = { data = 'error: allowlist flush failed' }
+      pcall(clearOutbox)
+    end
+  else
+    pcall(restoreState, base, snapshot)          -- AXIS 6: revert state + acl + allowlist
     output = { data = 'error: ' .. tostring(output) }
     pcall(clearOutbox)                           -- discard partial outbox
   end
+  alPending = nil
+  alBlocks = nil
 
   pcall(writeResults, base, output)              -- AXIS 5
 

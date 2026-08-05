@@ -382,6 +382,91 @@ const ao = createAoClient({
     }
   }
 
+  // ─── the WRITE GATE's view of this process ──────────────────────────────────────────────
+  //
+  // The gate reads the contract, so a deploy that materialised state correctly can still be
+  // unusable by everyone but us. Both reads below are the EXACT paths runtime/write-gate.lua
+  // uses; asserting them here is the only place the gate's inputs are checked against a real
+  // process before its id reaches Consul.
+  //
+  // Neither answers before slot 0 has been computed — a never-computed process 508s with
+  // "Request creates infinite recursion" on every `compute/…` path, the committer read
+  // included. The status view above already forced that compute, which is why this runs after
+  // it and not before. (Measured: scripts/probe/seed-on-spawn.ts.)
+  console.log('\nverifying the write gate can read this process …')
+  const gateGet = async (p: string) => {
+    try {
+      const r = await fetch(`${HB_URL}/${p}`, { signal: AbortSignal.timeout(120_000) })
+      return r.ok ? (await r.text()).trim() : null
+    } catch { return null }
+  }
+  let gateBad = 0
+  const gateCheck = (ok: boolean, label: string, detail = '') => {
+    if (!ok) gateBad++
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${detail ? `: ${detail}` : ''}`)
+  }
+
+  // isOwner — the invariant that keeps a contract from ever being locked out by its own gate.
+  const committer = await gateGet(
+    `${processId}~process@1.0/compute/process/commitments/${processId}/committer`)
+  gateCheck(committer === deployer, 'Owner readable from the spawn commitment',
+    committer === deployer ? deployer : `got ${committer ?? '(no answer)'}, want ${deployer}`)
+
+  // The allowlist seeds at slot 0, alongside state. No message is needed to build it.
+  const allowlistId = await gateGet(`${processId}~process@1.0/compute/allowlistId`)
+  gateCheck(!!allowlistId && /^[A-Za-z0-9_-]{43}$/.test(allowlistId),
+    'allowlist trie materialised', allowlistId ?? '(no answer)')
+
+  // The gate's per-address read. Admission is a positive integer refcount; a 404 (absent) and
+  // 'B<n>' (blocked) both read as denied.
+  const admits = async (addr: string) => {
+    const v = await gateGet(`${processId}~process@1.0/compute/allowlistId/~trie@1.0/${addr}`)
+    return { ok: !!v && !v.startsWith('B') && Number(v) >= 1, v }
+  }
+
+  if (allowlistId && /^[A-Za-z0-9_-]{43}$/.test(allowlistId)) {
+    const owner = await admits(deployer)
+    gateCheck(owner.ok, 'deployer admitted by the gate read path', owner.v ?? '(absent)')
+
+    // The deployer alone proves nothing: it is granted unconditionally as the Owner, so this
+    // block would pass green on a seed that populated NOTHING ELSE — the exact failure that
+    // locks every operator and admin out of a contract whose state migrated perfectly.
+    if (seedEnvelope) {
+      const envelope = JSON.parse(seedEnvelope)
+
+      // Every ACL role holder, contract-independently. These are our controller/admin wallets.
+      const holders = new Set<string>()
+      for (const byRole of Object.values<any>(envelope.acl?.roles ?? {})) {
+        for (const addr of Object.keys(byRole ?? {})) holders.add(addr)
+      }
+      let holderBad = 0
+      for (const addr of holders) if (!(await admits(addr)).ok) holderBad++
+      gateCheck(holders.size > 0 && holderBad === 0,
+        `all ${holders.size} seeded ACL role holders admitted`,
+        holderBad ? `${holderBad} NOT admitted` : '')
+
+      // Operators live only in operator-registry, and they are the bulk of the allowlist —
+      // ~830 addresses whose refcount is their fingerprint count. Sample rather than sweep:
+      // one read is ~35 ms, and a seed that dropped operators drops all of them, not a few.
+      if (contract === 'operator-registry') {
+        const verified: Record<string, string> = envelope.state?.verified ?? {}
+        const sample = [...new Set(Object.values(verified))].slice(0, 5)
+        let opBad = 0
+        for (const addr of sample) if (!(await admits(addr)).ok) opBad++
+        gateCheck(sample.length > 0 && opBad === 0,
+          `sampled ${sample.length} seeded operators admitted`,
+          opBad ? `${opBad} NOT admitted` : '')
+      }
+    }
+  }
+
+  if (gateBad) {
+    console.error('\nFAILED: the write gate cannot read this process. Publishing this PID into')
+    console.error('gated-processes would refuse every operator write, because the gate fails')
+    console.error('CLOSED. Do NOT write this id to Consul.')
+    process.exit(1)
+  }
+
   const env = seed === 'none' ? '<env>' : seed
   console.log('\n=== DEPLOYED ===')
   console.log(`  ${processId}`)

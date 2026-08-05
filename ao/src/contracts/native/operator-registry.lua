@@ -63,7 +63,16 @@ return {
 
           utils.assertValidFingerprint(fingerprint)
           -- Validate + canonicalize to EIP-55 on-chain (rejects a mixed-case bad checksum).
-          ctx.state.claimable[fingerprint] = eip55.checksum(address)
+          local addr = eip55.checksum(address)
+          -- A fingerprint is ONE reason to be allowed. Re-assigning it to a different operator
+          -- moves that reason rather than creating a second one, or the previous holder keeps
+          -- write access to a certificate they no longer have.
+          local prev = ctx.state.claimable[fingerprint]
+          if prev ~= addr then
+            if prev then ctx.disallow(prev) end
+            ctx.allow(addr)
+          end
+          ctx.state.claimable[fingerprint] = addr
 
           if hw then
             addVerifiedHardwareFingerprint(ctx.state, fingerprint)
@@ -102,6 +111,11 @@ return {
       ctx.state.verified[fingerprint] = address
       -- NB: Don't remove registration credits on claim.
       ctx.state.claimable[fingerprint] = nil
+      -- The fingerprint moves claimable -> verified for the SAME address, so the reason count
+      -- is unchanged. Written explicitly rather than skipped so every fingerprint transition
+      -- goes through the same paired revoke/grant and none can be forgotten.
+      ctx.disallow(address)
+      ctx.allow(address)
 
       return 'OK'
     end,
@@ -117,6 +131,7 @@ return {
       )
 
       ctx.state.verified[fingerprint] = nil
+      ctx.disallow(address)
       return 'OK'
     end,
 
@@ -127,7 +142,11 @@ return {
         assert(type(fingerprint) == 'string', errors.FingerprintRequired)
         assert(string.len(fingerprint) == 40, errors.InvalidCertificate)
 
+        -- Read the holder BEFORE clearing — afterwards there is nothing to revoke against,
+        -- and the operator would keep write access to a certificate they no longer hold.
+        local prev = ctx.state.verified[fingerprint]
         ctx.state.verified[fingerprint] = nil
+        if prev then ctx.disallow(prev) end
         return 'OK'
       end,
     },
@@ -138,7 +157,11 @@ return {
         local address = ctx.tags['Address']
         assert(type(address) == 'string', errors.AddressRequired)
 
-        ctx.state.blocked[eip55.checksum(address)] = true
+        local addr = eip55.checksum(address)
+        ctx.state.blocked[addr] = true
+        -- Blocking must also close the WRITE GATE. A veto, not a revoke: the address may still
+        -- hold roles or verified fingerprints, and decrementing would leave it able to write.
+        ctx.block(addr)
         return 'OK'
       end,
     },
@@ -152,6 +175,7 @@ return {
         assert(ctx.state.blocked[addr] ~= nil, errors.AddressIsNotBlocked)
 
         ctx.state.blocked[addr] = nil
+        ctx.unblock(addr)
         return 'OK'
       end,
     },
@@ -241,6 +265,20 @@ return {
   -- use (see the consumer read-surface survey), replacing the legacynet List-*/Info
   -- round-trips and the full-`View-State` over-fetch.
   -- ------------------------------------------------------------------------
+  -- Migration seed for the write gate's allowlist. Called ONCE, on the first slot, alongside
+  -- the runtime's own seeding of the Owner and ACL role holders.
+  --
+  -- A fingerprint held in `claimable` counts exactly as much as one in `verified`: an operator's
+  -- FIRST action is Submit-Fingerprint-Certificate against a claimable fingerprint an admin
+  -- assigned them, so if claimable did not count they could never make that first write and
+  -- could never become verified. That is the whole bootstrapping path.
+  writers = function(state, al)
+    for _, addr in pairs(state.claimable or {}) do al.allow(addr) end
+    for _, addr in pairs(state.verified or {}) do al.allow(addr) end
+    -- Blocked is a veto that survives however many fingerprints the address holds.
+    for addr in pairs(state.blocked or {}) do al.block(addr) end
+  end,
+
   views = {
     -- One operator's whole footprint by address — replaces downloading the entire
     -- registry just to filter to one address (the dashboard's hottest over-fetch).
