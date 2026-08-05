@@ -4,10 +4,10 @@
 // Run: HB_URL=https://hb-dev.anyone.tech bun run scripts/interact-probe.ts
 import { connect as aoConnect } from '@permaweb/aoconnect'
 import { EthereumSigner } from '@dha-team/arbundles'
-import { createEthSigner, resolveAuthority, resolveImportAuthority } from './util/helpers'
+import { createEthSigner, resolveAuthority, resolveImportAuthority, requireDeployerKey } from './util/helpers'
 
 const HB_URL = process.env.HB_URL || 'https://hb-dev.anyone.tech'
-const DEV_KEY = '0x80611882d38e5502d93305c88b64da234fea23037334ecb9a647249076c5fa37'
+const DEV_KEY = requireDeployerKey()
 const MODULE = process.env.MODULE || 'ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s'
 
 // See the raw node responses (aoconnect hides them).

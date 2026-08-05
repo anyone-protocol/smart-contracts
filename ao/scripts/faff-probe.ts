@@ -4,7 +4,7 @@
 // Run: npx tsx scripts/faff-probe.ts
 import { connect as aoConnect } from '@permaweb/aoconnect'
 import { EthereumSigner } from '@dha-team/arbundles'
-import { createEthSigner, resolveAuthority } from './util/helpers'
+import { createEthSigner, resolveAuthority, requireDeployerKey } from './util/helpers'
 import { randomBytes } from 'node:crypto'
 
 const HB_URL = process.env.HB_URL || 'https://hb-dev.anyone.tech'
@@ -23,8 +23,8 @@ globalThis.fetch = (async (input: any, init?: any) => {
   }
   return res
 }) as any
-// Dev test wallet — in the node's faff-allow-list (addr 0xa9A1BdfA75...39AEcE).
-const DEV_KEY = '0x80611882d38e5502d93305c88b64da234fea23037334ecb9a647249076c5fa37'
+// Allow-listed signer, from DEPLOYER_PRIVATE_KEY (ao/.env). See requireDeployerKey().
+const DEV_KEY = requireDeployerKey()
 // Fresh random wallet — NOT in the allow-list.
 const RND_KEY = '0x' + randomBytes(32).toString('hex')
 const MODULE = process.env.MODULE || 'ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s'

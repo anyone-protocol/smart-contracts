@@ -3,10 +3,10 @@
 // Run: HB_URL=http://localhost:18741 bun run scripts/spawn-lua.ts
 import { connect as aoConnect } from '@permaweb/aoconnect'
 import { EthereumSigner } from '@dha-team/arbundles'
-import { createEthSigner, resolveAuthority } from './util/helpers'
+import { createEthSigner, resolveAuthority, requireDeployerKey } from './util/helpers'
 
 const HB_URL = process.env.HB_URL || 'http://localhost:18741'
-const DEV_KEY = '0x80611882d38e5502d93305c88b64da234fea23037334ecb9a647249076c5fa37'
+const DEV_KEY = requireDeployerKey()
 
 // Minimal vanilla lua process: `compute` is the per-message reducer.
 // Counts messages and exposes the count in results/output/body and state.

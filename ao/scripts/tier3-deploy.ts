@@ -1,28 +1,26 @@
-// Tier-3 deploy: spawn the NATIVE operator-registry on the local node, populate it with
-// realistic data (owner = deploy wallet), and print a menu of ready-to-poke URLs.
-// Run: HB_URL=http://localhost:8734 bun run scripts/tier3-deploy.ts
+// Tier-3 deploy: spawn the NATIVE operator-registry, populate it with realistic data
+// (owner = deploy wallet), and print a menu of ready-to-poke URLs.
+//
+// Spawns with INLINE lua source, so it needs no pre-published module and works against a remote
+// node as well as a local one:
+//   HB_URL=http://localhost:8734      bun run scripts/tier3-deploy.ts
+//   HB_URL=https://hb-dev.anyone.tech bun run scripts/tier3-deploy.ts
 import { EthereumSigner } from '@dha-team/arbundles'
 import { Wallet } from 'ethers'
 import { fetchNodeAddress, spawnLuaProcess, sendMessage } from './util/hb-client'
-import fs from 'fs'
-import path from 'path'
+import { buildBundle } from './util/native-bundle'
+import { requireDeployerKey } from './util/helpers'
 
 const HB_URL = process.env.HB_URL || 'http://localhost:8734'
-const KEY = process.env.DEPLOYER_PRIVATE_KEY
-  || '80611882d38e5502d93305c88b64da234fea23037334ecb9a647249076c5fa37'
-const AO = path.resolve(import.meta.dir, '..')
-const rd = (rel: string) => fs.readFileSync(path.join(AO, rel), 'utf-8')
-const wrap = (src: string) => `(function()\n${src}\nend)()`
+const KEY = requireDeployerKey()
 
-const BUNDLE = [
-  `package.loaded['json'] = ${wrap(rd('runtime/vendor/json.lua'))}`,
-  `package.loaded['.json'] = package.loaded['json']`,
-  `package.loaded['.common.errors'] = ${wrap(rd('src/contracts/common/errors.lua'))}`,
-  `package.loaded['.common.utils'] = ${wrap(rd('src/contracts/common/utils.lua'))}`,
-  `native = ${wrap(rd('runtime/native.lua'))}`,
-  `native.install()`,
-  `native.register(${wrap(rd('src/contracts/native/operator-registry.lua'))})`,
-].join('\n')
+// Use the CANONICAL bundle builder. This used to hand-roll its own preload list, which silently
+// drifted from the contract: operator-registry.lua requires `.common.eip55` (line 25) and the
+// list here only preloaded json/errors/utils. A missing preload is not a load-time warning — the
+// require fails, the whole chunk dies, and the spawn still returns a pid. The process is then
+// simply dead: every read 500s and every push 400s, with no message saying why. Keeping one
+// builder means adding a require to a contract cannot break a deploy script.
+const BUNDLE = buildBundle('src/contracts/native/operator-registry.lua')
 
 // Deploy wallet address (owner) — DERIVED from the actual signing key (bun auto-loads
 // .env, so the key may not be the hardcoded fallback). FP1/FP4 are assigned to it so the

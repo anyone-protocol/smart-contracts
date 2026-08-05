@@ -12,6 +12,36 @@ export function loadWallet (path: string) {
 }
 
 /**
+ * The signing key for anything that must be admitted past a node's faff allow-list.
+ *
+ * Single source of truth ON PURPOSE. This used to be a hardcoded literal duplicated across ~20
+ * scripts, whose address was then allow-listed on hb-dev — meaning anyone who read this PUBLIC
+ * repo could spend that node's compute. That key was removed from the allow-list on 2026-07-30
+ * and the allow-listed signer is now workstation-local, living only in `ao/.env` (untracked).
+ *
+ * There is deliberately NO fallback. A missing key must fail here with a clear message rather
+ * than silently signing as someone else — a run that used an unexpected signer surfaces as an
+ * opaque faff `400 Node will not service this request`, which reads like an access-policy
+ * finding and has twice been mistaken for one.
+ *
+ * Callers that need a signer which must NOT be admitted (negative tests) should generate a
+ * random key instead — never borrow this one, because it is allow-listed on dev and would turn
+ * a denial assertion into a false pass.
+ */
+export function requireDeployerKey (): string {
+  const raw = process.env.DEPLOYER_PRIVATE_KEY
+  if (!raw) {
+    console.error(
+      'DEPLOYER_PRIVATE_KEY is not set.\n' +
+      '  Expected in smart-contracts/ao/.env (bun autoloads it when you run from ao/),\n' +
+      '  or pass it explicitly: DEPLOYER_PRIVATE_KEY=0x… bun run <script>'
+    )
+    process.exit(2)
+  }
+  return raw.replace(/^0x/, '')
+}
+
+/**
  * Resolve the node's own operator address (used as the default `scheduler`).
  */
 export async function resolveAuthority (url: string) {
