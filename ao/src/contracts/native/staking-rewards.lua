@@ -9,10 +9,15 @@
 --- (Handlers → native actions; `StakingRewards.X` → `ctx.state.X`; `msg` → `ctx`) — the numbers
 --- must not move.
 ---
---- SHAPE NOTE: unlike relay-rewards, every reward map here is TWO levels deep —
---- `Rewarded[hodler][operator]`, `Claimed[hodler][operator]`, `PendingRounds[ts][hodler][operator]`,
---- `PreviousRound.Details[hodler][operator]`. An operator's own earnings live at the self-key
---- `Rewarded[operator][operator]`.
+--- SHAPE NOTE: every reward map here is logically a (hodler, operator) PAIR map. Legacynet
+--- nested them two levels deep; D32 FLATTENED the storage to `[hodler .. '/' .. operator]`, and
+--- `PreviousRound.Details` to parallel typed maps, because the nested form cost 3,336 live Lua
+--- tables and luerl's GC mark phase is quadratic in that count. See the pair-key section below.
+--- An operator's own earnings still live at the self-key, now `Rewarded[operator/operator]`.
+---
+--- The flattening is STORAGE ONLY. Every view reassembles the original nested shape, so the
+--- legacynet read payloads are unchanged — pinned by `spec/fixtures/staking-view-golden.json`,
+--- captured from the real dump and re-checked with `scripts/staking-view-golden.ts --check`.
 ---
 --- DELIBERATE DEVIATIONS from legacynet:
 ---   * Addresses stored EIP-55 (was 0x+ALLCAPS via normalizeEvmAddress). Every untrusted address
@@ -22,6 +27,17 @@
 ---     because they were 3.6 MB of a 4 MB state; staking's whole state is ~322 KB (Details ~181 KB),
 ---     so the pressure does not exist and `Last-Snapshot`/`Last-Round-Data` stay plain views.
 ---   * A17: `PendingRounds` is keyed by the STRING timestamp (a large int key hangs the device VM).
+---   * EMPTY HODLER ROWS ARE DROPPED (2026-08-09, deliberate — a consequence of the D32 pair-key
+---     flattening). Legacynet's `Complete-Round` ran `if Rewarded[h] == nil then Rewarded[h] = {} end`
+---     BEFORE the `bint.ispos` guard, so a hodler whose reward rounded to zero got an empty row
+---     created and never filled. The live dump carries exactly 2 of them
+---     (`0xD9595B16…`, `0x339075B3…`); neither appears in `Claimed` or `Details` — they hold
+---     nothing. A map keyed by (hodler, operator) cannot represent a hodler with no pairs, so
+---     they do not survive the migration. Two visible effects, both accepted:
+---       · `status.counts.rewardedHodlers` reports 560 rather than 562
+---       · `Claim-Rewards` on those 2 addresses now errors ('No rewards for …') instead of
+---         returning an empty `{}` payload — they had nothing to claim either way
+---     This code cannot create new ones: `Rewarded` is only written under `bint.ispos`.
 ---   * SHARE-DELAY UNIT FIX (2026-07-25, deliberate — NOT a frozen-math change): legacynet compared
 ---     `RequestedTimestamp + ChangeDelaySeconds <= roundTimestamp` where BOTH timestamps are
 ---     MILLISECONDS but the delay is denominated in SECONDS, making the 7-day (604800 s) default
@@ -57,6 +73,116 @@ local errors = require('.common.errors')
 local eip55  = require('.common.eip55')
 local json   = require('json')
 local bint   = require('.common.bigint')(256)
+
+-- ===========================================================================
+-- Pair keys — the D32 flattening (storage only; nothing consumer-visible moves)
+-- ===========================================================================
+--
+-- Every reward map here used to be `[hodler][operator]`, which costs ONE LIVE LUA TABLE PER
+-- HODLER. Under the globals state model that whole tree is marked on every GC, and luerl's mark
+-- phase is quadratic in live table count, so this contract alone carried 3,336 tables against 6
+-- for operator-registry. Measured on the real seed:
+--
+--     Rewarded        563 tables  ->  1     (562 hodler maps; values are strings)
+--     Claimed         401 tables  ->  1     (400 hodler maps)
+--     PreviousRound  2,365 tables ->  ~9    (451 hodler maps + 636 pair + 636 Score + 636 Reward)
+--
+-- `Rewarded`/`Claimed` are the ones that matter most: they grow FOREVER with the hodler x
+-- operator pair count. `Details` is bounded to one round but was the largest single block,
+-- because a composite key alone cannot remove the per-pair VALUE tables — hence the parallel
+-- typed maps below rather than `Details[h/o] = { ... }`.
+--
+-- ⚠ The separator is safe because both halves are EIP-55 addresses (`0x` + 40 hex), which
+-- cannot contain `/`. Do not reuse this scheme for a key that could.
+--
+-- ⚠ NOTHING a consumer sees changes. Every view reassembles the original nested shape, and
+-- `spec/fixtures/staking-view-golden.json` pins that against the real legacynet dump.
+local SEP = '/'
+
+local function pairKey(hodler, operator) return hodler .. SEP .. operator end
+
+local function splitPair(key)
+  local i = string.find(key, SEP, 1, true)   -- plain find: luerl's pattern classes are a gap (A13)
+  if not i then return nil end
+  return string.sub(key, 1, i - 1), string.sub(key, i + 1)
+end
+
+--- Every entry for one hodler, as the `[operator] = value` map the legacy shape had.
+--- Returns nil (not {}) when the hodler has none, because callers distinguish those:
+--- `Claim-Rewards` asserts on it and the `claimed` view returns it verbatim.
+local function forHodler(flat, hodler)
+  local prefix = hodler .. SEP
+  local plen = #prefix
+  local out, found = {}, false
+  for k, v in pairs(flat) do
+    if string.sub(k, 1, plen) == prefix then
+      out[string.sub(k, plen + 1)] = v
+      found = true
+    end
+  end
+  if not found then return nil end
+  return out
+end
+
+--- Distinct hodlers in a flat map. `status.counts` reported HODLERS before the flattening and
+--- must keep doing so — counting keys would silently start reporting PAIRS.
+local function countHodlers(flat)
+  local seen, n = {}, 0
+  for k in pairs(flat) do
+    local h = splitPair(k)
+    if h ~= nil and not seen[h] then seen[h] = true; n = n + 1 end
+  end
+  return n
+end
+
+--- `PreviousRound.Details` is stored as parallel typed maps so a round costs a fixed ~7 tables
+--- instead of 3 per pair. Values keep their Lua TYPES — `Running`/`Share` stay numbers rather
+--- than being packed into a string, because float -> string -> float is not guaranteed to
+--- round-trip identically under luerl and this port must stay byte-identical.
+local function emptyDetails()
+  return { Staked = {}, Restaked = {}, Running = {}, Share = {},
+           Rating = {}, RewardHodler = {}, RewardOperator = {} }
+end
+
+--- Rebuild one pair's `{ Score, Rating, Reward }` record — the legacy shape, verbatim.
+local function detailRecord(d, key)
+  return {
+    Score = { Staked = d.Staked[key], Restaked = d.Restaked[key],
+              Running = d.Running[key], Share = d.Share[key] },
+    Rating = d.Rating[key],
+    Reward = { Hodler = d.RewardHodler[key], Operator = d.RewardOperator[key] },
+  }
+end
+
+--- `Details[hodler]` as it used to look, or nil when the hodler was not in the round.
+local function detailsForHodler(d, hodler)
+  if type(d) ~= 'table' or type(d.Rating) ~= 'table' then return nil end
+  local prefix = hodler .. SEP
+  local plen = #prefix
+  local out, found = {}, false
+  for k in pairs(d.Rating) do
+    if string.sub(k, 1, plen) == prefix then
+      out[string.sub(k, plen + 1)] = detailRecord(d, k)
+      found = true
+    end
+  end
+  if not found then return nil end
+  return out
+end
+
+--- The whole `Details` map in its original two-level shape, for `last_snapshot`.
+local function detailsNested(d)
+  if type(d) ~= 'table' or type(d.Rating) ~= 'table' then return {} end
+  local out = {}
+  for k in pairs(d.Rating) do
+    local h, o = splitPair(k)
+    if h ~= nil then
+      if out[h] == nil then out[h] = {} end
+      out[h][o] = detailRecord(d, k)
+    end
+  end
+  return out
+end
 
 --- Validate + canonicalize an address, preserving a caller-supplied legacynet error message.
 local function checksum(addr, message)
@@ -156,16 +282,13 @@ return {
   -- the base-addressed point reads this comment used to advertise
   -- (now/state/Rewarded/<hodler>/<operator>) no longer exist.
   --
-  -- 🔴 FLATTENING DEBT (D31 §2, D32 §2). The `[hodler][operator]` maps below cost ONE LIVE TABLE
-  -- PER OUTER KEY — 3,336 of them in the real seed, against 6 for operator-registry and 31 for
-  -- relay-rewards. luerl's GC mark phase is quadratic in live tables, so this contract pays far
-  -- more per collect than the other two, and it grows with the hodler x operator pair count.
-  -- The fix is composite keys (`[hodler .. '/' .. operator]`), which takes it to ~10 tables. It
-  -- is correctness-neutral but touches the round math, so it lands as its own change gated on
-  -- the bint golden — NOT as part of the state-root move.
+  -- FLATTENED (D32) — see the pair-key section at the top of this file. Every reward map is
+  -- keyed `hodler .. '/' .. operator` and `PreviousRound.Details` is parallel typed maps, so
+  -- the whole contract holds a FIXED handful of live tables instead of 3,336 growing ones.
+  -- Storage only: the views reassemble the original nested shape.
   state = {
-    Claimed             = {},   -- [hodler][operator] = "bigint" (high-water mark at claim time)
-    Rewarded            = {},   -- [hodler][operator] = "bigint" (cumulative; operator self-key = own cut)
+    Claimed             = {},   -- [hodler/operator] = "bigint" (high-water mark at claim time)
+    Rewarded            = {},   -- [hodler/operator] = "bigint" (cumulative; self-key = own cut)
     Shares              = {},   -- [operator] = float (only when the operator set one)
     PendingShareChanges = {},   -- [operator] = { Share = float, RequestedTimestamp = ms }
     Configuration = {
@@ -185,9 +308,15 @@ return {
       Period = 0,
       Summary = { Rewards = '0', Ratings = '0', Stakes = '0' },
       Configuration = {},
-      Details = {},   -- [hodler][operator] = { Score, Rating, Reward } — PERSISTED (see header)
+      -- PERSISTED (see header). Parallel typed maps keyed [hodler/operator]; `last_snapshot`
+      -- and `last_round_data` rebuild the `{ Score, Rating, Reward }` records.
+      Details = { Staked = {}, Restaked = {}, Running = {}, Share = {},
+                  Rating = {}, RewardHodler = {}, RewardOperator = {} },
     },
-    PendingRounds = {},   -- [tostring(Timestamp)][hodler][operator] = { Staked, Running, Share }
+    -- [tostring(Timestamp)] = { Staked/Running/Share = { [hodler/operator] = v } }. The
+    -- timestamp stays the outer key (rounds in flight are few, and Cancel/Complete drop one by
+    -- key); A17 still applies — it must be a STRING, never a large integer.
+    PendingRounds = {},
   },
 
   -- ------------------------------------------------------------------------
@@ -288,7 +417,11 @@ return {
         for hodlerAddress, scores in pairs(request.Scores) do
           local nHodlerAddress = checksum(hodlerAddress, 'Invalid Hodler Address:' .. tostring(hodlerAddress))
           if state.PendingRounds[tsKey] then
-            assert(state.PendingRounds[tsKey][nHodlerAddress] == nil, 'Duplicated score for ' .. nHodlerAddress)
+            -- Same rule as before the flattening — one Add-Scores per hodler per round. The
+            -- hodler no longer has a map of their own, so this asks whether ANY pair of theirs
+            -- is already staged.
+            assert(forHodler(state.PendingRounds[tsKey].Staked, nHodlerAddress) == nil,
+              'Duplicated score for ' .. nHodlerAddress)
           end
           canon[hodlerAddress] = { hodler = nHodlerAddress, ops = {} }
           for operatorAddress, score in pairs(scores) do
@@ -308,12 +441,12 @@ return {
         end
 
         if state.PendingRounds[tsKey] == nil then
-          state.PendingRounds[tsKey] = {}
+          state.PendingRounds[tsKey] = { Staked = {}, Running = {}, Share = {} }
         end
+        local pending = state.PendingRounds[tsKey]
 
         for hodlerAddress, scores in pairs(request.Scores) do
           local nHodlerAddress = canon[hodlerAddress].hodler
-          state.PendingRounds[tsKey][nHodlerAddress] = {}
           for operatorAddress, score in pairs(scores) do
             local nOperatorAddress = canon[hodlerAddress].ops[operatorAddress]
             -- Share is SNAPSHOTTED at scoring time: the operator's own share when they have set one
@@ -326,9 +459,10 @@ return {
                 share = state.Configuration.Shares.Default
               end
             end
-            state.PendingRounds[tsKey][nHodlerAddress][nOperatorAddress] = {
-              Staked = tostring(bint(score.Staked)), Running = score.Running, Share = share,
-            }
+            local key = pairKey(nHodlerAddress, nOperatorAddress)
+            pending.Staked[key] = tostring(bint(score.Staked))
+            pending.Running[key] = score.Running
+            pending.Share[key] = share
           end
         end
 
@@ -350,38 +484,49 @@ return {
         local summary = { Rewards = bint(0), Ratings = bint(0), Stakes = bint(0) }
         local roundData = {}
 
-        for hodlerAddress, scores in pairs(state.PendingRounds[tsKey]) do
-          roundData[hodlerAddress] = {}
-          for operatorAddress, score in pairs(scores) do
-            local staked = bint(score.Staked)
-            local restaked = bint(0)
-            local rating = bint(0)
-            if score.Running >= state.Configuration.Requirements.Running then
-              if state.Rewarded[hodlerAddress] ~= nil and
-                  state.Rewarded[hodlerAddress][operatorAddress] ~= nil then
-                if state.Claimed[hodlerAddress] ~= nil and
-                    state.Claimed[hodlerAddress][operatorAddress] ~= nil then
-                  restaked = bint(state.Rewarded[hodlerAddress][operatorAddress]) - bint(state.Claimed[hodlerAddress][operatorAddress])
-                else
-                  restaked = bint(state.Rewarded[hodlerAddress][operatorAddress])
-                end
+        -- Reads the flat pending maps and rebuilds the per-pair `score` the frozen math expects,
+        -- so the arithmetic below is untouched. `roundData` stays NESTED on purpose: it is
+        -- compute-local (garbage by the next collect), and keeping it means the two settlement
+        -- loops that follow are byte-identical to legacynet.
+        --
+        -- ⚠ ITERATION ORDER CHANGES (one flat map instead of nested `pairs`), and that is safe
+        -- ONLY because every accumulation here is exact bigint addition — commutative and
+        -- associative, so the sums and the per-pair writes land on the same values whatever the
+        -- order. Do not introduce a float accumulation or an order-sensitive step into this loop.
+        local pending = state.PendingRounds[tsKey]
+        for key, stakedStr in pairs(pending.Staked) do
+          local hodlerAddress, operatorAddress = splitPair(key)
+          local score = { Staked = stakedStr, Running = pending.Running[key], Share = pending.Share[key] }
+          if roundData[hodlerAddress] == nil then roundData[hodlerAddress] = {} end
+
+          local staked = bint(score.Staked)
+          local restaked = bint(0)
+          local rating = bint(0)
+          if score.Running >= state.Configuration.Requirements.Running then
+            local rewardedPrior = state.Rewarded[key]
+            if rewardedPrior ~= nil then
+              local claimedPrior = state.Claimed[key]
+              if claimedPrior ~= nil then
+                restaked = bint(rewardedPrior) - bint(claimedPrior)
+              else
+                restaked = bint(rewardedPrior)
               end
-              rating = staked + restaked
             end
-
-            summary.Stakes = summary.Stakes + bint(score.Staked) + restaked
-            summary.Ratings = summary.Ratings + rating
-
-            roundData[hodlerAddress][operatorAddress] = {
-              Score = {
-                Staked = bint(score.Staked),
-                Restaked = restaked,
-                Running = score.Running,
-                Share = score.Share
-              },
-              Rating = rating
-            }
+            rating = staked + restaked
           end
+
+          summary.Stakes = summary.Stakes + bint(score.Staked) + restaked
+          summary.Ratings = summary.Ratings + rating
+
+          roundData[hodlerAddress][operatorAddress] = {
+            Score = {
+              Staked = bint(score.Staked),
+              Restaked = restaked,
+              Running = score.Running,
+              Share = score.Share
+            },
+            Rating = rating
+          }
         end
 
         local roundLength = bint(0)
@@ -410,44 +555,39 @@ return {
           end
         end
 
-        local dataWithStrings = {}
+        -- Settle. Cumulative balances are keyed by pair now; the operator's own cut still lands
+        -- on the SELF-KEY (`operator/operator`) and still accumulates across every hodler who
+        -- staked with them, which is why this must read state fresh on each iteration.
+        local details = emptyDetails()
         for hodlerAddress, ratedData in pairs(roundData) do
-          dataWithStrings[hodlerAddress] = {}
           for operatorAddress, data in pairs(ratedData) do
-            if state.Rewarded[hodlerAddress] == nil then
-              state.Rewarded[hodlerAddress] = {}
-            end
+            local hodlerKey = pairKey(hodlerAddress, operatorAddress)
             local previousHodlerReward = bint(0)
-            if state.Rewarded[hodlerAddress][operatorAddress] ~= nil then
-              previousHodlerReward = bint(state.Rewarded[hodlerAddress][operatorAddress])
+            if state.Rewarded[hodlerKey] ~= nil then
+              previousHodlerReward = bint(state.Rewarded[hodlerKey])
             end
             local hodlerReward = data.Reward.Hodler + previousHodlerReward
             if bint.ispos(hodlerReward) then
-              state.Rewarded[hodlerAddress][operatorAddress] = tostring(hodlerReward)
+              state.Rewarded[hodlerKey] = tostring(hodlerReward)
             end
 
-            if state.Rewarded[operatorAddress] == nil then
-              state.Rewarded[operatorAddress] = {}
-            end
+            local operatorKey = pairKey(operatorAddress, operatorAddress)
             local previousOperatorReward = bint(0)
-            if state.Rewarded[operatorAddress][operatorAddress] ~= nil then
-              previousOperatorReward = bint(state.Rewarded[operatorAddress][operatorAddress])
+            if state.Rewarded[operatorKey] ~= nil then
+              previousOperatorReward = bint(state.Rewarded[operatorKey])
             end
             local operatorReward = data.Reward.Operator + previousOperatorReward
             if bint.ispos(operatorReward) then
-              state.Rewarded[operatorAddress][operatorAddress] = tostring(operatorReward)
+              state.Rewarded[operatorKey] = tostring(operatorReward)
             end
 
-            dataWithStrings[hodlerAddress][operatorAddress] = {
-              Score = {
-                Staked = tostring(data.Score.Staked),
-                Restaked = tostring(data.Score.Restaked),
-                Running = data.Score.Running,
-                Share = data.Score.Share
-              },
-              Rating = tostring(data.Rating),
-              Reward = { Hodler = tostring(data.Reward.Hodler), Operator = tostring(data.Reward.Operator) }
-            }
+            details.Staked[hodlerKey] = tostring(data.Score.Staked)
+            details.Restaked[hodlerKey] = tostring(data.Score.Restaked)
+            details.Running[hodlerKey] = data.Score.Running
+            details.Share[hodlerKey] = data.Score.Share
+            details.Rating[hodlerKey] = tostring(data.Rating)
+            details.RewardHodler[hodlerKey] = tostring(data.Reward.Hodler)
+            details.RewardOperator[hodlerKey] = tostring(data.Reward.Operator)
           end
         end
 
@@ -460,7 +600,7 @@ return {
             Rewards = tostring(summary.Rewards)
           },
           Configuration = state.Configuration,
-          Details = dataWithStrings
+          Details = details
         }
 
         for roundStamp, _ in pairs(state.PendingRounds) do
@@ -503,25 +643,25 @@ return {
       handler = function(ctx)
         local state = ctx.state
         local hodlerAddress = checksum(ctx.tags['Address'], 'Address tag')
-        local rewarded = state.Rewarded[hodlerAddress]
+        -- `forHodler` returns nil (not {}) when there is nothing, so the legacynet error text
+        -- fires on exactly the same condition as before.
+        local rewarded = forHodler(state.Rewarded, hodlerAddress)
         assert(rewarded, 'No rewards for ' .. hodlerAddress)
 
-        if state.Claimed[hodlerAddress] == nil then
-          state.Claimed[hodlerAddress] = {}
-        end
-        for operatorAddress, _ in pairs(rewarded) do
-          state.Claimed[hodlerAddress][operatorAddress] = state.Rewarded[hodlerAddress][operatorAddress]
+        for operatorAddress, amount in pairs(rewarded) do
+          state.Claimed[pairKey(hodlerAddress, operatorAddress)] = amount
         end
 
+        -- The legacynet payload: the hodler's `[operator] = amount` map, unchanged.
         return json.encode(rewarded)
       end,
     },
   },
 
   -- ------------------------------------------------------------------------
-  -- READS — point lookups come FREE from base-addressing
-  -- (now/state/Rewarded/<hodler>/<operator>, now/state/Claimed/<hodler>/<operator>).
-  -- These are the computed/bundled reads.
+  -- READS. Every view reassembles the pre-flattening nested shape, so nothing a consumer sees
+  -- changed with D32. `spec/fixtures/staking-view-golden.json` pins that against the real
+  -- legacynet dump; `scripts/staking-view-golden.ts --check` is the gate.
   -- ------------------------------------------------------------------------
   views = {
     -- legacynet Get-Rewards: both maps for one hodler.
@@ -529,7 +669,8 @@ return {
       if not (p and p.address) then return nil end
       local ok, addr = pcall(eip55.checksum, p.address)
       if not ok then return nil end
-      return { Rewarded = s.Rewarded[addr] or {}, Claimed = s.Claimed[addr] or {} }
+      -- Reassembled from the flat maps into the exact legacy `[operator] = amount` shape.
+      return { Rewarded = forHodler(s.Rewarded, addr) or {}, Claimed = forHodler(s.Claimed, addr) or {} }
     end,
 
     -- legacynet Get-Claimed.
@@ -537,7 +678,8 @@ return {
       if not (p and p.address) then return nil end
       local ok, addr = pcall(eip55.checksum, p.address)
       if not ok then return nil end
-      return { address = addr, claimed = s.Claimed[addr] }
+      -- nil (absent), not {}, when the hodler has never claimed — same as before.
+      return { address = addr, claimed = forHodler(s.Claimed, addr) }
     end,
 
     -- Operator share state (set shares + queued changes awaiting their delay).
@@ -565,13 +707,22 @@ return {
       if not (p and p.address) then return nil end
       local ok, addr = pcall(eip55.checksum, p.address)
       if not ok then return nil end
-      local details = s.PreviousRound.Details and s.PreviousRound.Details[addr]
+      local details = detailsForHodler(s.PreviousRound.Details, addr)
       if not details then return nil end
       return { Timestamp = s.PreviousRound.Timestamp, Period = s.PreviousRound.Period, Details = details }
     end,
 
-    -- legacynet Last-Snapshot: the whole previous round, Details included (persisted — see header).
-    last_snapshot = function(s) return s.PreviousRound end,
+    -- legacynet Last-Snapshot: the whole previous round, Details included (persisted — see
+    -- header). Details is rebuilt into its original two-level shape here; storage is flat.
+    last_snapshot = function(s)
+      return {
+        Timestamp = s.PreviousRound.Timestamp,
+        Period = s.PreviousRound.Period,
+        Summary = s.PreviousRound.Summary,
+        Configuration = s.PreviousRound.Configuration,
+        Details = detailsNested(s.PreviousRound.Details),
+      }
+    end,
 
     -- Operational visibility + liveness/wedge probe.
     status = function(s)
@@ -583,8 +734,9 @@ return {
         setSharesEnabled = s.Configuration.Shares.SetSharesEnabled,
         lastRoundTimestamp = s.PreviousRound.Timestamp,
         counts = {
-          rewardedHodlers = count(s.Rewarded),
-          claimedHodlers = count(s.Claimed),
+          -- HODLERS, not pairs. Counting keys would silently change what this reports.
+          rewardedHodlers = countHodlers(s.Rewarded),
+          claimedHodlers = countHodlers(s.Claimed),
           shares = count(s.Shares),
           pendingShareChanges = count(s.PendingShareChanges),
           pendingRounds = count(s.PendingRounds),
