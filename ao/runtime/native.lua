@@ -9,13 +9,40 @@
 ---   * Contracts own only: their state shape, validation asserts, and — for the reward
 ---     contracts — the economic math, held byte-identical to the bint golden (Axis 7).
 ---
---- STATE IS BASE-ADDRESSABLE (the pilot decision, 2026-07-20). Contract state lives at
---- `base.state` — one source of truth, directly addressable at `now/state/<key>`, no
---- patch device and no projection. Writes mutate `base.state`; reads are pure functions
---- of `base.state` served as views (`now/as/<view>`). Atomic revert is a pointer swap
---- of the pre-handler snapshot — no in-place key-clearing, because nothing outside the
---- runtime holds a live reference to `base.state` (handlers receive it per-call as
---- `ctx.state`). Runtime-owned ACL roles live at `base.acl.roles`.
+--- STATE LIVES IN LUA GLOBALS (D31/D32, 2026-08-09 — supersedes the base-addressable pilot
+--- decision of 2026-07-20). Contract state lives at `_G[contract.root]`, e.g.
+--- `OperatorRegistry`; runtime-owned ACL roles at the `ACL` global, symmetric with `Owner`.
+--- Nothing state-shaped is written to the process message any more.
+---
+--- WHY (all measured — D31 §1, §5a):
+---   * writes  682.8 -> 5.4 ms/slot (127x). Per-key content-addressing of ~18k keys per slot
+---     was the entire cost; the process message is now results-only.
+---   * reads   371 -> 27.6 ms (13x). State is ALREADY live in the VM when a view runs, so
+---     view complexity is nearly free (an O(n) scan of 7,932 entries costs ~5 ms).
+---   * A16 and A18 CEASE TO EXIST. Both are `dev_lua:decode` corrupting state on its way
+---     through the message; state that never enters the message cannot be corrupted by it.
+---     All six `stripMeta` calls are gone with them.
+---
+--- THE COST THAT REPLACES IT — GC. Live state is now marked on every collect, and luerl's
+--- mark phase is O(live tables squared) (`luerl_heap.erl` ordsets). The schema rule:
+---   `[a][b] = scalar` costs ONE TABLE PER OUTER KEY; `[a .. '/' .. b] = scalar` costs one
+---   table total. Never nest in a way that scales with data volume.
+--- Measured: opreg 6 live tables, relay 31, staking 3,336 (staking is the flattening debt).
+---
+--- READS MUST USE `as/<view>`, NOT `now/~lua@5.3a/<view>`. `now` resolves FIRST and hands the
+--- lua device a priv-stripped message, so it re-initialises a FRESH VM from the module: the
+--- view function exists but every data global is nil. `as/` applies the execution device to
+--- the LOADED process, against the restored VM. This is not optional under globals.
+---
+--- Writes mutate `_G[root]` (handlers receive it per-call as `ctx.state`); reads are pure
+--- functions of it served as views (`as/<view>`). Atomic revert is a pointer swap of the
+--- pre-handler snapshot — no in-place key-clearing, because nothing outside the runtime holds
+--- a live reference to the root.
+---
+--- ⚠️ WHAT STAYS ON `base`: `allowlistId` (+ the `allowlistTable` fallback and
+--- `allowlistSeeded`). The node-side write gate reads `compute/allowlistId/~trie@1.0/<addr>`
+--- WITHOUT entering the contract's compute path — it cannot see a global. Moving it would
+--- close the gate's only cheap read.
 ---
 --- Relationship to runtime.lua (the legacynet shim): that runtime runs the unmodified
 --- contracts byte-for-byte behind a legacynet `msg` adapter and remains the
@@ -41,29 +68,38 @@ local function deepcopy(v)
 end
 native.deepcopy = deepcopy
 
---- CONFIRMED on-device (Tier-3, v0.9-FINAL): on the READ path HyperBEAM serves
---- `base.state` with every map committed as a sub-message. `ao-types`/`device` are
---- consumed by dev_lua on internalize, but `commitments` SURVIVES as a real Lua table
---- entry on every map (base.state itself and each nested map). A view that iterates a
---- state map with `pairs` would then count it (status off-by-one), emit it (scoring/roles
---- leak the blob), or — fatally — use its table VALUE as a key (operators: `out[a]=true`
---- with `a` a commitment table → json.encode 500). We strip these HB-reserved keys at
---- every level so contract views iterate ONLY real entries and keep writing plain `pairs`.
---- Read-only: returns a CLEANED COPY; never mutates the persistent base.state.
---- (On the compute/write path state is clean, so this is a harmless deepcopy there and in
---- the busted/luerl harness — views stay pure functions of a metadata-free state.)
-local READ_META = {
-  commitments = true, device = true, ['ao-types'] = true, hashpath = true, priv = true,
-}
-local function stripMeta(v)
-  if type(v) ~= 'table' then return v end
-  local out = {}
-  for k, x in pairs(v) do
-    if not (type(k) == 'string' and READ_META[k]) then out[k] = stripMeta(x) end
-  end
-  return out
+-- ===========================================================================
+-- Section R — the state root (D31/D32)
+-- ===========================================================================
+--
+-- The contract declares `root = 'OperatorRegistry'`; state lives at that GLOBAL. These two
+-- accessors are the ONLY places that name is dereferenced, so `ctx.state` stays the handler
+-- API and placement remains a runtime concern (D31 §3 — the seam D26 created).
+--
+-- There is deliberately no `stripMeta` any more. It existed because state travelled through
+-- the process message and `dev_lua:decode` re-injected `commitments`/`ao-types` onto every
+-- nested map on each reload (A16/A18). State no longer travels through the message.
+
+--- Name of the global holding contract state. nil until a contract registers.
+local ROOT = nil
+
+local function stateRoot()
+  return ROOT and _G[ROOT] or nil
 end
-native.stripMeta = stripMeta
+local function setStateRoot(v)
+  if ROOT then _G[ROOT] = v end
+end
+
+--- Placement seam. Exported because a TEST HARNESS CANNOT ASSIGN THESE GLOBALS ITSELF.
+--- busted runs each spec file under an `_ENV` that PROXIES `_G`: reads fall through, writes
+--- stay in the proxy. So `OperatorRegistry = {...}` in a spec is invisible to this module and
+--- the runtime keeps seeing nil — silently, with views returning empty rather than erroring.
+--- Seed through these instead. (Verified: `_ENV == _G` is false under busted.)
+--- The same applies to any consumer that is not this file, including a future restore tool.
+native.stateRoot = stateRoot
+native.setStateRoot = setStateRoot
+function native.acl() return ACL end
+function native.setACL(v) ACL = v end
 
 -- ===========================================================================
 -- Section 1 — identity: node-verified committer (AXIS 1, basis for 2/3/4/ACL)
@@ -181,18 +217,21 @@ local function initEnv(base)
 end
 
 -- ===========================================================================
--- Section ACL — runtime-owned roles at base.acl.roles (AXIS: ACL)
+-- Section ACL — runtime-owned roles at the `ACL` global (AXIS: ACL)
 -- ===========================================================================
 --
 -- Roles are keyed by committer address (EIP-55 verbatim). `owner` is the process Owner.
 -- Centralized here so all contracts share one ACL implementation (was duplicated in
 -- every contract's Update-Roles/View-Roles handlers — see native.builtins below).
-local function hasRole(from, roleList, base)
+--
+-- `ACL` is a global for the same reason state is (D31), and is symmetric with `Owner`, which
+-- has been a global since D26. It rides the same snapshot/revert as state.
+local function hasRole(from, roleList)
   for _, role in ipairs(roleList) do
     if role == 'owner' and from == Owner then
       return true
     else
-      local r = base.acl and base.acl.roles and base.acl.roles[role]
+      local r = ACL and ACL.roles and ACL.roles[role]
       if r and r[from] ~= nil then return true end
     end
   end
@@ -210,9 +249,12 @@ end
 --
 -- Held as a `~trie@1.0` trie ADDRESSED BY ID, with the id at `base.allowlistId`, so the gate
 -- reads `compute/allowlistId/~trie@1.0/<addr>` in ONE request (~22ms measured, vs ~458ms for
--- any view). A trie read never enters the contract's compute path, so it skips the
--- `stripMeta(base.state)` materialization that puts a ~400ms floor under every view. Keeping it
--- out of `base.state` also keeps it off the per-slot key count.
+-- any view). A trie read never enters the contract's compute path at all — no process load, no
+-- VM restore, no Lua.
+--
+-- ⚠️ `allowlistId` MUST STAY A `base` KEY (D32). Under globals everything else moved off the
+-- message, but the gate reads the trie id WITHOUT executing contract code, so it cannot see a
+-- Lua global. A global here would leave the gate no cheap read and reopen the DoS hole.
 --
 -- ⚠️ REFCOUNTS, NOT BOOLEANS. An address can be listed for several independent reasons at once
 -- — an ACL role, AND an operator fingerprint, AND being the owner. "Remove when it loses a role"
@@ -374,7 +416,7 @@ function native.allowlist.seed(base)
   local owner = resolveCommitter(base.process)
   if owner then native.allowlist.grant(owner) end
   -- Every ACL role holder — our controller/admin wallets.
-  for _, holders in pairs((base.acl and base.acl.roles) or {}) do
+  for _, holders in pairs((ACL and ACL.roles) or {}) do
     if type(holders) == 'table' then
       for addr in pairs(holders) do native.allowlist.grant(addr) end
     end
@@ -383,7 +425,7 @@ function native.allowlist.seed(base)
   -- writers (the reward contracts) simply omits it.
   local c = native._contract
   if c and type(c.writers) == 'function' then
-    pcall(c.writers, base.state or {}, {
+    pcall(c.writers, stateRoot() or {}, {
       allow = native.allowlist.grant,
       block = native.allowlist.block,
     })
@@ -439,8 +481,8 @@ native.builtins = {
     roles = { 'owner', 'admin', 'Update-Roles' },
     handler = function(ctx, base)
       local dto = require('json').decode(ctx.data)
-      base.acl.roles = base.acl.roles or {}
-      local roles = base.acl.roles
+      ACL.roles = ACL.roles or {}
+      local roles = ACL.roles
       -- Allowlist refcounts track ACTUAL transitions only. Granting a role the address already
       -- holds must not increment, or the matching revoke leaves a phantom count behind and the
       -- address stays allowed forever.
@@ -472,28 +514,53 @@ native.builtins = {
 }
 
 -- ===========================================================================
--- Section V — views (AXIS: reads): pure functions of base.state at now/as/<name>
+-- Section V — views (AXIS: reads): pure functions of the state root at as/<name>
 -- ===========================================================================
 --
--- `roles` is a runtime-served view (reads base.acl); everything else is a contract view
--- over base.state. Views NEVER touch compute and never mutate — read path only.
+-- `roles` and `dump` are runtime-served views; everything else is a contract view over the
+-- state root. Views NEVER touch compute and never mutate — read path only.
+--
+-- ⚠️ RETURN LITTLE. Path segments (`as/<view>/<k>/<k2>`) select AFTER the view is
+-- materialized, so addressing into a whole-state view is a trap: measured on the registry
+-- seed, `as/one` (targeted) 29.5 ms vs `as/dump/verified/<fp>` 674 ms vs `as/dump` 1,574 ms.
+-- Read cost tracks what the view RETURNS, not what the response contains. Doing an O(n) scan
+-- inside Lua and returning one row costs ~5 ms; returning the tree costs seconds.
+--- State as a view should see it. Falls back to the contract's DECLARED shape while the root
+--- is still nil, which is a real state a live process passes through: HyperBEAM computes
+--- LAZILY, so a freshly spawned process has run no slot and holds no state until something
+--- forces one (a message, or any `now/` read — `as/` alone does NOT drive slot 0).
+---
+--- Without this fallback the shape of that window is a 500, because a contract view indexes
+--- `s.claimable` on nil. That is the worst possible answer: `status` is the liveness probe and
+--- the thing deploy tooling polls, so the one moment it is asked "are you alive yet" it would
+--- crash instead of saying "yes, empty". Read-only — no view may mutate, so no copy is taken.
+local function viewState()
+  local root = stateRoot()
+  if root ~= nil then return root end
+  return (native._contract and native._contract.state) or {}
+end
+
 function native.view(base, name, params)
-  -- Strip read-path HB metadata (`commitments` &c.) once, so every view below iterates a
-  -- clean, metadata-free copy of state/acl and never sees the committed sub-message keys.
-  local acl   = stripMeta(base.acl) or {}
   -- Cross-cutting, runtime-owned views (available to every contract).
   if name == 'roles' then
-    return acl.roles or {}
+    return (ACL and ACL.roles) or {}
   end
   if name == 'version' then
     local c = native._contract
-    return { runtime = native._version, contract = c and c.name or nil }
+    return { runtime = native._version, contract = c and c.name or nil,
+             root = ROOT }
+  end
+  -- RUNTIME-OWNED (D31 §4, D32 §1). Under globals, state is an opaque blob in `priv` with no
+  -- HTTP path of its own, so extraction depends on the process's own Lua working. Owning
+  -- `dump` here means the admin/seed-diff escape hatch exists regardless of what a contract
+  -- declares — a bad deploy that breaks a contract view cannot strand state.
+  if name == 'dump' then
+    return viewState()
   end
   local c = native._contract
   local v = c and c.views and c.views[name]
   if not v then return nil, 'unknown view: ' .. tostring(name) end
-  local state = stripMeta(base.state) or {}
-  local result = v(state, params)
+  local result = v(viewState(), params)
   -- Enrich the operational `status` view with runtime-owned identity/version so one
   -- GET answers "who owns this, what code is live, is it initialized, and its shape".
   if name == 'status' and type(result) == 'table' then
@@ -503,6 +570,11 @@ function native.view(base, name, params)
     -- to the global if base.process is unavailable.
     result.owner = resolveCommitter(base.process) or (Owner ~= '' and Owner or nil)
     result.version = native._version
+    -- Has any slot actually run? Under globals this is NOT inferable from the counts: a
+    -- correctly seeded contract and one that has never computed both answer through
+    -- viewState(), so an all-zero `counts` is ambiguous. Deploy tooling needs the difference
+    -- — it polls this view to know when a spawn has materialized before diffing the seed.
+    result.initialized = stateRoot() ~= nil
   end
   return result
 end
@@ -513,16 +585,16 @@ end
 --
 -- From smoke.lua (verified v0.9-FINAL): any error escaping compute() fails the slot at
 -- the node level and PERMANENTLY WEDGES the process. So compute() is nothing but pcalls.
--- Snapshot base.state + base.acl before dispatch; on any error, swap them back (a failed
+-- Snapshot the state root + ACL before dispatch; on any error, swap them back (a failed
 -- slot never mutates state — the native replacement for legacynet's CU revert).
 
 -- HyperBEAM process/base message keys that a view name would SHADOW on the read path:
--- `now/~lua@5.3a/<name>` resolves `<name>` against the process message FIRST, so if a base
--- key by that name exists it is returned verbatim and the view global is never invoked (the
--- `state` view hit this — it returned the base.state HTML explorer, not the view). Enumerated
--- from a live `now` message (v0.9-FINAL) plus the standard ao/message envelope keys. The
--- collision is SILENT on-device and invisible to Tier-1/2 (no path resolution there), so we
--- reject a colliding view name at register() time — loud at load/spawn, not shadowed in prod.
+-- `as/<name>` resolves `<name>` against the process message FIRST, so if a base key by that
+-- name exists it is returned verbatim and the view global is never invoked (the `state` view
+-- hit this — it returned the state HTML explorer, not the view). Enumerated from a live `now`
+-- message (v0.9-FINAL) plus the standard ao/message envelope keys. The collision is SILENT
+-- on-device and invisible to Tier-1/2 (no path resolution there), so we reject a colliding
+-- view name at register() time — loud at load/spawn, not shadowed in prod.
 native.RESERVED = {
   -- observed top-level keys of a live `now` message (v0.9-FINAL)
   acl = true, ['at-slot'] = true, authority = true, ['data-protocol'] = true,
@@ -537,10 +609,25 @@ native.RESERVED = {
   committed = true, ['from-process'] = true,
 }
 
+-- Globals the RUNTIME itself owns. A contract root named any of these would clobber the
+-- runtime the moment state was seeded — `compute` especially, which is the device entrypoint
+-- and would take down the process on the first slot. Rejected at register(), not at 3am.
+local RUNTIME_GLOBALS = {
+  ACL = true, Owner = true, Send = true, ao = true, compute = true, native = true,
+  json = true, require = true, _G = true, arg = true,
+}
+
 native._contract = nil
 function native.register(contract)
   assert(type(contract) == 'table', 'register: contract table required')
   assert(type(contract.state) == 'table', 'register: contract.state table required')
+  -- The state root (D31/D32). Declared, never derived from `name`: a silent PascalCase
+  -- transform is exactly the kind of guess that lands the wrong global in production.
+  assert(type(contract.root) == 'string' and contract.root:match('^%a[%w_]*$'),
+    'register: contract.root must be a Lua identifier naming the state global '
+    .. "(e.g. 'OperatorRegistry')")
+  assert(not RUNTIME_GLOBALS[contract.root],
+    "register: contract.root '" .. contract.root .. "' is a runtime-owned global")
   -- Fail loud on a view name that would be shadowed on the read path (see native.RESERVED)
   -- or that collides with a runtime-owned view. Better a dead process at spawn than a view
   -- that silently returns the wrong thing in production.
@@ -550,19 +637,38 @@ function native.register(contract)
       assert(not native.RESERVED[name],
         "register: view name '" .. name .. "' collides with a reserved HyperBEAM key "
         .. "(shadowed on the read path) — rename the view")
-      assert(name ~= 'roles' and name ~= 'version',
+      assert(name ~= 'roles' and name ~= 'version' and name ~= 'dump',
         "register: view name '" .. name .. "' is a runtime-owned view — rename the view")
+      -- installViews writes `_G[name]`, so a view named after the root would REPLACE the
+      -- state with a function on register.
+      assert(name ~= contract.root,
+        "register: view name '" .. name .. "' is the state root global — rename the view")
     end
   end
   native._contract = contract
+  ROOT = contract.root
   native.installViews()
   return contract
 end
 
+--- TEST SEAM ONLY. Clears the state root + ACL so a harness can run each case against a fresh
+--- contract. NEVER call this from module scope or from compute: on the read path `as/` restores
+--- a VM that already holds live state, and clearing it there would silently empty the process.
+function native.reset()
+  setStateRoot(nil)
+  ACL = nil
+end
+
 --- Expose each view as a GLOBAL function `fn(base, req)` so the lua device can serve it at
---- the read path `now/~lua@5.3a/<view>?<params>` (the on-device computed-view mechanism: a
---- global taking the process state `base` + the request `req`). `base` is the whole process
---- state (base.state / base.acl live under it); `req` carries the query params.
+--- the read path `as/<view>?<params>` (the on-device computed-view mechanism: a global taking
+--- the process message `base` + the request `req`). State no longer travels in `base` — the
+--- view reads the root global — but the device still passes `base`, and `base.process` is
+--- where `status` gets the spawn committer.
+---
+--- ⚠️ A FUNCTION IS THE ONLY THING `as/` CAN REACH (measured 2026-08-09). `as/<name>` CALLS a
+--- Lua global of that name: a global holding a table or a scalar 500s. So a view wrapper is
+--- not a serialization convenience under globals, it is the entire read surface — state is
+--- unreachable except through one of these.
 ---
 --- The wrapper returns a MESSAGE `{ body = <json string>, ['content-type'] = ... }`, not a
 --- Lua table of the data itself. Two reasons:
@@ -578,7 +684,7 @@ end
 ---      `serialize~json@1.0`; the body is already JSON and re-serializing a string 500s.
 --- The underlying `native.view` still returns tables, so the spec harness is unaffected.
 function native.installViews()
-  local names = { 'roles', 'version' }        -- runtime cross-cutting views
+  local names = { 'roles', 'version', 'dump' }   -- runtime cross-cutting views
   local c = native._contract
   if c and c.views then for name in pairs(c.views) do names[#names + 1] = name end end
   for _, name in ipairs(names) do
@@ -595,16 +701,16 @@ end
 -- no record of why. `allowlistTable` is the no-node fallback store and reverts with it.
 local function snapshotState(base)
   return {
-    state = deepcopy(base.state),
-    acl = deepcopy(base.acl),
+    state = deepcopy(stateRoot()),
+    acl = deepcopy(ACL),
     allowlistId = base.allowlistId,
     allowlistTable = deepcopy(base.allowlistTable),
     allowlistSeeded = base.allowlistSeeded,
   }
 end
 local function restoreState(base, snap)
-  base.state = snap.state
-  base.acl = snap.acl
+  setStateRoot(snap.state)
+  ACL = snap.acl
   base.allowlistId = snap.allowlistId
   base.allowlistTable = snap.allowlistTable
   base.allowlistSeeded = snap.allowlistSeeded
@@ -662,7 +768,7 @@ local function protectedCompute(base, req)
     tags   = tags,
     data   = body.data,
     timestamp = timestamp,                       -- ms, or nil if unassigned (read path/harness)
-    state  = base.state,                         -- the mutable contract state tree
+    state  = stateRoot(),                        -- the mutable contract state tree (_G[root])
     send   = function(m) table.insert(ao.outbox.Messages, m); return m end,
     -- Contract-side allowlist maintenance, for writers implied by STATE rather than by an ACL
     -- role (an operator gaining a verified fingerprint, say). Deltas are batched and flushed
@@ -689,7 +795,7 @@ local function protectedCompute(base, req)
   -- Runtime built-ins (centralized ACL) before contract actions.
   local b = native.builtins[action]
   if b then
-    if b.roles and not hasRole(from, b.roles, base) then error('Permission Denied') end
+    if b.roles and not hasRole(from, b.roles) then error('Permission Denied') end
     return { data = b.handler(ctx, base) or '' }
   end
 
@@ -700,7 +806,7 @@ local function protectedCompute(base, req)
     return { data = 'error: unknown action: ' .. tostring(action) }
   end
   local spec = (type(a) == 'table') and a or { handler = a }
-  if spec.roles and not hasRole(from, spec.roles, base) then    -- ACL
+  if spec.roles and not hasRole(from, spec.roles) then          -- ACL
     error('Permission Denied')
   end
   local res = spec.handler(ctx)                  -- mutates ctx.state; may throw → revert
@@ -714,7 +820,7 @@ function native.compute(base, req)
   -- Initialize base sub-trees once (idempotent; persists across slots). Done BEFORE the
   -- snapshot so a first-message handler error reverts to the initialized baseline.
   pcall(function()
-    if base.state == nil then
+    if stateRoot() == nil then
       -- MIGRATION SEED, supplied as the SPAWN MESSAGE data so the published module stays
       -- PURE SOURCE. It used to be embedded in the module itself, which meant a json.decode
       -- of the entire dump on EVERY READ -- the module is reloaded into a fresh luerl VM per
@@ -734,32 +840,21 @@ function native.compute(base, req)
           seed = (type(env.state) == 'table') and env or { state = {} }
         end
       end
-      base.state = (seed and seed.state)
-        or (native._contract and deepcopy(native._contract.state) or {})
+      setStateRoot((seed and seed.state)
+        or (native._contract and deepcopy(native._contract.state) or {}))
       -- ACL roles are migration state too, so they ride the same envelope.
-      if seed and type(seed.acl) == 'table' then base.acl = seed.acl end
+      if seed and type(seed.acl) == 'table' then ACL = seed.acl end
     end
     -- ACL roles are migration state too: seed them from a module-declared `acl` at spawn,
     -- symmetric with `state` above (migrate-on-spawn -- no runtime bulk-load step). The
     -- luerl-only fixtures (Tier-2/Tier-3 oracles) still use embedded-seed bundles built by
     -- native-bundle.ts buildSeedBundle, which declare `acl` on the contract; the base
     -- contract omits `acl`, so a normal deploy still defaults to an empty role set. See D26.
-    if base.acl == nil then
-      base.acl = (native._contract and native._contract.acl and deepcopy(native._contract.acl))
+    if ACL == nil then
+      ACL = (native._contract and native._contract.acl and deepcopy(native._contract.acl))
         or { roles = {} }
     end
-    base.acl.roles = base.acl.roles or {}
-  end)
-
-  -- Hand handlers a metadata-CLEAN state, symmetric with the view read path. On every reload
-  -- HyperBEAM re-injects `ao-types`/`commitments` onto each nested map; a handler that POINT-reads
-  -- (operator-registry) is unaffected, but one that ITERATES a persisted map (relay-rewards
-  -- Complete-Round over `Configuration.Modifiers.Uptime.Tiers` / `PendingRounds`) would hit those
-  -- metadata keys as data. Strip in place so ctx.state stays the tree we mutate + persist. Done
-  -- BEFORE the snapshot so revert restores clean state too. See UPSTREAM-ISSUES A18.
-  pcall(function()
-    base.state = stripMeta(base.state)
-    base.acl   = stripMeta(base.acl)
+    ACL.roles = ACL.roles or {}
   end)
 
   local snapok, snapshot = pcall(snapshotState, base)
@@ -797,18 +892,13 @@ function native.compute(base, req)
 
   pcall(writeResults, base, output)              -- AXIS 5
 
-  -- A16 (CONFIRMED live, v0.9-FINAL): strip the per-slot HB commitment/metadata off the
-  -- persisted state maps so the device re-commits the FULL current key set next slot.
-  -- Without this, STRING-valued maps (claimable/verified/registrationCredits) silently
-  -- drop keys added after the first slot — the map's `commitments.committed` list stays
-  -- pinned to slot-1's keys, so every later slot's new key is dropped on persist while the
-  -- handler still returns OK (a silent write-loss). Boolean-valued maps (blocked/
-  -- verifiedHardware/acl.roles) carry `ao-types` and re-commit fully, so they were immune —
-  -- which is why it hid until a string map was grown across slots. See UPSTREAM-ISSUES A16.
-  pcall(function()
-    base.state = stripMeta(base.state)
-    base.acl   = stripMeta(base.acl)
-  end)
+  -- The A16/A18 `stripMeta` passes that used to sit here are GONE, and not because they were
+  -- overhead. Both bugs are `dev_lua:decode` running `normalize_commitments(…, verify)` over
+  -- state on its way through the process message: A16 silently dropped keys added to a
+  -- string-valued map after slot 1 (the committed key set stayed pinned to slot-1's keys);
+  -- A18 re-injected `ao-types`/`commitments` onto every nested map on reload. State no longer
+  -- enters the message, so neither mechanism has anything to act on. Do NOT reintroduce a
+  -- state key on `base` without bringing them back with it. See UPSTREAM-ISSUES A16/A18.
   return base
 end
 
