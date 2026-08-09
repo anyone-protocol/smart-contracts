@@ -2,11 +2,11 @@
 ---
 --- FULL PARITY with the legacynet WASM harness (test/spec/contracts/relay-rewards/*.spec.ts),
 --- re-expressed native:
----   · state read from `base.state` (single source of truth) — not patch@1.0 tags
+---   · state read from `RelayRewards` (single source of truth) — not patch@1.0 tags
 ---   · a WRITE's reply is the compute output ('OK'; Complete-Round returns the JSON snapshot;
 ---     Claim-Rewards returns the claimed value) — not a `*-Response` message
 ---   · reads (Get-Rewards / Get-Claimed / Get-Delegate / Last-Round-*) are `native.view(...)` or
----     direct base.state — not messages. Last-Round-Data (per-fingerprint Details) rides the
+---     direct RelayRewards — not messages. Last-Round-Data (per-fingerprint Details) rides the
 ---     Complete-Round OUTPUT (Details are never persisted — see the contract header / D27).
 ---   · an assert failure surfaces as `output.data = 'error: <msg>'` and reverts state atomically.
 ---
@@ -16,7 +16,7 @@
 --- token-scale magnitudes are the Tier-2 concern (spec/luerl golden + tier2-relay-legacy-crosscheck).
 ---
 --- The Init import/reimport cases (WASM view-init-state) map to migrate-on-spawn: a native process is
---- SEEDED by a module carrying `base.state` (no Init action), so those are recreated as seeded-base
+--- SEEDED by a module carrying `RelayRewards` (no Init action), so those are recreated as seeded-base
 --- view round-trips. Plus D8 runtime-safety axes the WASM harness never exercised.
 ---
 --- OWNER=0x11..1; ALICE/BOB/CHARLS are real mixed-case EIP-55 addresses stored VERBATIM.
@@ -42,6 +42,7 @@ local function freshEnv()
   local native = loadmod(RT .. '/native.lua')
   native.install()
   native.register(loadmod(CT .. '/native/relay-rewards.lua'))
+  native.reset()               -- state lives in globals; clear it per test
   return native
 end
 
@@ -66,7 +67,13 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       commitments = committer and commit(committer) or nil,
     } }
   end
-  local function newBase() return { process = { id = 'PID', commitments = commit(OWNER) } } end
+  -- Each call starts a FRESH contract: native.reset() clears the state root + ACL globals.
+  -- Under globals there is one VM per process, so `base = newBase()` mid-test means
+  -- "start over", which is exactly how these tests already used it.
+  local function newBase()
+    native.reset()
+    return { process = { id = 'PID', commitments = commit(OWNER) } }
+  end
   local function outData(base) return base.results and base.results.output and base.results.output.data or '' end
   local function has(s, sub) return type(s) == 'string' and s:find(sub, 1, true) ~= nil end
   local function view(base, name, params) return native.view(base, name, params) end
@@ -192,7 +199,7 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = 'abc' })), 'must be an integer'))
       assert.is_true(has(outData(updateConfig(base, { TokensPerSecond = '-100' })), 'must be a positive value'))
       assert.are.equal('OK', outData(updateConfig(base, { TokensPerSecond = '42' })))
-      assert.are.equal('42', base.state.Configuration.TokensPerSecond)
+      assert.are.equal('42', RelayRewards.Configuration.TokensPerSecond)
     end)
   end)
 
@@ -348,16 +355,16 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       -- asserted msg.From. So an operator can only ever set a delegate for their OWN verified address.
       local base = newBase()
       setDelegate(base, ALICE, BOB, 0.2)
-      assert.are.same({ Address = BOB, Share = 0.2 }, base.state.Configuration.Delegates[ALICE])
-      assert.is_nil(base.state.Configuration.Delegates[BOB])
+      assert.are.same({ Address = BOB, Share = 0.2 }, RelayRewards.Configuration.Delegates[ALICE])
+      assert.is_nil(RelayRewards.Configuration.Delegates[BOB])
     end)
     it('Allows users to set and clear the Delegate', function()
       local base = newBase()
       assert.are.equal('OK', outData(setDelegate(base, ALICE, BOB, 0.2)))
-      assert.are.same({ Address = BOB, Share = 0.2 }, base.state.Configuration.Delegates[ALICE])
+      assert.are.same({ Address = BOB, Share = 0.2 }, RelayRewards.Configuration.Delegates[ALICE])
       assert.are.same({ Address = BOB, Share = 0.2 }, view(base, 'delegate', { address = ALICE }))
       assert.are.equal('RESET', outData(setDelegate(base, ALICE, nil, nil)))
-      assert.is_nil(base.state.Configuration.Delegates[ALICE])
+      assert.is_nil(RelayRewards.Configuration.Delegates[ALICE])
       assert.are.same({ Address = '', Share = 0 }, view(base, 'delegate', { address = ALICE }))
     end)
   end)
@@ -469,10 +476,10 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE), [FP_B] = score('bad') }, 1000)
       assert.is_true(has(outData(base), 'Invalid Address'))
-      assert.is_nil(base.state.PendingRounds['1000'])
+      assert.is_nil(RelayRewards.PendingRounds['1000'])
       assert.are.equal('OK', outData(addScores(base, { [FP_A] = score(ALICE, { Network = 7 }) }, 1000)))
-      assert.are.equal(7, base.state.PendingRounds['1000'][FP_A].Score.Network)
-      assert.is_nil(base.state.PendingRounds[1000])   -- A17: string key only
+      assert.are.equal(7, RelayRewards.PendingRounds['1000'][FP_A].Score.Network)
+      assert.is_nil(RelayRewards.PendingRounds[1000])   -- A17: string key only
     end)
   end)
 
@@ -500,7 +507,7 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE) }, 1234567890)
       assert.are.equal('OK', outData(cancelRound(base, 1234567890)))
-      assert.is_nil(base.state.PendingRounds['1234567890'])
+      assert.is_nil(RelayRewards.PendingRounds['1234567890'])
     end)
   end)
 
@@ -529,8 +536,8 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       addScores(base, { [FP_A] = score(ALICE) }, 1000)
       addScores(base, { [FP_B] = score(BOB) }, 2000)
       completeRound(base, 2000)
-      assert.is_nil(base.state.PendingRounds['1000'])   -- older pruned
-      assert.is_nil(base.state.PendingRounds['2000'])   -- settled pruned
+      assert.is_nil(RelayRewards.PendingRounds['1000'])   -- older pruned
+      assert.is_nil(RelayRewards.PendingRounds['2000'])   -- settled pruned
       cancelRound(base, 1000)
       assert.is_true(has(outData(base), 'No pending round for 1000'))
     end)
@@ -554,11 +561,11 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.are.equal('123', lr.Summary.Rewards.Network)
       assert.are.equal('100', lr.Summary.Ratings.Network)
       -- cumulative maps
-      assert.are.equal('123', base.state.TotalAddressReward[BOB])
-      assert.are.equal('0', base.state.TotalAddressReward[ALICE])
-      assert.are.equal('123', base.state.TotalFingerprintReward[FP_B])
-      assert.are.equal('0', base.state.TotalFingerprintReward[FP_A])
-      assert.is_nil(base.state.PreviousRound.Details)   -- Details NOT persisted
+      assert.are.equal('123', RelayRewards.TotalAddressReward[BOB])
+      assert.are.equal('0', RelayRewards.TotalAddressReward[ALICE])
+      assert.are.equal('123', RelayRewards.TotalFingerprintReward[FP_B])
+      assert.are.equal('0', RelayRewards.TotalFingerprintReward[FP_A])
+      assert.is_nil(RelayRewards.PreviousRound.Details)   -- Details NOT persisted
     end)
   end)
 
@@ -578,8 +585,8 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
         Multipliers = { Location = { Enabled = false, Offset = 1, Power = 1, Divider = 1 } } })
       completeR(base, 1000, { [FP_A] = score0, [FP_B] = score1 })   -- Period 0
       completeR(base, 2000, { [FP_A] = score0, [FP_B] = score1 })   -- Period 1 → Bob 123
-      assert.are.equal('123', base.state.TotalAddressReward[BOB])
-      assert.are.equal('0', base.state.TotalAddressReward[ALICE])
+      assert.are.equal('123', RelayRewards.TotalAddressReward[BOB])
+      assert.are.equal('0', RelayRewards.TotalAddressReward[ALICE])
       completeR(base, 3000, { [FP_A] = score0, [FP_B] = score1 })   -- cumulative → Bob 246
       assert.are.equal('246', view(base, 'rewards', { address = BOB }).reward)
       assert.are.equal('0', view(base, 'rewards', { address = ALICE }).reward)
@@ -737,7 +744,7 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       local snap = completeR(base, 11000, { [FP_A] = score1, [FP_B] = score2, [FP_C] = score3 })
       assert.are.equal(11000, snap.Timestamp)
       assert.are.equal(10, snap.Period)
-      local sum = base.state.PreviousRound.Summary.Ratings
+      local sum = RelayRewards.PreviousRound.Summary.Ratings
       local sumNet, sumUp, sumExit = tonumber(sum.Network), tonumber(sum.Uptime), tonumber(sum.ExitBonus)
       -- reference formula (matches the WASM harness): Total = floor(5600·ratNet/sumNet) +
       -- floor(1400·ratUp/sumUp) + Reward.Hardware + floor(1000·ratExit/sumExit)
@@ -768,17 +775,17 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       updateConfig(base, fullConfig({ Delegates = { [ALICE] = { Address = BOB, Share = 0.4 } } }))
       completeR(base, 1000, { [FP_A] = score1 })                        -- Period 0
       completeR(base, 11000, { [FP_A] = score1, [FP_B] = score2, [FP_C] = score3 })
-      assert.are.equal('558', base.state.TotalAddressReward[ALICE])     -- 930 * 0.6
-      assert.are.equal('930', base.state.TotalFingerprintReward[FP_A])
-      assert.are.equal('3631', base.state.TotalAddressReward[BOB])      -- own 3259 + Alice delegate 372
-      assert.are.equal('3259', base.state.TotalFingerprintReward[FP_B])
-      assert.are.equal('5808', base.state.TotalAddressReward[CHARLS])
-      assert.are.equal('5808', base.state.TotalFingerprintReward[FP_C])
+      assert.are.equal('558', RelayRewards.TotalAddressReward[ALICE])     -- 930 * 0.6
+      assert.are.equal('930', RelayRewards.TotalFingerprintReward[FP_A])
+      assert.are.equal('3631', RelayRewards.TotalAddressReward[BOB])      -- own 3259 + Alice delegate 372
+      assert.are.equal('3259', RelayRewards.TotalFingerprintReward[FP_B])
+      assert.are.equal('5808', RelayRewards.TotalAddressReward[CHARLS])
+      assert.are.equal('5808', RelayRewards.TotalFingerprintReward[FP_C])
       completeR(base, 21000, { [FP_A] = score1 })                       -- only Alice scored
-      assert.are.equal('3918', base.state.TotalAddressReward[ALICE])
-      assert.are.equal('6530', base.state.TotalFingerprintReward[FP_A])
-      assert.are.equal('5871', base.state.TotalAddressReward[BOB])
-      assert.are.equal('3259', base.state.TotalFingerprintReward[FP_B])
+      assert.are.equal('3918', RelayRewards.TotalAddressReward[ALICE])
+      assert.are.equal('6530', RelayRewards.TotalFingerprintReward[FP_A])
+      assert.are.equal('5871', RelayRewards.TotalAddressReward[BOB])
+      assert.are.equal('3259', RelayRewards.TotalFingerprintReward[FP_B])
     end)
   end)
 
@@ -806,9 +813,9 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.are.equal('5808', view(base, 'rewards', { address = CHARLS }).reward)
       -- claim Alice + Bob
       assert.are.equal('558', json.decode(outData(claimRewards(base, ALICE))))
-      assert.are.equal('558', base.state.Claimed[ALICE])
+      assert.are.equal('558', RelayRewards.Claimed[ALICE])
       assert.are.equal('3631', json.decode(outData(claimRewards(base, BOB))))
-      assert.are.equal('3631', base.state.Claimed[BOB])
+      assert.are.equal('3631', RelayRewards.Claimed[BOB])
       assert.are.equal('558', view(base, 'claimed', { address = ALICE }).claimed)
       assert.are.equal('3631', view(base, 'claimed', { address = BOB }).claimed)
       assert.is_nil(view(base, 'claimed', { address = CHARLS }).claimed)   -- never claimed
@@ -826,7 +833,7 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
   end)
 
   -- =========================================================================
-  -- view-init-state.spec.ts → migrate-on-spawn: a SEEDED base (module carries base.state, no Init
+  -- view-init-state.spec.ts → migrate-on-spawn: a SEEDED base (module carries RelayRewards, no Init
   -- action) exposes the imported state through views. Reimport = seed a fresh base from a dump.
   -- =========================================================================
   describe('Seeded state (migrate-on-spawn ≙ Init import/reimport)', function()
@@ -843,8 +850,14 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
         PendingRounds = {},
       }
     end
+    -- Migrate-on-spawn: the state root is planted directly, exactly as native.compute's seed
+    -- path does. Through the setters — busted's per-file _ENV proxies _G, so `RelayRewards = …`
+    -- here would be invisible to the runtime.
     local function seededBase(state)
-      return { process = { id = 'PID', commitments = commit(OWNER) }, state = state, acl = { roles = {} } }
+      native.reset()
+      native.setStateRoot(state)
+      native.setACL({ roles = {} })
+      return { process = { id = 'PID', commitments = commit(OWNER) } }
     end
 
     it('exposes imported reward + round state through views (import)', function()
@@ -880,7 +893,7 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       local base = newBase()
       compute(base, assign('Add-Scores', nil, json.encode({ Scores = { [FP_A] = score(ALICE) } }), { ['Round-Timestamp'] = '1000' }))
       assert.is_true(has(outData(base), 'unsigned or unresolved committer'))
-      assert.is_nil(base.state.PendingRounds['1000'])
+      assert.is_nil(RelayRewards.PendingRounds['1000'])
     end)
     it('Rejects an unknown action', function()
       local base = newBase()
@@ -892,10 +905,10 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       addScores(base, { [FP_A] = score(ALICE) }, 1000); completeRound(base, 1000)
       -- deep-copy + structural compare: `pairs` order is not stable, so comparing json.encode
       -- strings is flaky as soon as the map has more than one key (revert also REPLACES the table).
-      local tfrBefore = native.deepcopy(base.state.TotalFingerprintReward)
+      local tfrBefore = native.deepcopy(RelayRewards.TotalFingerprintReward)
       completeRound(base, 999999)
       assert.is_true(has(outData(base), 'No pending round for'))
-      assert.are.same(tfrBefore, base.state.TotalFingerprintReward)
+      assert.are.same(tfrBefore, RelayRewards.TotalFingerprintReward)
     end)
   end)
 end)

@@ -35,6 +35,7 @@ local function freshEnv(contractFile)
   local native = loadmod(RT .. '/native.lua')
   native.install()
   native.register(loadmod(CT .. '/native/' .. contractFile))
+  native.reset()               -- state lives in globals; clear it per test
   return native
 end
 
@@ -54,9 +55,12 @@ for _, contract in ipairs({ 'relay-rewards', 'staking-rewards' }) do
         commitments = committer and commit(committer) or nil,
       } }
     end
+    -- This file loops over BOTH reward contracts, so it cannot name the root global
+    -- literally — native.stateRoot() dereferences whichever one is registered.
     local function newBase()
-      -- state = nil, so native.compute initializes it from the contract's declared shape.
-      return { process = { id = 'PID', commitments = commit(OWNER) }, acl = { roles = {} } }
+      native.reset()
+      native.setACL({ roles = {} })
+      return { process = { id = 'PID', commitments = commit(OWNER) } }
     end
     local function listed(b, a) return b.allowlistTable and b.allowlistTable[a] or nil end
 
@@ -77,7 +81,7 @@ for _, contract in ipairs({ 'relay-rewards', 'staking-rewards' }) do
 
     it('seeds ACL role holders from the migration envelope', function()
       local b = newBase()
-      b.acl.roles = { ['Complete-Round'] = { [ALICE] = true },
+      native.acl().roles = { ['Complete-Round'] = { [ALICE] = true },
                       ['Claim-Rewards']  = { [ALICE] = true } }
       native.compute(b, assign('Unknown-Action', OWNER))
       assert.equal('2', listed(b, ALICE))
@@ -99,9 +103,9 @@ for _, contract in ipairs({ 'relay-rewards', 'staking-rewards' }) do
       local b = newBase()
       native.compute(b, assign('Unknown-Action', OWNER))   -- force init + seed
       if contract == 'relay-rewards' then
-        b.state.Configuration.Delegates[RANDO] = { Address = ALICE, Share = 0.1 }
+        native.stateRoot().Configuration.Delegates[RANDO] = { Address = ALICE, Share = 0.1 }
       else
-        b.state.Shares[RANDO] = 0.1
+        native.stateRoot().Shares[RANDO] = 0.1
       end
       native.compute(b, assign('Unknown-Action', OWNER))
       assert.is_nil(listed(b, RANDO))

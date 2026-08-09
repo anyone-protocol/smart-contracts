@@ -27,13 +27,17 @@ local function assign(action, committer, data, tags)
   return { body = { action = action, tags = taglist, data = data,
                     commitments = committer and commit(committer) or nil } }
 end
+-- State lives in the `OperatorRegistry` global now (D31/D32), so each case must reset it or
+-- it inherits the previous one's registry. Seeded through the runtime setters, which is also
+-- what the Tier-1 harness does (busted proxies _G there; here it is just consistency).
 local function newBase()
-  local b = { process = { id = 'PID', commitments = commit(OWNER) } }
-  b.state = { claimable = {}, verified = {}, blocked = {}, verifiedHardware = {},
-              registrationCredits = {}, registrationCreditsRequired = false }
-  b.acl = { roles = {} }
-  return b
+  native.reset()
+  native.setStateRoot({ claimable = {}, verified = {}, blocked = {}, verifiedHardware = {},
+              registrationCredits = {}, registrationCreditsRequired = false })
+  native.setACL({ roles = {} })
+  return { process = { id = 'PID', commitments = commit(OWNER) } }
 end
+local function S() return native.stateRoot() end
 local function listed(b, a) return b.allowlistTable and b.allowlistTable[a] or nil end
 local function roleUpdate(g, r) return json.encode({ Grant = g, Revoke = r }) end
 
@@ -72,7 +76,7 @@ do
   native.compute(b, assign('Submit-Fingerprint-Certificate', ALICE, nil,
     { ['Fingerprint-Certificate'] = FP_A }))
   check('fp: claim keeps count', listed(b, ALICE) == '2')
-  check('fp: claim verified', b.state.verified[FP_A] == ALICE)
+  check('fp: claim verified', S().verified[FP_A] == ALICE)
   native.compute(b, assign('Renounce-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))
   check('fp: renounce one keeps listed', listed(b, ALICE) == '1')
 
@@ -103,11 +107,11 @@ end
 do
   local b = newBase()
   for i = 1, 250 do
-    b.state.verified[string.format('%040X', i)] = ALICE
-    b.state.claimable[string.format('%040X', i + 100000)] = BOB
+    S().verified[string.format('%040X', i)] = ALICE
+    S().claimable[string.format('%040X', i + 100000)] = BOB
   end
-  b.acl.roles = { admin = { [OWNER] = true } }
-  b.state.blocked[BOB] = true
+  native.acl().roles = { admin = { [OWNER] = true } }
+  S().blocked[BOB] = true
   native.compute(b, assign('Unknown-Action', OWNER))
   check('seed: verified operator counted per fingerprint', listed(b, ALICE) == '250')
   check('seed: blocked operator seeded as denied', listed(b, BOB) == 'B250')

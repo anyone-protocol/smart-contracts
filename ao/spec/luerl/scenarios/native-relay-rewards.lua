@@ -4,6 +4,7 @@
 -- RelayRewards.X→ctx.state.X) did not move the frozen reward math. Plus the native invariants:
 -- Details NOT persisted, Details ride the Complete-Round OUTPUT, cumulative maps keyed EIP-55.
 local json = require('json')
+local function S() return native.stateRoot() end
 local eip55 = require('.common.eip55')
 local pass, fail, failures = 0, 0, {}
 local function check(name, cond, got)
@@ -23,7 +24,8 @@ end
 local function scores(net) return json.encode({ Scores = { [FP] = { Address = ADDR, Network = net,
   IsHardware = false, UptimeStreak = 5, FamilySize = 1, ExitBonus = false, LocationSize = 1 } } }) end
 
--- ONE base across the sequence: native persists on base.state slot-to-slot.
+-- ONE base across the sequence: native persists in the `RelayRewards` GLOBAL slot-to-slot
+-- (D31/D32), not on the message. S() dereferences it.
 local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 local function run(a, d, ts) compute(base, assign(a, d, ts)); return base end
 
@@ -31,7 +33,7 @@ run('Add-Scores', scores(1000), T1); run('Complete-Round', nil, T1)   -- round 1
 run('Add-Scores', scores(1000), T2)
 local last = run('Complete-Round', nil, T2)                            -- round 2: Period 60 → golden
 
-local pr = base.state.PreviousRound                       -- persisted SUMMARY (no Details)
+local pr = S().PreviousRound                       -- persisted SUMMARY (no Details)
 local snap = json.decode(last.results.output.data)        -- settle-slot OUTPUT (has Details)
 
 -- === golden values (from the bint version — must be byte-identical) ===
@@ -47,10 +49,10 @@ check('Reward.OperatorTotal',    snap.Details[FP].Reward.OperatorTotal == '12152
 check('Details NOT persisted', pr.Details == nil, tostring(pr.Details))
 check('output carries Details', snap.Details ~= nil and snap.Details[FP] ~= nil, tostring(snap.Details))
 -- cumulative TotalFingerprintReward (round1=0 + round2=golden)
-check('TotalFingerprintReward[FP]', base.state.TotalFingerprintReward[FP] == '1215277736400000000', base.state.TotalFingerprintReward[FP])
+check('TotalFingerprintReward[FP]', S().TotalFingerprintReward[FP] == '1215277736400000000', S().TotalFingerprintReward[FP])
 -- cumulative TotalAddressReward keyed by canonical EIP-55 of ADDR
 local key = eip55.checksum(ADDR)
-check('TotalAddressReward[eip55(addr)]', base.state.TotalAddressReward[key] == '1215277736400000000', base.state.TotalAddressReward[key])
+check('TotalAddressReward[eip55(addr)]', S().TotalAddressReward[key] == '1215277736400000000', S().TotalAddressReward[key])
 check('address key is EIP-55 (not legacy ALLCAPS)', key ~= string.upper(ADDR), key)
 
 return { pass = pass, fail = fail, failures = failures }

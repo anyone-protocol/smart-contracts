@@ -36,14 +36,20 @@ local function assign(action, committer, data, tags, extra)
   if extra then for k, v in pairs(extra) do body[k] = v end end
   return { body = body }
 end
-local function newBase() return { process = { id = 'PID', commitments = commit(OWNER) } } end
+-- State lives in the `OperatorRegistry` global now (D31/D32), so newBase() must reset it or
+-- each case inherits the previous one's registry. S() dereferences the root.
+local function newBase()
+  native.reset()
+  return { process = { id = 'PID', commitments = commit(OWNER) } }
+end
+local function S() return native.stateRoot() end
 local function seededBase(o)
   o = o or {}
   local b = newBase()
-  b.state = { claimable = o.claimable or {}, verified = o.verified or {}, blocked = o.blocked or {},
+  native.setStateRoot({ claimable = o.claimable or {}, verified = o.verified or {}, blocked = o.blocked or {},
     verifiedHardware = o.verifiedHardware or {}, registrationCredits = o.registrationCredits or {},
-    registrationCreditsRequired = o.registrationCreditsRequired or false }
-  b.acl = { roles = {} }
+    registrationCreditsRequired = o.registrationCreditsRequired or false })
+  native.setACL({ roles = {} })
   return b
 end
 local function outData(base) return base.results and base.results.output and base.results.output.data or '' end
@@ -66,29 +72,29 @@ local EXPECTED = { [FP_A] = ALICE, [FP_B] = BOB, [FP_C] = CHARLS, [FP_D] = ALICE
 
 -- Submitting Operator Certificates
 do local base = newBase(); submitCerts(base, OWNER, ALL)
-  check('submit: owner accepts certs', same(EXPECTED, base.state.claimable))
-  check('submit: no hardware set', same({}, base.state.verifiedHardware))
+  check('submit: owner accepts certs', same(EXPECTED, S().claimable))
+  check('submit: no hardware set', same({}, S().verifiedHardware))
   check('submit: OK output', outData(base) == 'OK')
 end
 do local base = newBase(); submitCerts(base, OWNER, ALL)
-  check('submit: operators view lists certs', same(EXPECTED, base.state.claimable))
+  check('submit: operators view lists certs', same(EXPECTED, S().claimable))
 end
 do local base = newBase()
   submitCerts(base, OWNER, { { f = FP_A, a = ALICE, hw = true }, { f = FP_B, a = BOB },
     { f = FP_C, a = CHARLS, hw = true }, { f = FP_D, a = ALICE }, { f = FP_E, a = BOB, hw = true }, { f = FP_F, a = CHARLS } })
-  check('submit hw: operators view', same(EXPECTED, base.state.claimable))
-  check('submit hw: verifiedHardware view', same({ [FP_A] = true, [FP_C] = true, [FP_E] = true }, base.state.verifiedHardware))
+  check('submit hw: operators view', same(EXPECTED, S().claimable))
+  check('submit hw: verifiedHardware view', same({ [FP_A] = true, [FP_C] = true, [FP_E] = true }, S().verifiedHardware))
 end
 do local base = newBase(); compute(base, assign('Admin-Submit-Operator-Certificates', OWNER, nil))
   check('submit validate: missing certs', has(outData(base), 'Operator Certificates required'))
 end
 do local base = newBase(); submitCerts(base, OWNER, { { f = FP_A, a = ALICE }, { f = 'invalid-fingerprint' } })
   check('submit validate: invalid fingerprint', has(outData(base), 'Invalid Fingerprint'))
-  check('submit validate: invalid fingerprint reverts', base.state.claimable[FP_A] == nil)
+  check('submit validate: invalid fingerprint reverts', S().claimable[FP_A] == nil)
 end
 do local base = newBase(); submitCerts(base, OWNER, { { f = FP_A, a = ALICE }, { f = FP_B, a = 'invalid-address' } })
   check('submit validate: invalid address', has(outData(base), 'Invalid Address'))
-  check('submit validate: invalid address reverts', base.state.claimable[FP_A] == nil)
+  check('submit validate: invalid address reverts', S().claimable[FP_A] == nil)
 end
 do local base = newBase(); compute(base, assign('Admin-Submit-Operator-Certificates', ALICE, 'mock-certs-data'))
   check('submit: non-owner denied', has(outData(base), 'Permission Denied'))
@@ -96,8 +102,8 @@ end
 
 -- Fingerprint Certificates
 do local base = newBase(); addOperatorCert(base, ALICE, FP_A); addRC(base, ALICE, FP_A); claim(base, ALICE, FP_A)
-  check('claim: verified set', base.state.verified[FP_A] == ALICE)
-  check('claim: claimable cleared', base.state.claimable[FP_A] == nil)
+  check('claim: verified set', S().verified[FP_A] == ALICE)
+  check('claim: claimable cleared', S().claimable[FP_A] == nil)
   check('claim: OK output', outData(base) == 'OK')
 end
 do local base = newBase()
@@ -109,15 +115,15 @@ do local base = newBase()
   check('claim: unknown fingerprint', has(outData(base), 'Invalid certificate'))
 end
 do local base = newBase(); setupClaimed(base, ALICE, FP_A)
-  check('claim: certificates view', same({ [FP_A] = ALICE }, base.state.verified))
+  check('claim: certificates view', same({ [FP_A] = ALICE }, S().verified))
 end
 
 -- Renouncing
 do local base = newBase(); setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Renounce-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))
-  check('renounce: verified cleared', base.state.verified[FP_A] == nil)
+  check('renounce: verified cleared', S().verified[FP_A] == nil)
   check('renounce: OK output', outData(base) == 'OK')
-  check('renounce: certificates empty', same({}, base.state.verified))
+  check('renounce: certificates empty', same({}, S().verified))
 end
 do local base = newBase(); compute(base, assign('Renounce-Fingerprint-Certificate', ALICE, nil))
   check('renounce: missing fingerprint', has(outData(base), 'Fingerprint required'))
@@ -125,7 +131,7 @@ end
 do local base = newBase(); setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Renounce-Fingerprint-Certificate', BOB, nil, { Fingerprint = FP_A }))
   check('renounce: non-operator denied', has(outData(base), 'Only the Relay Operator can renounce'))
-  check('renounce: non-operator no mutation', base.state.verified[FP_A] == ALICE)
+  check('renounce: non-operator no mutation', S().verified[FP_A] == ALICE)
 end
 do local base = newBase(); compute(base, assign('Renounce-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))
   check('renounce: unknown fingerprint', has(outData(base), 'Only the Relay Operator can renounce'))
@@ -134,9 +140,9 @@ end
 -- Removing Fingerprint Certificates
 do local base = newBase(); setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Remove-Fingerprint-Certificate', OWNER, nil, { Fingerprint = FP_A }))
-  check('remove-fp: owner removes', base.state.verified[FP_A] == nil)
+  check('remove-fp: owner removes', S().verified[FP_A] == nil)
   check('remove-fp: OK output', outData(base) == 'OK')
-  check('remove-fp: certificates empty', same({}, base.state.verified))
+  check('remove-fp: certificates empty', same({}, S().verified))
 end
 do local base = newBase(); setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Remove-Fingerprint-Certificate', OWNER, nil))
@@ -145,12 +151,12 @@ end
 do local base = newBase(); setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Remove-Fingerprint-Certificate', BOB, nil, { Fingerprint = FP_A }))
   check('remove-fp: non-owner denied', has(outData(base), 'Permission Denied'))
-  check('remove-fp: non-owner no mutation', base.state.verified[FP_A] == ALICE)
+  check('remove-fp: non-owner no mutation', S().verified[FP_A] == ALICE)
 end
 
 -- Blocking
 do local base = newBase(); compute(base, assign('Block-Operator-Address', OWNER, nil, { Address = ALICE }))
-  check('block: owner blocks', base.state.blocked[ALICE] == true)
+  check('block: owner blocks', S().blocked[ALICE] == true)
   check('block: OK output', outData(base) == 'OK')
 end
 do local base = newBase(); compute(base, assign('Block-Operator-Address', OWNER, nil))
@@ -169,14 +175,14 @@ do local base = newBase()
 end
 do local base = newBase()
   for _, a in ipairs({ ALICE, BOB, CHARLS }) do compute(base, assign('Block-Operator-Address', OWNER, nil, { Address = a })) end
-  check('block: lists blocked', same({ [ALICE] = true, [BOB] = true, [CHARLS] = true }, base.state.blocked))
+  check('block: lists blocked', same({ [ALICE] = true, [BOB] = true, [CHARLS] = true }, S().blocked))
 end
 do local base = newBase()
   compute(base, assign('Block-Operator-Address', OWNER, nil, { Address = ALICE }))
   compute(base, assign('Unblock-Operator-Address', OWNER, nil, { Address = ALICE }))
-  check('unblock: owner unblocks', base.state.blocked[ALICE] == nil)
+  check('unblock: owner unblocks', S().blocked[ALICE] == nil)
   check('unblock: OK output', outData(base) == 'OK')
-  check('unblock: blocked empty', same({}, base.state.blocked))
+  check('unblock: blocked empty', same({}, S().blocked))
 end
 do local base = newBase(); compute(base, assign('Unblock-Operator-Address', OWNER, nil))
   check('unblock: missing address', has(outData(base), 'Address is required'))
@@ -195,13 +201,13 @@ do local base = newBase()
   compute(base, assign('Block-Operator-Address', OWNER, nil, { Address = ALICE }))
   compute(base, assign('Unblock-Operator-Address', OWNER, nil, { Address = ALICE }))
   claim(base, ALICE, FP_A)
-  check('unblock: allows claim again', base.state.verified[FP_A] == ALICE)
+  check('unblock: allows claim again', S().verified[FP_A] == ALICE)
   check('unblock: claim OK output', outData(base) == 'OK')
 end
 
 -- Registration Credits
 do local base = newBase(); addRC(base, ALICE, FP_A)
-  check('rc add: owner adds', same({ [FP_A] = ALICE }, base.state.registrationCredits))
+  check('rc add: owner adds', same({ [FP_A] = ALICE }, S().registrationCredits))
   check('rc add: OK output', outData(base) == 'OK')
 end
 do local base = newBase(); compute(base, assign('Add-Registration-Credit', OWNER, nil, { Fingerprint = FP_A }))
@@ -223,17 +229,17 @@ do local base = newBase(); compute(base, assign('Add-Registration-Credit', ALICE
   check('rc add: non-owner denied', has(outData(base), 'Permission Denied'))
 end
 do local base = newBase(); addOperatorCert(base, ALICE, FP_A); claim(base, ALICE, FP_A)
-  check('rc disabled: claim without credit', base.state.verified[FP_A] == ALICE and outData(base) == 'OK')
+  check('rc disabled: claim without credit', S().verified[FP_A] == ALICE and outData(base) == 'OK')
 end
 do local base = newBase()
   local credits = { [FP_A] = ALICE, [FP_B] = BOB, [FP_C] = CHARLS, [FP_D] = ALICE }
   for fp, addr in pairs(credits) do addRC(base, addr, fp) end
-  check('rc list', same(credits, base.state.registrationCredits))
+  check('rc list', same(credits, S().registrationCredits))
 end
 do local base = newBase()
   for fp, addr in pairs({ [FP_A] = ALICE, [FP_B] = BOB, [FP_C] = CHARLS, [FP_D] = ALICE }) do addRC(base, addr, fp) end
   compute(base, assign('Remove-Registration-Credit', OWNER, nil, { Address = ALICE, Fingerprint = FP_D }))
-  check('rc remove: owner removes', same({ [FP_A] = ALICE, [FP_B] = BOB, [FP_C] = CHARLS }, base.state.registrationCredits))
+  check('rc remove: owner removes', same({ [FP_A] = ALICE, [FP_B] = BOB, [FP_C] = CHARLS }, S().registrationCredits))
   check('rc remove: OK output', outData(base) == 'OK')
 end
 do local base = newBase(); compute(base, assign('Remove-Registration-Credit', OWNER, nil, { Fingerprint = FP_D }))
@@ -257,7 +263,7 @@ end
 
 -- Verified Hardware (exercises string.gmatch replacement / A13 under luerl)
 do local base = newBase(); compute(base, assign('Add-Verified-Hardware', OWNER, table.concat({ FP_A, FP_B, FP_C, FP_D }, ',')))
-  check('vh add: owner adds', same({ [FP_A] = true, [FP_B] = true, [FP_C] = true, [FP_D] = true }, base.state.verifiedHardware))
+  check('vh add: owner adds', same({ [FP_A] = true, [FP_B] = true, [FP_C] = true, [FP_D] = true }, S().verifiedHardware))
   check('vh add: OK output', outData(base) == 'OK')
 end
 do local base = newBase(); compute(base, assign('Add-Verified-Hardware', OWNER, nil))
@@ -265,13 +271,13 @@ do local base = newBase(); compute(base, assign('Add-Verified-Hardware', OWNER, 
 end
 do local base = newBase(); compute(base, assign('Add-Verified-Hardware', OWNER, FP_A .. ',invalid-fingerprint'))
   check('vh add: invalid fingerprint', has(outData(base), 'Invalid Fingerprint'))
-  check('vh add: invalid reverts', base.state.verifiedHardware[FP_A] == nil)
+  check('vh add: invalid reverts', S().verifiedHardware[FP_A] == nil)
 end
 do local base = newBase()
   compute(base, assign('Add-Verified-Hardware', OWNER, table.concat({ FP_A, FP_B, FP_C }, ',')))
   compute(base, assign('Add-Verified-Hardware', OWNER, FP_D .. ',' .. FP_C))
   check('vh add: duplicate', has(outData(base), 'Duplicate Fingerprint'))
-  check('vh add: duplicate reverts', base.state.verifiedHardware[FP_D] == nil)
+  check('vh add: duplicate reverts', S().verifiedHardware[FP_D] == nil)
 end
 do local base = newBase(); compute(base, assign('Add-Verified-Hardware', ALICE, FP_A))
   check('vh add: non-owner denied', has(outData(base), 'Permission Denied'))
@@ -280,15 +286,15 @@ do local base = newBase()
   addOperatorCert(base, ALICE, FP_A)
   compute(base, assign('Add-Verified-Hardware', OWNER, FP_A))
   claim(base, ALICE, FP_A)
-  check('vh: does not require RC', base.state.verified[FP_A] == ALICE and outData(base) == 'OK')
+  check('vh: does not require RC', S().verified[FP_A] == ALICE and outData(base) == 'OK')
 end
 do local base = newBase(); compute(base, assign('Add-Verified-Hardware', OWNER, table.concat({ FP_A, FP_B, FP_C, FP_D }, ',')))
-  check('vh list', same({ [FP_A] = true, [FP_B] = true, [FP_C] = true, [FP_D] = true }, base.state.verifiedHardware))
+  check('vh list', same({ [FP_A] = true, [FP_B] = true, [FP_C] = true, [FP_D] = true }, S().verifiedHardware))
 end
 do local base = newBase()
   compute(base, assign('Add-Verified-Hardware', OWNER, table.concat({ FP_A, FP_B, FP_C, FP_D }, ',')))
   compute(base, assign('Remove-Verified-Hardware', OWNER, FP_B .. ',' .. FP_C))
-  check('vh remove: owner removes', same({ [FP_A] = true, [FP_D] = true }, base.state.verifiedHardware))
+  check('vh remove: owner removes', same({ [FP_A] = true, [FP_D] = true }, S().verifiedHardware))
   check('vh remove: OK output', outData(base) == 'OK')
 end
 do local base = newBase(); compute(base, assign('Remove-Verified-Hardware', OWNER, nil))
@@ -335,58 +341,58 @@ end
 -- ACL — Enforcing Roles
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   submitCerts(base, ALICE, { { f = FP_A, a = ALICE }, { f = FP_B, a = BOB } })
-  check('acl: admin submits certs', same({ [FP_A] = ALICE, [FP_B] = BOB }, base.state.claimable) and outData(base) == 'OK')
+  check('acl: admin submits certs', same({ [FP_A] = ALICE, [FP_B] = BOB }, S().claimable) and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
   submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
-  check('acl: specific submit role', same({ [FP_A] = ALICE }, base.state.claimable) and outData(base) == 'OK')
+  check('acl: specific submit role', same({ [FP_A] = ALICE }, S().claimable) and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Remove-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))
-  check('acl: admin removes fp', base.state.verified[FP_A] == nil and outData(base) == 'OK')
+  check('acl: admin removes fp', S().verified[FP_A] == nil and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   setupClaimed(base, ALICE, FP_A); grantRole(base, BOB, { 'Remove-Fingerprint-Certificate' })
   compute(base, assign('Remove-Fingerprint-Certificate', BOB, nil, { Fingerprint = FP_A }))
-  check('acl: specific remove-fp role', base.state.verified[FP_A] == nil and outData(base) == 'OK')
+  check('acl: specific remove-fp role', S().verified[FP_A] == nil and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   compute(base, assign('Block-Operator-Address', ALICE, nil, { Address = CHARLS }))
-  check('acl: admin blocks', base.state.blocked[CHARLS] == true and outData(base) == 'OK')
+  check('acl: admin blocks', S().blocked[CHARLS] == true and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   grantRole(base, BOB, { 'Block-Operator-Address' })
   compute(base, assign('Block-Operator-Address', BOB, nil, { Address = CHARLS }))
-  check('acl: specific block role', base.state.blocked[CHARLS] == true and outData(base) == 'OK')
+  check('acl: specific block role', S().blocked[CHARLS] == true and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   compute(base, assign('Add-Registration-Credit', ALICE, nil, { Address = CHARLS, Fingerprint = FP_A }))
-  check('acl: admin adds RC', same({ [FP_A] = CHARLS }, base.state.registrationCredits) and outData(base) == 'OK')
+  check('acl: admin adds RC', same({ [FP_A] = CHARLS }, S().registrationCredits) and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   grantRole(base, BOB, { 'Add-Registration-Credit' })
   compute(base, assign('Add-Registration-Credit', BOB, nil, { Address = CHARLS, Fingerprint = FP_A }))
-  check('acl: specific RC role', same({ [FP_A] = CHARLS }, base.state.registrationCredits) and outData(base) == 'OK')
+  check('acl: specific RC role', same({ [FP_A] = CHARLS }, S().registrationCredits) and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   compute(base, assign('Add-Verified-Hardware', ALICE, table.concat({ FP_A, FP_B, FP_C, FP_D }, ',')))
-  check('acl: admin adds VH', same({ [FP_A] = true, [FP_B] = true, [FP_C] = true, [FP_D] = true }, base.state.verifiedHardware) and outData(base) == 'OK')
+  check('acl: admin adds VH', same({ [FP_A] = true, [FP_B] = true, [FP_C] = true, [FP_D] = true }, S().verifiedHardware) and outData(base) == 'OK')
 end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   grantRole(base, BOB, { 'Add-Verified-Hardware' })
   compute(base, assign('Add-Verified-Hardware', BOB, table.concat({ FP_A, FP_B }, ',')))
-  check('acl: specific VH role', same({ [FP_A] = true, [FP_B] = true }, base.state.verifiedHardware) and outData(base) == 'OK')
+  check('acl: specific VH role', same({ [FP_A] = true, [FP_B] = true }, S().verifiedHardware) and outData(base) == 'OK')
 end
 
 -- Runtime safety (D8 axes) — native-runtime specific
 do local base = newBase(); compute(base, assign('Admin-Submit-Operator-Certificates', nil, certs({ { f = FP_A, a = ALICE } })))
-  check('safety: unsigned rejected', has(outData(base), 'unsigned') and base.state.claimable[FP_A] == nil)
+  check('safety: unsigned rejected', has(outData(base), 'unsigned') and S().claimable[FP_A] == nil)
 end
 do local base = newBase()
   compute(base, assign('Admin-Submit-Operator-Certificates', ALICE, certs({ { f = FP_A, a = ALICE } }), nil, { ['from-process'] = OWNER }))
-  check('safety: A11 forged from-process denied', has(outData(base), 'Permission Denied') and base.state.claimable[FP_A] == nil)
+  check('safety: A11 forged from-process denied', has(outData(base), 'Permission Denied') and S().claimable[FP_A] == nil)
 end
 do local base = newBase(); compute(base, assign('No-Such-Action', OWNER, ''))
   check('safety: unknown action', has(outData(base), 'unknown action'))
@@ -394,8 +400,8 @@ end
 do local base = newBase()
   addOperatorCert(base, ALICE, FP_A)
   submitCerts(base, OWNER, { { f = FP_B, a = BOB }, { f = 'BAD', a = CHARLS } })
-  check('safety: cross-action atomicity keeps prior commit', base.state.claimable[FP_A] == ALICE)
-  check('safety: cross-action atomicity reverts failed batch', base.state.claimable[FP_B] == nil)
+  check('safety: cross-action atomicity keeps prior commit', S().claimable[FP_A] == ALICE)
+  check('safety: cross-action atomicity reverts failed batch', S().claimable[FP_B] == nil)
 end
 
 -- Consumption + visibility views (asserted against state)
@@ -416,23 +422,23 @@ end
 -- EIP-55 on-chain ingress: canonicalize + checksum-validate every untrusted address.
 do local base = newBase()
   submitCerts(base, OWNER, { { f = FP_A, a = string.lower(ALICE) } })
-  check('eip55: lowercase admin addr → canonical in state', same({ [FP_A] = ALICE }, base.state.claimable))
+  check('eip55: lowercase admin addr → canonical in state', same({ [FP_A] = ALICE }, S().claimable))
 end
 do local base = newBase()
   submitCerts(base, OWNER, { { f = FP_A, a = '0x' .. string.upper(string.sub(ALICE, 3)) } })
-  check('eip55: ALLCAPS admin addr → canonical in state', same({ [FP_A] = ALICE }, base.state.claimable))
+  check('eip55: ALLCAPS admin addr → canonical in state', same({ [FP_A] = ALICE }, S().claimable))
 end
 do local base = newBase()
   -- ALICE with one checksummed letter flipped → mixed-case, non-canonical → rejected + reverted
   submitCerts(base, OWNER, { { f = FP_A, a = '0x70997970c51812dc3A010C7d01b50e0d17dc79C8' } })
   check('eip55: mixed-case bad checksum rejected', has(outData(base), 'checksum'))
-  check('eip55: bad checksum reverts', same({}, base.state.claimable))
+  check('eip55: bad checksum reverts', same({}, S().claimable))
 end
 do local base = newBase()
   compute(base, assign('Block-Operator-Address', OWNER, nil, { Address = string.lower(ALICE) }))
-  check('eip55: Block canonicalizes key', same({ [ALICE] = true }, base.state.blocked))
+  check('eip55: Block canonicalizes key', same({ [ALICE] = true }, S().blocked))
   compute(base, assign('Unblock-Operator-Address', OWNER, nil, { Address = '0x' .. string.upper(string.sub(ALICE, 3)) }))
-  check('eip55: Unblock canonicalizes key', same({}, base.state.blocked))
+  check('eip55: Unblock canonicalizes key', same({}, S().blocked))
 end
 do local base = seededBase({ verified = { [FP_A] = ALICE, [FP_B] = BOB, [FP_C] = ALICE },
     blocked = { [BOB] = true } })
@@ -463,72 +469,76 @@ do local base = newBase()
   check('status view: enriched owner', st.owner == OWNER)
 end
 
--- Read-path HB metadata contamination (Tier-3 regression) through real luerl. On the live
--- device every committed state map surfaces a spurious `commitments` table to Lua views;
--- the runtime strips it (native.stripMeta) so views iterate only real entries. Reproduce
--- that shape here so luerl proves the strip too. See D26-native-contract-shape.md.
+-- STATE IS NOT ON THE MESSAGE (D31/D32). Replaces the read-path metadata contamination block,
+-- which pinned native.stripMeta against A16/A18. Both were dev_lua:decode corrupting state as
+-- it crossed the process message; state now lives in a global and never crosses it, so the
+-- mechanism has nothing to act on. What is worth proving under the REAL device VM instead is
+-- that compute leaves nothing state-shaped on `base`, and that the global survives slot to slot.
 do
-  local function meta()
-    return { commitments = { sig1 = { ['commitment-device'] = 'httpsig@1.0',
-        committed = { 'a', 'b' }, keyid = 'constant:ao', signature = 'sig1',
-        type = 'hmac-sha256' } }, device = 'json@1.0', ['ao-types'] = 'x="atom"' }
-  end
-  local function contaminate(t) for k, v in pairs(meta()) do t[k] = v end; return t end
-  local function readPathBase(o)
-    local b = seededBase(o)
-    for _, k in ipairs({ 'claimable', 'verified', 'blocked',
-        'verifiedHardware', 'registrationCredits' }) do contaminate(b.state[k]) end
-    contaminate(b.state)
-    b.acl.roles.admin = contaminate({ [CHARLS] = true })
-    contaminate(b.acl.roles); contaminate(b.acl)
-    return b
-  end
+  local base = newBase()
+  addOperatorCert(base, ALICE, FP_A)
+  check('placement: no state key on the message', base.state == nil)
+  check('placement: no acl key on the message', base.acl == nil)
+  check('placement: state is at the root global', S().claimable[FP_A] == ALICE)
+  check('placement: acl is at the ACL global', same({ roles = {} }, native.acl()))
 
-  local base = readPathBase({
-    claimable = { [FP_A] = ALICE, [FP_B] = BOB, [FP_D] = ALICE },
-    verified = { [FP_C] = CHARLS }, blocked = { [BOB] = true },
-    verifiedHardware = { [FP_A] = true, [FP_C] = true }, registrationCredits = { [FP_B] = BOB } })
-  local st = view(base, 'status')
-  check('meta: status claimable count', st.counts.claimable == 3)
-  check('meta: status verified count', st.counts.verified == 1)
-  check('meta: status blocked count', st.counts.blocked == 1)
-  check('meta: status hardware count', st.counts.hardware == 2)
-  check('meta: status credits count', st.counts.credits == 1)
+  -- Only the envelope, the results, and the allowlist trie id may ride on the message. The
+  -- allowlist is deliberate: the p4 write gate reads compute/allowlistId/~trie@1.0/<addr>
+  -- without executing contract code, so it cannot see a Lua global.
+  local allowed = { process = true, results = true, allowlistId = true,
+                    allowlistTable = true, allowlistSeeded = true }
+  local extra = nil
+  for k in pairs(base) do if not allowed[k] then extra = k end end
+  check('placement: only envelope keys on the message', extra == nil, tostring(extra))
 
-  local ops = view(readPathBase({ verified = { [FP_A] = ALICE, [FP_B] = BOB },
-    blocked = { [BOB] = true } }), 'operators')
-  check('meta: operators clean (was 500)', same({ [ALICE] = true }, ops))
+  -- A DIFFERENT message table, as the device hands us on the next slot: state must carry.
+  local next_ = { process = base.process }
+  addOperatorCert(next_, BOB, FP_B)
+  check('placement: state persists across slots via the global',
+    S().claimable[FP_A] == ALICE and S().claimable[FP_B] == BOB)
 
-  local sc = view(readPathBase({ verified = { [FP_A] = ALICE },
-    verifiedHardware = { [FP_A] = true } }), 'scoring')
-  check('meta: scoring verified clean', same({ [FP_A] = ALICE }, sc.verified))
-  check('meta: scoring hardware clean', same({ [FP_A] = true }, sc.hardware))
-
-  local r = view(readPathBase({}), 'roles')
-  check('meta: roles clean', same({ [CHARLS] = true }, r.admin))
-
-  local op = view(readPathBase({ verified = { [FP_A] = ALICE }, claimable = { [FP_D] = ALICE },
-    verifiedHardware = { [FP_A] = true } }), 'operator', { address = ALICE })
-  check('meta: operator verified clean', same({ [FP_A] = true }, op.verified))
-  check('meta: operator claimable clean', same({ [FP_D] = true }, op.claimable))
-
-  local sb = readPathBase({ verified = { [FP_A] = ALICE } })
-  view(sb, 'status')
-  check('meta: strip is read-only', sb.state.commitments ~= nil and sb.state.verified.commitments ~= nil)
+  -- The runtime owns `dump` (D31 section 4): under globals state has no HTTP path of its own,
+  -- so the export path must not depend on what a contract happens to declare.
+  local d = view(next_, 'dump')
+  check('runtime dump: returns the whole root', d.claimable[FP_A] == ALICE and d.claimable[FP_B] == BOB)
+  -- Compute is LAZY: a spawned process holds no state until a slot runs, and `as/` does not
+  -- drive slot 0. Views must survive that window from the contract's DECLARED shape rather
+  -- than crashing on nil — `status` is the liveness probe deploy tooling polls. `initialized`
+  -- is what separates "seeded and empty" from "never computed"; the counts cannot.
+  newBase()
+  check('lazy init: state root really is nil', native.stateRoot() == nil)
+  check('lazy init: dump falls back to the declared shape', same({}, view({}, 'dump').claimable))
+  local cold = view({}, 'status')
+  check('lazy init: status answers instead of erroring', cold.counts.claimable == 0)
+  check('lazy init: status reports NOT initialized', cold.initialized == false)
 end
 
 -- View-name collision guard (register) — a view named for a reserved HB base key is silently
 -- shadowed on the read path; the runtime rejects it at register() time. (Runs LAST: it
 -- re-registers throwaway contracts, replacing native._contract.)
 do
-  local badState = pcall(function() native.register({ state = {}, views = { state = function(s) return s end } }) end)
+  local function reg(views, root) return { state = {}, root = root or 'TestRoot', views = views } end
+  local badState = pcall(function() native.register(reg({ state = function(s) return s end })) end)
   check('guard: rejects reserved view name (state)', badState == false)
-  local badName = pcall(function() native.register({ state = {}, views = { name = function(s) return s end } }) end)
+  local badName = pcall(function() native.register(reg({ name = function(s) return s end })) end)
   check('guard: rejects reserved view name (name)', badName == false)
-  local badRoles = pcall(function() native.register({ state = {}, views = { roles = function(s) return s end } }) end)
+  local badRoles = pcall(function() native.register(reg({ roles = function(s) return s end })) end)
   check('guard: rejects runtime-owned view name (roles)', badRoles == false)
-  local okDump = pcall(function() native.register({ state = {}, views = { dump = function(s) return s end } }) end)
-  check('guard: accepts non-colliding view name (dump)', okDump == true)
+  local badDump = pcall(function() native.register(reg({ dump = function(s) return s end })) end)
+  check('guard: rejects runtime-owned view name (dump)', badDump == false)
+  local okStatus = pcall(function() native.register(reg({ status = function(s) return s end })) end)
+  check('guard: accepts non-colliding view name (status)', okStatus == true)
+  -- The root names a GLOBAL and installViews writes into the same namespace, so a bad root
+  -- does not fail loudly, it overwrites something. `compute` would wedge the process.
+  local noRoot = pcall(function() native.register({ state = {}, views = {} }) end)
+  check('guard: rejects a contract with no root', noRoot == false)
+  local badRoot = pcall(function() native.register({ state = {}, root = 'operator-registry', views = {} }) end)
+  check('guard: rejects a root that is not an identifier', badRoot == false)
+  local clobber = pcall(function() native.register({ state = {}, root = 'compute', views = {} }) end)
+  check('guard: rejects a root that clobbers a runtime global', clobber == false)
+  local selfView = pcall(function() native.register({ state = {}, root = 'MyRoot',
+    views = { MyRoot = function(s) return s end } }) end)
+  check('guard: rejects a view named after the root', selfView == false)
 end
 
 return { pass = pass, fail = fail, failures = failures }

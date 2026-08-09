@@ -31,8 +31,8 @@ local out = json.decode(base.results.output.data)
 local probe = {
   Period = out.Period,
   Details = out.Details,
-  tar = { [AA] = base.state.TotalAddressReward[AA], [BB] = base.state.TotalAddressReward[BB] },
-  tfr = { [FP1] = base.state.TotalFingerprintReward[FP1], [FP2] = base.state.TotalFingerprintReward[FP2], [FP3] = base.state.TotalFingerprintReward[FP3] },
+  tar = { [AA] = native.stateRoot().TotalAddressReward[AA], [BB] = native.stateRoot().TotalAddressReward[BB] },
+  tfr = { [FP1] = native.stateRoot().TotalFingerprintReward[FP1], [FP2] = native.stateRoot().TotalFingerprintReward[FP2], [FP3] = native.stateRoot().TotalFingerprintReward[FP3] },
 }
 print('PROBE=' .. json.encode(probe))
 return { pass = 1, fail = 0, failures = {} }

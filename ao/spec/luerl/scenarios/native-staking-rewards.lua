@@ -9,6 +9,7 @@
 --   * A18 — metadata on persisted nested maps; staking's maps are TWO levels deep
 --     (Rewarded[hodler][operator]), so iteration hits it harder than relay's.
 local json = require('json')
+local function S() return native.stateRoot() end
 local pass, fail, failures = 0, 0, {}
 local function check(name, cond, got)
   if cond then pass = pass + 1
@@ -33,7 +34,8 @@ local function assign(a, d, tagKVs, msgTs)
   return req
 end
 
--- ONE base across the sequence: native persists on base.state slot-to-slot.
+-- ONE base across the sequence: native persists in the `StakingRewards` GLOBAL slot-to-slot
+-- (D31/D32), not on the message. S() dereferences it.
 local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 local function run(a, d, tagKVs, msgTs) compute(base, assign(a, d, tagKVs, msgTs)); return base end
 local function out() return base.results.output.data end
@@ -52,8 +54,8 @@ run('Update-Shares-Configuration', json.encode({ SetSharesEnabled = true, Change
 run('Set-Share', json.encode({ Share = 0.1 }), nil, T1 - 1000)   -- committer is OWNER here
 -- re-issue as CHARLS by writing directly is not possible (ctx.from is the committer), so drive the
 -- CHARLS share through the state the same way the node would after a CHARLS-signed Set-Share:
-base.state.Shares[CHARLS] = 0.1
-base.state.Shares[OWNER] = nil
+S().Shares[CHARLS] = 0.1
+S().Shares[OWNER] = nil
 
 local all = { [ALICE] = { [BOB] = stake('1000', 0.6) },
               [BOB] = { [CHARLS] = stake('2000', 0.7) },
@@ -61,13 +63,13 @@ local all = { [ALICE] = { [BOB] = stake('1000', 0.6) },
 
 round(T1, { [ALICE] = { [BOB] = stake('1000', 0.6) } })   -- Period 0 → no rewards
 check('round1 settled', out() == 'OK', out())
-check('A17: PendingRounds cleared by string key', base.state.PendingRounds[tostring(T1)] == nil,
-  tostring(base.state.PendingRounds[tostring(T1)]))
+check('A17: PendingRounds cleared by string key', S().PendingRounds[tostring(T1)] == nil,
+  tostring(S().PendingRounds[tostring(T1)]))
 
 round(T2, all)                                            -- Period 10 → the golden numbers
 check('round2 settled', out() == 'OK', out())
 
-local pr = base.state.PreviousRound
+local pr = S().PreviousRound
 check('Period == 10', pr.Period == 10, pr.Period)
 check('Timestamp == T2', pr.Timestamp == T2, pr.Timestamp)
 check('Summary.Ratings', pr.Summary.Ratings == '6000', pr.Summary.Ratings)
@@ -85,10 +87,10 @@ check('C→C Hodler 4500',   pr.Details[CHARLS][CHARLS].Reward.Hodler   == '4500
 check('C→C Operator 500',  pr.Details[CHARLS][CHARLS].Reward.Operator == '500',  pr.Details[CHARLS][CHARLS].Reward.Operator)
 
 -- cumulative two-level maps; the operator self-key carries their own cut (4500 + 500 + 333)
-check('Rewarded[A][B] 1583', base.state.Rewarded[ALICE][BOB] == '1583', base.state.Rewarded[ALICE][BOB])
-check('Rewarded[B][C] 3000', base.state.Rewarded[BOB][CHARLS] == '3000', base.state.Rewarded[BOB][CHARLS])
-check('Rewarded[B][B] 83',   base.state.Rewarded[BOB][BOB] == '83', base.state.Rewarded[BOB][BOB])
-check('Rewarded[C][C] 5333', base.state.Rewarded[CHARLS][CHARLS] == '5333', base.state.Rewarded[CHARLS][CHARLS])
+check('Rewarded[A][B] 1583', S().Rewarded[ALICE][BOB] == '1583', S().Rewarded[ALICE][BOB])
+check('Rewarded[B][C] 3000', S().Rewarded[BOB][CHARLS] == '3000', S().Rewarded[BOB][CHARLS])
+check('Rewarded[B][B] 83',   S().Rewarded[BOB][BOB] == '83', S().Rewarded[BOB][BOB])
+check('Rewarded[C][C] 5333', S().Rewarded[CHARLS][CHARLS] == '5333', S().Rewarded[CHARLS][CHARLS])
 
 -- views resolve through the real VM
 local rw = native.view(base, 'rewards', { address = CHARLS })
@@ -101,16 +103,16 @@ check('view last_snapshot has Details', ls.Details[ALICE][BOB] ~= nil, tostring(
 -- === share-change delay at realistic ms (the unit fix) ===
 run('Update-Shares-Configuration', json.encode({ ChangeDelaySeconds = 604800 }))   -- 7 days
 run('Set-Share', json.encode({ Share = 0.42 }), nil, T2 + 1000)                    -- OWNER queues
-check('queued, not applied', base.state.Shares[OWNER] == nil, tostring(base.state.Shares[OWNER]))
-check('pending recorded ms', base.state.PendingShareChanges[OWNER].RequestedTimestamp == T2 + 1000,
-  tostring(base.state.PendingShareChanges[OWNER].RequestedTimestamp))
+check('queued, not applied', S().Shares[OWNER] == nil, tostring(S().Shares[OWNER]))
+check('pending recorded ms', S().PendingShareChanges[OWNER].RequestedTimestamp == T2 + 1000,
+  tostring(S().PendingShareChanges[OWNER].RequestedTimestamp))
 
 round(T2 + 3600 * 1000, all)   -- one hour later: under the legacy ms+seconds bug this would apply
-check('7-day delay NOT elapsed after 1h', base.state.Shares[OWNER] == nil, tostring(base.state.Shares[OWNER]))
+check('7-day delay NOT elapsed after 1h', S().Shares[OWNER] == nil, tostring(S().Shares[OWNER]))
 
 round(T2 + 1000 + 604800 * 1000, all)   -- exactly 7 days after the request
-check('7-day delay elapsed at 7d', base.state.Shares[OWNER] == 0.42, tostring(base.state.Shares[OWNER]))
-check('pending cleared', base.state.PendingShareChanges[OWNER] == nil,
-  tostring(base.state.PendingShareChanges[OWNER]))
+check('7-day delay elapsed at 7d', S().Shares[OWNER] == 0.42, tostring(S().Shares[OWNER]))
+check('pending cleared', S().PendingShareChanges[OWNER] == nil,
+  tostring(S().PendingShareChanges[OWNER]))
 
 return { pass = pass, fail = fail, failures = failures }

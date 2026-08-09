@@ -50,14 +50,27 @@ at run time, so editing a spec needs no rebuild.
 - Lua 5.3, not LuaJIT: LuaJIT is 5.1 and would diverge from luerl's 5.3 semantics
   (integers, `//`, `math.type`).
 
-## Native shape (D26) — `runtime/native.lua`
+## Native shape (D26/D32) — `runtime/native.lua`
 
 The **native runtime** (`../runtime/native.lua`) is the D26 target: contracts declare
-`{ state, actions, views }` and the runtime owns identity/trust/ACL/owner-set-once/
-eval/atomicity/dispatch/views. State is base-addressable (`base.state`), so writes land
-on `base` and reads are pure `views` (no patch device, no `*-Response` sends). The
+`{ root, state, actions, views }` and the runtime owns identity/trust/ACL/owner-set-once/
+eval/atomicity/dispatch/views. The
 legacynet-shim runtime (`../runtime/runtime.lua`) + its `dist/*-deploy.lua` bundles
 remain the emergency-deploy fallback.
+
+**State lives in a Lua global named by `root`** (`OperatorRegistry`, `RelayRewards`,
+`StakingRewards`) — D32, superseding the base-addressable pilot. Writes mutate that global;
+reads are pure `views` served at **`as/<view>`** (no patch device, no `*-Response` sends).
+
+Two consequences that bite in the harness:
+
+- **Nothing state-shaped lands on `base`.** A spec asserting `base.state` is asserting the
+  bug, not the behavior. `spec/native/operator-registry_spec.lua` pins this explicitly.
+- **A spec cannot seed by assigning the global.** busted runs each file under an `_ENV` that
+  proxies `_G`: reads fall through, writes stay in the proxy, so `OperatorRegistry = {...}`
+  is invisible to the runtime and views silently return empty. Seed through
+  `native.setStateRoot(...)` / `native.setACL(...)`, and call `native.reset()` between cases
+  (`newBase()` already does).
 
 Pilot = **operator-registry** (`../src/contracts/native/operator-registry.lua`). The specs
 have **full behavioral parity** with the legacynet WASM harness
@@ -67,14 +80,18 @@ have **full behavioral parity** with the legacynet WASM harness
 ```sh
 # Tier-1 (busted / Lua 5.3)
 podman run --rm -v "$PWD":/work:Z -w /work anyone-lua-spec:5.3 spec/native/
-#  → 75 successes / 0 failures
+#  → 349 successes / 0 failures  (all native specs; D32 baseline)
 
 # Tier-2 (luerl 1.3.0) — note the `native` runner mode (the `run` mode is shim-shaped)
 podman build -t anyone-luerl:1.3.0 spec/luerl/   # rebuild only if luerl_runner.erl changed
 podman run --rm -v "$PWD":/work:Z -w /work anyone-luerl:1.3.0 \
   native /work /work/src/contracts/native/operator-registry.lua \
   /work/spec/luerl/scenarios/native-operator-registry.lua
-#  → 124 passed, 0 failed
+#  → 142 passed, 0 failed
+
+# every Tier-2 scenario, aggregated (knows each runner mode; skips the Tier-3 oracle)
+./spec/run-tier2.sh
+#  → 230 passed, 0 failed, 0 errored across 7 scenarios  (D32 baseline)
 ```
 
 Tier-2 caught **A13** here: luerl 1.3.0's `string.gmatch` throws `bad argument`, so

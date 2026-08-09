@@ -34,6 +34,7 @@ local function freshEnv()
   local native = loadmod(RT .. '/native.lua')
   native.install()
   native.register(loadmod(CT .. '/native/operator-registry.lua'))
+  native.reset()               -- state lives in globals; clear it per test
   return native
 end
 
@@ -54,12 +55,16 @@ describe('runtime allowlist', function()
       commitments = committer and commit(committer) or nil,
     } }
   end
+  -- native.reset() first: state lives in the `OperatorRegistry` global now, so without it
+  -- each case would inherit the previous one's registry.
   local function newBase()
+    native.reset()
     local b = { process = { id = 'PID', commitments = commit(OWNER) } }
-    b.state = { claimable = {}, verified = {}, blocked = {},
+    -- Setters, not direct assignment: busted's per-file _ENV proxies _G and swallows writes.
+    native.setStateRoot({ claimable = {}, verified = {}, blocked = {},
                 verifiedHardware = {}, registrationCredits = {},
-                registrationCreditsRequired = false }
-    b.acl = { roles = {} }
+                registrationCreditsRequired = false })
+    native.setACL({ roles = {} })
     return b
   end
   --- What the gate would see for `addr`: the persisted count, or nil.
@@ -195,7 +200,7 @@ describe('runtime allowlist', function()
       local b = newBase()
       native.compute(b, assign('Update-Roles', OWNER, 'not json at all'))
       assert.is_nil(listed(b, ALICE))
-      assert.same({}, b.acl.roles)
+      assert.same({}, native.acl().roles)
     end)
   end)
 
@@ -219,7 +224,7 @@ describe('runtime allowlist', function()
         json.encode({ { f = FP_A, a = ALICE } })))
       native.compute(b, assign('Submit-Fingerprint-Certificate', ALICE, nil,
         { ['Fingerprint-Certificate'] = FP_A }))
-      assert.equal(ALICE, b.state.verified[FP_A])
+      assert.equal(ALICE, native.stateRoot().verified[FP_A])
       assert.equal('1', listed(b, ALICE))
     end)
 
@@ -285,9 +290,9 @@ describe('runtime allowlist', function()
       -- Without this every migrated operator is locked out until something happens to grant
       -- them, which for most of them is never.
       local b = newBase()
-      b.state.verified[string.rep('C', 40)] = ALICE
-      b.state.claimable[string.rep('D', 40)] = BOB
-      b.acl.roles = { admin = { [OWNER] = true } }
+      native.stateRoot().verified[string.rep('C', 40)] = ALICE
+      native.stateRoot().claimable[string.rep('D', 40)] = BOB
+      native.acl().roles = { admin = { [OWNER] = true } }
       native.compute(b, assign('Unknown-Action', OWNER))
       assert.equal('1', listed(b, ALICE))
       assert.equal('1', listed(b, BOB))
@@ -296,15 +301,15 @@ describe('runtime allowlist', function()
 
     it('seeds a blocked operator as denied, not merely absent', function()
       local b = newBase()
-      b.state.verified[string.rep('C', 40)] = ALICE
-      b.state.blocked[ALICE] = true
+      native.stateRoot().verified[string.rep('C', 40)] = ALICE
+      native.stateRoot().blocked[ALICE] = true
       native.compute(b, assign('Unknown-Action', OWNER))
       assert.equal('B1', listed(b, ALICE))
     end)
 
     it('seeds once, not on every slot', function()
       local b = newBase()
-      b.state.verified[string.rep('C', 40)] = ALICE
+      native.stateRoot().verified[string.rep('C', 40)] = ALICE
       native.compute(b, assign('Unknown-Action', OWNER))
       native.compute(b, assign('Unknown-Action', OWNER))
       native.compute(b, assign('Unknown-Action', OWNER))
