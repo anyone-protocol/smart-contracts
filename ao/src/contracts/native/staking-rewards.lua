@@ -149,9 +149,20 @@ end
 
 return {
   name = 'staking-rewards',
+  -- State root: the Lua global holding state (D31/D32). Restores the legacynet global name.
+  root = 'StakingRewards',
 
-  -- Single source of truth on `base.state`, addressable at now/state/<key>. NB: point reads are FREE
-  -- via base-addressing — now/state/Rewarded/<hodler>/<operator>, now/state/Claimed/<hodler>/<operator>.
+  -- Single source of truth at the `StakingRewards` global. Read ONLY through views (`as/<view>`);
+  -- the base-addressed point reads this comment used to advertise
+  -- (now/state/Rewarded/<hodler>/<operator>) no longer exist.
+  --
+  -- 🔴 FLATTENING DEBT (D31 §2, D32 §2). The `[hodler][operator]` maps below cost ONE LIVE TABLE
+  -- PER OUTER KEY — 3,336 of them in the real seed, against 6 for operator-registry and 31 for
+  -- relay-rewards. luerl's GC mark phase is quadratic in live tables, so this contract pays far
+  -- more per collect than the other two, and it grows with the hodler x operator pair count.
+  -- The fix is composite keys (`[hodler .. '/' .. operator]`), which takes it to ~10 tables. It
+  -- is correctness-neutral but touches the round math, so it lands as its own change gated on
+  -- the bint golden — NOT as part of the state-root move.
   state = {
     Claimed             = {},   -- [hodler][operator] = "bigint" (high-water mark at claim time)
     Rewarded            = {},   -- [hodler][operator] = "bigint" (cumulative; operator self-key = own cut)
@@ -581,8 +592,6 @@ return {
       }
     end,
 
-    -- Full state (clean JSON) — admin/debug + post-migration seed-diff. NB: named `dump`, not
-    -- `state` (base-addressed `now/state` is reserved).
-    dump = function(s) return s end,
+    -- NB: no `dump` view here — the runtime owns it (native.view / D32 §1).
   },
 }

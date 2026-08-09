@@ -152,11 +152,14 @@ end
 
 return {
   name = 'relay-rewards',
+  -- State root: the Lua global holding state (D31/D32). Restores the legacynet global name.
+  root = 'RelayRewards',
 
-  -- Single source of truth on `base.state`, directly addressable at now/state/<key>. NB: reward
-  -- point reads are FREE via base-addressing — now/state/TotalAddressReward/<addr> (payout) and
-  -- now/state/TotalFingerprintReward/<fp> (lifetime-per-relay). PreviousRound carries the summary
-  -- ONLY; Details ride the Complete-Round output (see header). PendingRounds is the staging buffer.
+  -- Single source of truth at the `RelayRewards` global. Read ONLY through views (`as/<view>`);
+  -- the base-addressed point reads this comment used to advertise
+  -- (now/state/TotalAddressReward/<addr>) no longer exist, and were measured SLOWER than a view
+  -- anyway (148 ms vs 27.6 ms — D31 §5a). PreviousRound carries the summary ONLY; Details ride
+  -- the Complete-Round output (see header). PendingRounds is the staging buffer.
   state = {
     Claimed                = {},   -- [EIP-55 addr] = "bigint" (high-water mark)
     TotalAddressReward     = {},   -- [EIP-55 addr] = "bigint" (cumulative claimable; delegate-adjusted)
@@ -653,9 +656,7 @@ return {
       }
     end,
 
-    -- Full state (clean JSON) — admin/debug + post-migration seed-diff. NB: named `dump`, not
-    -- `state` (base-addressed `now/state` is reserved). PendingRounds/PreviousRound.Details absent
-    -- by design (Details never persisted).
-    dump = function(s) return s end,
+    -- NB: no `dump` view here — the runtime owns it (native.view / D32 §1).
+    -- PendingRounds/PreviousRound.Details are absent from it by design (Details never persisted).
   },
 }

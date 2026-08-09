@@ -34,8 +34,11 @@ end
 
 return {
   name = 'operator-registry',
+  -- State root: the Lua global holding state (D31/D32). Restores the legacynet global name.
+  root = 'OperatorRegistry',
 
-  -- Single source of truth on `base.state`. Directly addressable at now/state/<key>.
+  -- Single source of truth at the `OperatorRegistry` global. Read ONLY through views
+  -- (`as/<view>`) — a data global is not reachable by path.
   state = {
     claimable                   = {},     -- [fingerprint] = operatorAddress (assigned, unclaimed)
     verified                    = {},     -- [fingerprint] = operatorAddress (claimed)
@@ -351,10 +354,9 @@ return {
       }
     end,
 
-    -- Full state (clean, metadata-stripped JSON) — admin/debug + the post-migration
-    -- seed-diff correctness check. NB: named `dump`, NOT `state`: a `state` view is shadowed
-    -- on the read path by the base-addressable `now/state` (a reserved key — see
-    -- native.RESERVED / D26). For raw base-addressed access use `now/state/serialize~json@1.0`.
-    dump = function(s) return s end,
+    -- NB: no `dump` view here. The runtime owns it (native.view / D32 §1) so the admin +
+    -- seed-diff escape hatch exists even if a bad deploy breaks the contract's own views —
+    -- under globals there is no base-addressed path to fall back on. register() rejects a
+    -- contract that declares one.
   },
 }
