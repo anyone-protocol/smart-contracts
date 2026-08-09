@@ -7,7 +7,7 @@
     "url": "git+https://github.com/anyone-protocol/smart-contracts"
   },
   "devDependencies": {
-    "@anyone-protocol/ao-client": "github:anyone-protocol/ao-client#v0.1.2",
+    "@anyone-protocol/ao-client": "github:anyone-protocol/ao-client#v0.1.3",
     "@ardrive/turbo-sdk": "^1.30.0",
     "@dha-team/arbundles": "^1.0.3",
     "@permaweb/ao-core-libs": "^0.0.9",
