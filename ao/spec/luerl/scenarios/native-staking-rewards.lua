@@ -7,7 +7,7 @@
 --     integers would never trigger it). Period is kept at 10 s so the golden reward values below are
 --     identical to the WASM harness's (rewards depend on ratings + period, not on absolute time).
 --   * A18 — metadata on persisted nested maps; staking's maps are TWO levels deep
---     (Rewarded[hodler][operator]), so iteration hits it harder than relay's.
+--     (Rewarded[hodler/operator] since D32), so iteration hits it harder than relay's.
 local json = require('json')
 local function S() return native.stateRoot() end
 local pass, fail, failures = 0, 0, {}
@@ -70,6 +70,9 @@ round(T2, all)                                            -- Period 10 → the g
 check('round2 settled', out() == 'OK', out())
 
 local pr = S().PreviousRound
+-- Details is stored as parallel typed maps under D32; the `last_snapshot` view reassembles the
+-- legacy nested shape, so assert through it — that is the shape consumers actually get.
+local prDetails = native.view(base, 'last_snapshot').Details
 check('Period == 10', pr.Period == 10, pr.Period)
 check('Timestamp == T2', pr.Timestamp == T2, pr.Timestamp)
 check('Summary.Ratings', pr.Summary.Ratings == '6000', pr.Summary.Ratings)
@@ -77,20 +80,20 @@ check('Summary.Stakes',  pr.Summary.Stakes  == '6000', pr.Summary.Stakes)
 check('Summary.Rewards', pr.Summary.Rewards == '9999', pr.Summary.Rewards)
 
 -- per-hodler/operator breakdown (Details ARE persisted for staking — see contract header)
-check('A→B Hodler 1583',   pr.Details[ALICE][BOB].Reward.Hodler   == '1583', pr.Details[ALICE][BOB].Reward.Hodler)
-check('A→B Operator 83',   pr.Details[ALICE][BOB].Reward.Operator == '83',   pr.Details[ALICE][BOB].Reward.Operator)
-check('A→B Rating 1000',   pr.Details[ALICE][BOB].Rating          == '1000', pr.Details[ALICE][BOB].Rating)
-check('A→B Share 0.05',    pr.Details[ALICE][BOB].Score.Share     == 0.05,   pr.Details[ALICE][BOB].Score.Share)
-check('B→C Hodler 3000',   pr.Details[BOB][CHARLS].Reward.Hodler   == '3000', pr.Details[BOB][CHARLS].Reward.Hodler)
-check('B→C Operator 333',  pr.Details[BOB][CHARLS].Reward.Operator == '333',  pr.Details[BOB][CHARLS].Reward.Operator)
-check('C→C Hodler 4500',   pr.Details[CHARLS][CHARLS].Reward.Hodler   == '4500', pr.Details[CHARLS][CHARLS].Reward.Hodler)
-check('C→C Operator 500',  pr.Details[CHARLS][CHARLS].Reward.Operator == '500',  pr.Details[CHARLS][CHARLS].Reward.Operator)
+check('A→B Hodler 1583',   prDetails[ALICE][BOB].Reward.Hodler   == '1583', prDetails[ALICE][BOB].Reward.Hodler)
+check('A→B Operator 83',   prDetails[ALICE][BOB].Reward.Operator == '83',   prDetails[ALICE][BOB].Reward.Operator)
+check('A→B Rating 1000',   prDetails[ALICE][BOB].Rating          == '1000', prDetails[ALICE][BOB].Rating)
+check('A→B Share 0.05',    prDetails[ALICE][BOB].Score.Share     == 0.05,   prDetails[ALICE][BOB].Score.Share)
+check('B→C Hodler 3000',   prDetails[BOB][CHARLS].Reward.Hodler   == '3000', prDetails[BOB][CHARLS].Reward.Hodler)
+check('B→C Operator 333',  prDetails[BOB][CHARLS].Reward.Operator == '333',  prDetails[BOB][CHARLS].Reward.Operator)
+check('C→C Hodler 4500',   prDetails[CHARLS][CHARLS].Reward.Hodler   == '4500', prDetails[CHARLS][CHARLS].Reward.Hodler)
+check('C→C Operator 500',  prDetails[CHARLS][CHARLS].Reward.Operator == '500',  prDetails[CHARLS][CHARLS].Reward.Operator)
 
 -- cumulative two-level maps; the operator self-key carries their own cut (4500 + 500 + 333)
-check('Rewarded[A][B] 1583', S().Rewarded[ALICE][BOB] == '1583', S().Rewarded[ALICE][BOB])
-check('Rewarded[B][C] 3000', S().Rewarded[BOB][CHARLS] == '3000', S().Rewarded[BOB][CHARLS])
-check('Rewarded[B][B] 83',   S().Rewarded[BOB][BOB] == '83', S().Rewarded[BOB][BOB])
-check('Rewarded[C][C] 5333', S().Rewarded[CHARLS][CHARLS] == '5333', S().Rewarded[CHARLS][CHARLS])
+check('Rewarded[A][B] 1583', S().Rewarded[ALICE .. '/' .. BOB] == '1583', S().Rewarded[ALICE .. '/' .. BOB])
+check('Rewarded[B][C] 3000', S().Rewarded[BOB .. '/' .. CHARLS] == '3000', S().Rewarded[BOB .. '/' .. CHARLS])
+check('Rewarded[B][B] 83',   S().Rewarded[BOB .. '/' .. BOB] == '83', S().Rewarded[BOB .. '/' .. BOB])
+check('Rewarded[C][C] 5333', S().Rewarded[CHARLS .. '/' .. CHARLS] == '5333', S().Rewarded[CHARLS .. '/' .. CHARLS])
 
 -- views resolve through the real VM
 local rw = native.view(base, 'rewards', { address = CHARLS })

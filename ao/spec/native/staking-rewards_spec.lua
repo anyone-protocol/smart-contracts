@@ -109,7 +109,10 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
   end
   local function round(base, ts, scores) addScores(base, scores, ts); return completeRound(base, ts) end
   local function stake(staked, running) return { Staked = staked, Running = running } end
-  local function snapshot(base) return StakingRewards.PreviousRound end
+  -- Through the `last_snapshot` VIEW, not the raw root: D32 stores Details as parallel typed
+  -- maps and the view is what reassembles the legacy nested shape. Asserting through it means
+  -- these tests pin what a CONSUMER sees, which is the property that must not move.
+  local function snapshot(base) return view(base, 'last_snapshot') end
 
   before_each(function() native = freshEnv(); json = require('json') end)
 
@@ -514,8 +517,9 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.are.same({ Reward = { Operator = '0', Hodler = '0' }, Rating = '1000',
         Score = { Running = 0.6, Restaked = '0', Staked = '1000', Share = 0.05 } }, s.Details[ALICE][BOB])
       -- zero rewards are never written into Rewarded (bint.ispos gate), but the maps exist
-      assert.is_not_nil(StakingRewards.Rewarded[ALICE])
-      assert.is_nil(StakingRewards.Rewarded[ALICE][BOB])
+      -- D32: there is no per-hodler map any more, and an empty one is not representable —
+      -- a zero reward simply writes no key (see the header deviation note).
+      assert.is_nil(StakingRewards.Rewarded[ALICE .. '/' .. BOB])
 
       round(base, 11000, all)   -- Period 10
       s = snapshot(base)
@@ -531,10 +535,10 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.are.equal(11000, view(base, 'last_round').Timestamp)
       assert.are.equal(10, view(base, 'last_round').Period)
       -- cumulative maps (operator self-key carries their own cut)
-      assert.are.equal('1583', StakingRewards.Rewarded[ALICE][BOB])
-      assert.are.equal('3000', StakingRewards.Rewarded[BOB][CHARLS])
-      assert.are.equal('83', StakingRewards.Rewarded[BOB][BOB])
-      assert.are.equal('5333', StakingRewards.Rewarded[CHARLS][CHARLS])   -- 4500 + 500 + 333
+      assert.are.equal('1583', StakingRewards.Rewarded[ALICE .. '/' .. BOB])
+      assert.are.equal('3000', StakingRewards.Rewarded[BOB .. '/' .. CHARLS])
+      assert.are.equal('83', StakingRewards.Rewarded[BOB .. '/' .. BOB])
+      assert.are.equal('5333', StakingRewards.Rewarded[CHARLS .. '/' .. CHARLS])   -- 4500 + 500 + 333
     end)
 
     it('Accumulates rewards for hodlers and operators', function()
@@ -583,10 +587,10 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
 
       -- claim CHARLS then BOB
       assert.are.equal('5333', json.decode(outData(claim(base, CHARLS)))[CHARLS])
-      assert.are.equal('5333', StakingRewards.Claimed[CHARLS][CHARLS])
+      assert.are.equal('5333', StakingRewards.Claimed[CHARLS .. '/' .. CHARLS])
       assert.are.equal('3000', json.decode(outData(claim(base, BOB)))[CHARLS])
-      assert.are.equal('3000', StakingRewards.Claimed[BOB][CHARLS])
-      assert.are.equal('83', StakingRewards.Claimed[BOB][BOB])
+      assert.are.equal('3000', StakingRewards.Claimed[BOB .. '/' .. CHARLS])
+      assert.are.equal('83', StakingRewards.Claimed[BOB .. '/' .. BOB])
       assert.are.equal('5333', view(base, 'claimed', { address = CHARLS }).claimed[CHARLS])
 
       -- next round: claimed stakes stop counting as restake
@@ -594,7 +598,7 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.are.equal('4819', view(base, 'rewards', { address = ALICE }).Rewarded[BOB])
       assert.are.equal('5374', view(base, 'rewards', { address = BOB }).Rewarded[CHARLS])
       assert.are.equal('3000', view(base, 'rewards', { address = BOB }).Claimed[CHARLS])
-      assert.are.equal('253', StakingRewards.Rewarded[BOB][BOB])
+      assert.are.equal('253', StakingRewards.Rewarded[BOB .. '/' .. BOB])
       assert.are.equal('9552', view(base, 'rewards', { address = CHARLS }).Rewarded[CHARLS])
       assert.are.equal('5333', view(base, 'rewards', { address = CHARLS }).Claimed[CHARLS])
 
@@ -1065,7 +1069,9 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
     local function seed()
       return {
         Claimed = {},
-        Rewarded = { [CHARLS] = { [ALICE] = '25000000000000', [CHARLS] = '75000000000000' } },
+        -- D32 storage shape: pair-keyed, exactly what build-staking-seed.ts now emits.
+        Rewarded = { [CHARLS .. '/' .. ALICE] = '25000000000000',
+                     [CHARLS .. '/' .. CHARLS] = '75000000000000' },
         Shares = {},
         PendingShareChanges = {},
         Configuration = {
@@ -1075,7 +1081,9 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
                      Default = 0.05, ChangeDelaySeconds = 604800 },
         },
         PreviousRound = { Timestamp = 1741829269954, Period = 100,
-          Summary = { Rewards = '0', Ratings = '0', Stakes = '0' }, Configuration = {}, Details = {} },
+          Summary = { Rewards = '0', Ratings = '0', Stakes = '0' }, Configuration = {},
+          Details = { Staked = {}, Restaked = {}, Running = {}, Share = {},
+                      Rating = {}, RewardHodler = {}, RewardOperator = {} } },
         PendingRounds = {},
       }
     end
