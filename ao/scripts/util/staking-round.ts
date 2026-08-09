@@ -30,9 +30,23 @@ export type Round = {
 
 const freshAddr = (i: number) => getAddress('0x' + 'feed' + i.toString(16).padStart(36, '0'))
 
+/** Pair-keyed (`hodler/operator`) map -> the nested index this builder reasons with.
+ *  The seed stores the FLAT shape since D32; accepts either so a caller cannot get it wrong
+ *  by passing a nested fixture. */
+const asNested = (m: Record<string, any>): Record<string, Record<string, string>> => {
+  const out: Record<string, Record<string, string>> = {}
+  for (const [k, v] of Object.entries(m ?? {})) {
+    if (v !== null && typeof v === 'object') { out[k] = v as Record<string, string>; continue }
+    const i = k.indexOf('/')
+    if (i < 0) continue
+    ;(out[k.slice(0, i)] ??= {})[k.slice(i + 1)] = v as string
+  }
+  return out
+}
+
 export function buildRound(seedState: any, n = 250): Round {
-  const rewarded: Record<string, Record<string, string>> = seedState.Rewarded
-  const claimed: Record<string, Record<string, string>> = seedState.Claimed
+  const rewarded = asNested(seedState.Rewarded)
+  const claimed = asNested(seedState.Claimed)
 
   const all: { h: string; o: string }[] = []
   for (const h of Object.keys(rewarded)) for (const o of Object.keys(rewarded[h])) all.push({ h, o })

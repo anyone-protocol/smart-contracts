@@ -42,8 +42,19 @@ compute(base, assign('Add-Scores', [==[${scoresJson}]==], ${round.timestamp}))
 compute(base, assign('Complete-Round', nil, ${round.timestamp}))
 print('ORACLE_PERIOD=' .. json.encode(native.stateRoot().PreviousRound.Period))
 print('ORACLE_SUMMARY=' .. json.encode(native.stateRoot().PreviousRound.Summary))
-print('ORACLE_DETAILS=' .. json.encode(native.stateRoot().PreviousRound.Details))
-print('ORACLE_REWARDED=' .. json.encode(native.stateRoot().Rewarded))
+-- Through the views: state is D32-flat, and the on-node side compares the NESTED shape a
+-- consumer sees. last_snapshot reassembles Details; Rewarded is un-flattened here.
+print('ORACLE_DETAILS=' .. json.encode(native.view(base, 'last_snapshot').Details))
+print('ORACLE_REWARDED=' .. json.encode((function()
+  local out = {}
+  for k, v in pairs(native.stateRoot().Rewarded) do
+    local i = string.find(k, '/', 1, true)
+    local h, o = string.sub(k, 1, i - 1), string.sub(k, i + 1)
+    if out[h] == nil then out[h] = {} end
+    out[h][o] = v
+  end
+  return out
+end)()))
 return { pass = 1, fail = 0, failures = {} }
 `
 const scenPath = path.join(AO, 'dist/staking-oracle-scen.lua')

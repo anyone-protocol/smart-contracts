@@ -169,26 +169,47 @@ function nativeScenario(r: Run) {
   const cfg = r.perturb
     ? { ...r.config, TokensPerSecond: (BigInt(r.config.TokensPerSecond) + 1n).toString() }
     : r.config
+  // D32: the native contract stores pair-keyed maps, so the injected state must be flat too —
+  // feeding it the nested shape makes every `Rewarded[hodler/operator]` lookup miss, `restaked`
+  // come out zero, and the whole comparison quietly measure the wrong thing.
+  const flat = (m: Record<string, Record<string, string>>) => {
+    const out: Record<string, string> = {}
+    for (const [h, ops] of Object.entries(m)) for (const [o, v] of Object.entries(ops)) out[`${h}/${o}`] = v
+    return out
+  }
   const state = {
-    Claimed: nativeClaimed,
-    Rewarded: nativeRewarded,
+    Claimed: flat(nativeClaimed),
+    Rewarded: flat(nativeRewarded),
     Shares: Object.fromEntries(Object.entries(r.shares).map(([k, v]) => [getAddress(k), v])),
     PendingShareChanges: Object.fromEntries(
       Object.entries(r.pending).map(([k, v]) => [getAddress(k), v])),
     Configuration: cfg,
-    PreviousRound: { Timestamp: PREV, Period: 0, Summary: {}, Configuration: {}, Details: {} },
+    PreviousRound: { Timestamp: PREV, Period: 0, Summary: {}, Configuration: {},
+      Details: { Staked: {}, Restaked: {}, Running: {}, Share: {},
+                 Rating: {}, RewardHodler: {}, RewardOperator: {} } },
     PendingRounds: {},
   }
   return `${preamble}
+-- Un-flatten for the comparison: legacy stores [hodler][operator], native stores the pair key.
+local function unflat(m)
+  local out = {}
+  for k, v in pairs(m) do
+    local i = string.find(k, '/', 1, true)
+    local h, o = string.sub(k, 1, i - 1), string.sub(k, i + 1)
+    if out[h] == nil then out[h] = {} end
+    out[h][o] = v
+  end
+  return out
+end
 native.setStateRoot(json.decode(${lit(state)}))
 local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 compute(base, assign('Add-Scores', ${lit(JSON.parse(r.scoresJson))}, ${T}))
 compute(base, assign('Complete-Round', nil, ${T}))
-print('OUT_DETAILS=' .. json.encode(native.stateRoot().PreviousRound.Details))
+print('OUT_DETAILS=' .. json.encode(native.view(base, 'last_snapshot').Details))
 print('OUT_SUMMARY=' .. json.encode(native.stateRoot().PreviousRound.Summary))
 print('OUT_PERIOD=' .. json.encode(native.stateRoot().PreviousRound.Period))
-print('OUT_REWARDED=' .. json.encode(native.stateRoot().Rewarded))
-print('OUT_CLAIMED=' .. json.encode(native.stateRoot().Claimed))
+print('OUT_REWARDED=' .. json.encode(unflat(native.stateRoot().Rewarded)))
+print('OUT_CLAIMED=' .. json.encode(unflat(native.stateRoot().Claimed)))
 print('OUT_SHARES=' .. json.encode(native.stateRoot().Shares))
 print('OUT_PENDING=' .. json.encode(native.stateRoot().PendingShareChanges))
 return { pass = 1, fail = 0, failures = {} }
@@ -232,6 +253,26 @@ const lower = (v: any): any => {
   if (Array.isArray(v)) return v.map(lower)
   const out: any = {}
   for (const [k, val] of Object.entries(v)) out[/^0x[0-9a-fA-F]{40}$/.test(k) ? k.toLowerCase() : k] = lower(val)
+  return out
+}
+
+// The ONE accepted structural deviation (D32, and see the contract header). Legacynet's
+// Complete-Round created `Rewarded[h] = {}` before its `bint.ispos` guard, so a hodler whose
+// reward rounded to zero got an empty row that was never filled. A pair-keyed map cannot hold a
+// hodler with no pairs, so those rows do not survive. Named explicitly rather than loosened
+// generally: any OTHER key that legacy has and native does not still fails.
+const EMPTY_LEGACY_ROWS = new Set([
+  '0xd9595b161c208ae83f9d65e1b62b0a538c167c0d',
+  '0x339075b35d7899dc9c9a6ba5457e52f70d9cf107',
+])
+/** Drop those rows from the LEGACY side, but only when they are genuinely empty. */
+function dropEmptyLegacyRows(m: any): any {
+  if (m === null || typeof m !== 'object') return m
+  const out: any = {}
+  for (const [k, v] of Object.entries(m)) {
+    if (EMPTY_LEGACY_ROWS.has(k) && v !== null && typeof v === 'object' && Object.keys(v).length === 0) continue
+    out[k] = v
+  }
   return out
 }
 
@@ -286,7 +327,8 @@ console.log(`  ${keys.length - detBad}/${keys.length} pair Details identical (le
 failures += detBad
 check('PreviousRound.Summary', diff(A.legacy.summary, A.native.summary, 'Summary'))
 check('PreviousRound.Period', diff(A.legacy.period, A.native.period, 'Period'))
-check('Rewarded (cumulative, onto migrated balances)', diff(lower(A.legacy.rewarded), lower(A.native.rewarded), 'Rewarded'))
+check('Rewarded (cumulative, onto migrated balances)',
+  diff(dropEmptyLegacyRows(lower(A.legacy.rewarded)), lower(A.native.rewarded), 'Rewarded'))
 check('Claimed (untouched by a round)', diff(lower(A.legacy.claimed), lower(A.native.claimed), 'Claimed'))
 // the accumulation must actually have moved off the seeded priors, or "identical" is vacuous
 const movedOff = Object.keys(lower(A.native.rewarded)).filter(h => {
@@ -321,7 +363,8 @@ const zeroCut = bKeys.filter(k => bLegFlat[k]?.Score?.Share === 0 && bLegFlat[k]
 console.log(`  edges reached: ${fullCut} pairs at Share=1.0 (Hodler cut 0), ${zeroCut} at Share=0 (Operator cut 0)`)
 if (fullCut === 0 || zeroCut === 0) { failures++; console.log('  FAIL  share edges not exercised') }
 check('Summary with per-operator shares', diff(B.legacy.summary, B.native.summary, 'Summary'))
-check('Rewarded with per-operator shares', diff(lower(B.legacy.rewarded), lower(B.native.rewarded), 'Rewarded'))
+check('Rewarded with per-operator shares',
+  diff(dropEmptyLegacyRows(lower(B.legacy.rewarded)), lower(B.native.rewarded), 'Rewarded'))
 
 // --- C: the one intended deviation ------------------------------------------------------------
 // The delay window has to straddle the two readings for the divergence to be visible:

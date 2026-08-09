@@ -43,7 +43,41 @@ const GOLDEN = path.join(AO, 'spec/fixtures/staking-view-golden.json')
 
 const seedEnvelope = JSON.parse(
   fs.readFileSync(path.join(AO, 'dist/staking-rewards-seed.envelope.json'), 'utf8'))
-const seed = seedEnvelope.state
+const seedRaw = seedEnvelope.state
+
+// The seed STORES the D32 flat shape (`[hodler/operator]`, Details as parallel typed maps).
+// Views must answer in the ORIGINAL nested shape, so un-flatten here and assert against that.
+// This is deliberately an independent reimplementation of the contract's reassembly — if both
+// had the same bug they would agree with each other and still be wrong, so the golden file
+// (captured from the pre-flattening contract) is what catches that.
+const unflatten = <T>(flat: Record<string, T>): Record<string, Record<string, T>> => {
+  const out: Record<string, Record<string, T>> = {}
+  for (const [k, v] of Object.entries(flat ?? {})) {
+    const i = k.indexOf('/')
+    const h = k.slice(0, i), o = k.slice(i + 1)
+    ;(out[h] ??= {})[o] = v
+  }
+  return out
+}
+const unflattenDetails = (d: any): Record<string, Record<string, any>> => {
+  const out: Record<string, Record<string, any>> = {}
+  for (const k of Object.keys(d?.Rating ?? {})) {
+    const i = k.indexOf('/')
+    const h = k.slice(0, i), o = k.slice(i + 1)
+    ;(out[h] ??= {})[o] = {
+      Score: { Staked: d.Staked[k], Restaked: d.Restaked[k], Running: d.Running[k], Share: d.Share[k] },
+      Rating: d.Rating[k],
+      Reward: { Hodler: d.RewardHodler[k], Operator: d.RewardOperator[k] },
+    }
+  }
+  return out
+}
+const seed = {
+  ...seedRaw,
+  Rewarded: unflatten(seedRaw.Rewarded),
+  Claimed: unflatten(seedRaw.Claimed),
+  PreviousRound: { ...seedRaw.PreviousRound, Details: unflattenDetails(seedRaw.PreviousRound.Details) },
+}
 
 let pass = 0, fail = 0
 const failures: string[] = []
@@ -189,7 +223,19 @@ function assertAgainstSeed (snap: Record<string, any>, addrs: [string, string][]
   })
   console.log(`pid ${pid}`)
 
-  const addrs = sampleAddresses()
+  // In --check mode REUSE the golden's address list. Recomputing it would let the sample drift
+  // with the seed shape and report harness noise as behavior change — which it did on the first
+  // run: the flattened seed has 2 fewer Rewarded hodlers, every index-based pick shifted, and
+  // 208 "diffs" were simply different addresses being compared.
+  let addrs = sampleAddresses()
+  if (CHECK && fs.existsSync(GOLDEN)) {
+    const g = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'))
+    addrs = (g.meta?.addresses ?? []).map((a: string) => {
+      const m = a.match(/^(\S+) \((.*)\)$/)
+      return [m ? m[1] : a, m ? m[2] : 'golden'] as [string, string]
+    })
+    console.log(`  --check: reusing the golden's ${addrs.length} addresses`)
+  }
   console.log(`sampled ${addrs.length} addresses across branches: `
     + [...new Set(addrs.map(([, b]) => b.replace(/#\d+$/, '')))].join(', '))
 
@@ -199,7 +245,7 @@ function assertAgainstSeed (snap: Record<string, any>, addrs: [string, string][]
 
   // A real round over the real seed — the write path is where flattening actually bites.
   console.log('\n[2] driving a real round (same fixture as the Tier-3 oracle)')
-  const round = buildRound(seed)
+  const round = buildRound(seedRaw)
   console.log(`  ${round.realPairs} real + ${round.freshPairs} fresh pairs, ${round.hodlers} hodlers, t=${round.timestamp}`)
   await sendMessage({ url: HB, signer }, {
     pid,
@@ -236,14 +282,33 @@ function assertAgainstSeed (snap: Record<string, any>, addrs: [string, string][]
   if (CHECK) {
     if (!fs.existsSync(GOLDEN)) { console.error(`\nno golden at ${GOLDEN} — run without --check first`); process.exit(2) }
     const golden = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'))
+    // The golden is deliberately NOT re-captured after the D32 flattening — it is the
+    // pre-flattening truth, and re-recording it would erase the evidence it exists to hold.
+    // The one accepted difference is named here instead, so every OTHER drift still fails.
+    //
+    // Legacynet created `Rewarded[h] = {}` before its `bint.ispos` guard, leaving 2 empty
+    // hodler rows in the dump. A pair-keyed map cannot hold a hodler with no pairs, so they
+    // are dropped and the hodler count falls by exactly 2. See the contract header.
+    const EMPTY_HODLER_ROWS = 2
+    const accepted = (key: string, g: any, n: any): string | null => {
+      if (key !== 'status') return null
+      const gc = g?.counts?.rewardedHodlers, nc = n?.counts?.rewardedHodlers
+      if (typeof gc !== 'number' || typeof nc !== 'number') return null
+      if (gc - nc !== EMPTY_HODLER_ROWS) return null
+      // Everything else about status must still match exactly.
+      const gRest = { ...g, counts: { ...g.counts, rewardedHodlers: nc } }
+      if (!eq(gRest, n)) return null
+      return `rewardedHodlers ${gc} -> ${nc} (${EMPTY_HODLER_ROWS} empty legacynet rows dropped)`
+    }
     // meta carries the module id and round timestamp, which legitimately differ per run.
     const drift: string[] = []
     for (const phase of ['before', 'after'] as const) {
       const g = golden[phase] ?? {}, n = (snapshot as any)[phase] ?? {}
       for (const k of new Set([...Object.keys(g), ...Object.keys(n)])) {
-        if (!eq(g[k], n[k])) {
-          drift.push(`${phase}.${k}\n      golden: ${JSON.stringify(g[k])?.slice(0, 220)}\n      now:    ${JSON.stringify(n[k])?.slice(0, 220)}`)
-        }
+        if (eq(g[k], n[k])) continue
+        const why = accepted(k, g[k], n[k])
+        if (why) { console.log(`   ~ ${phase}.${k}: ACCEPTED — ${why}`); continue }
+        drift.push(`${phase}.${k}\n      golden: ${JSON.stringify(g[k])?.slice(0, 220)}\n      now:    ${JSON.stringify(n[k])?.slice(0, 220)}`)
       }
     }
     console.log(`\n[4] golden diff: ${drift.length === 0 ? 'IDENTICAL' : `${drift.length} view(s) MOVED`}`)

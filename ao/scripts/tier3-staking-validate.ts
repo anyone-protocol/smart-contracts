@@ -32,6 +32,35 @@ const DEV = new Wallet('0x' + KEY).address
 
 const AO = path.resolve(import.meta.dir, '..')
 const expected = JSON.parse(fs.readFileSync(path.join(AO, 'dist/staking-rewards-seed.expected.json'), 'utf8'))
+
+// The seed STORES the D32 flat shape; VIEWS answer in the legacy nested shape. Keep both, and
+// compare each against the right one — the `dump` view returns storage, everything else returns
+// the consumer shape.
+const unflat = (m: Record<string, any>) => {
+  const out: Record<string, Record<string, string>> = {}
+  for (const [k, v] of Object.entries(m ?? {})) {
+    const i = k.indexOf('/'); if (i < 0) continue
+    ;(out[k.slice(0, i)] ??= {})[k.slice(i + 1)] = v as string
+  }
+  return out
+}
+const nestedDetails = (d: any) => {
+  const out: Record<string, Record<string, any>> = {}
+  for (const k of Object.keys(d?.Rating ?? {})) {
+    const i = k.indexOf('/'); const h = k.slice(0, i), o = k.slice(i + 1)
+    ;(out[h] ??= {})[o] = {
+      Score: { Staked: d.Staked[k], Restaked: d.Restaked[k], Running: d.Running[k], Share: d.Share[k] },
+      Rating: d.Rating[k],
+      Reward: { Hodler: d.RewardHodler[k], Operator: d.RewardOperator[k] },
+    }
+  }
+  return out
+}
+const nested = {
+  Rewarded: unflat(expected.state.Rewarded),
+  Claimed: unflat(expected.state.Claimed),
+  Details: nestedDetails(expected.state.PreviousRound.Details),
+}
 const oracle = JSON.parse(fs.readFileSync(path.join(AO, 'dist/staking-oracle-probe.json'), 'utf8'))
 const round = buildRound(expected.state, Number(process.env.N || 250))
 if (round.timestamp !== oracle.timestamp) {
@@ -128,8 +157,8 @@ const diffFlat = (got: any, want: any) => {
   }
   if (!status) { console.log('  FAIL  status never answered'); process.exit(1) }
   const ec = {
-    rewarded: Object.keys(expected.state.Rewarded).length,
-    claimed: Object.keys(expected.state.Claimed).length,
+    rewarded: Object.keys(nested.Rewarded).length,
+    claimed: Object.keys(nested.Claimed).length,
   }
   check(status.counts.rewardedHodlers === ec.rewarded, 'Rewarded hodler count', `${status.counts.rewardedHodlers}/${ec.rewarded}`)
   check(status.counts.claimedHodlers === ec.claimed, 'Claimed hodler count', `${status.counts.claimedHodlers}/${ec.claimed}`)
@@ -140,15 +169,16 @@ const diffFlat = (got: any, want: any) => {
   check(status.setSharesEnabled === false, 'SetSharesEnabled false (locked at the 5% Default)', String(status.setSharesEnabled))
   check(status.runningRequirement === expected.state.Configuration.Requirements.Running, 'Requirements.Running seeded', String(status.runningRequirement))
 
-  // 2) full seed-diff — every pair of the two-level maps
-  console.log('\n2) full seed-diff (dump vs expected), two-level maps pair-by-pair:')
+  // 2) full seed-diff — `dump` returns STORAGE, so compare the flat maps key by key.
+  console.log('\n2) full seed-diff (dump vs expected), pair-keyed maps entry-by-entry:')
   const dump = await view('dump')
   for (const m of ['Rewarded', 'Claimed'] as const) {
-    const d = diffTwoLevel(dump[m], expected.state[m], m)
-    check(d === '', `dump.${m} (${Object.keys(expected.state[m]).length} hodlers / ${pairCount(expected.state[m])} pairs)`, d || 'identical')
+    const d = diffFlat(dump[m], expected.state[m])
+    check(d === '', `dump.${m} (${Object.keys(expected.state[m]).length} pairs, flat)`, d || 'identical')
   }
+  // Details is 7 parallel typed maps; every one must match entry for entry.
   const dd = diffTwoLevel(dump.PreviousRound?.Details, expected.state.PreviousRound.Details, 'Details')
-  check(dd === '', `dump.PreviousRound.Details (${Object.keys(expected.state.PreviousRound.Details).length} hodlers / ${pairCount(expected.state.PreviousRound.Details)} pairs) — PERSISTED, unlike relay`, dd || 'identical')
+  check(dd === '', `dump.PreviousRound.Details (7 maps / ${Object.keys(expected.state.PreviousRound.Details.Rating).length} pairs) — PERSISTED, unlike relay`, dd || 'identical')
   check(deepEq(dump.Configuration, expected.state.Configuration), 'dump.Configuration', show(dump.Configuration))
   check(deepEq(dump.PreviousRound?.Summary, expected.state.PreviousRound.Summary), 'dump.PreviousRound.Summary', show(dump.PreviousRound?.Summary))
 
@@ -162,23 +192,23 @@ const diffFlat = (got: any, want: any) => {
   // 4) legacynet read surface answers off migrated state
   console.log('\n4) legacynet read surface, answered off migrated state:')
   const H = round.sampleHodler
-  const O = Object.keys(expected.state.Rewarded[H])[0]
+  const O = Object.keys(nested.Rewarded[H])[0]
   const lastRound = await view('last_round')
   check(lastRound.Timestamp === expected.state.PreviousRound.Timestamp && lastRound.Period === expected.state.PreviousRound.Period,
     'last_round (Last-Round-Metadata)', `t=${lastRound.Timestamp} period=${lastRound.Period}`)
   const snap = await view('last_snapshot')
-  check(diffTwoLevel(snap.Details, expected.state.PreviousRound.Details, 'Details') === '', 'last_snapshot carries the migrated Details', `${pairCount(snap.Details)} pairs`)
+  check(diffTwoLevel(snap.Details, nested.Details, 'Details') === '', 'last_snapshot carries the migrated Details', `${pairCount(snap.Details)} pairs`)
   const lrd = await view(`last_round_data?address=${H}`)
   check(!!lrd?.Details, `last_round_data[${H.slice(0, 10)}…] (Last-Round-Data)`, lrd?.Details ? `${Object.keys(lrd.Details).length} operator(s)` : 'nil')
   const rewards = await view(`rewards?address=${H}`)
-  check(diffFlat(rewards?.Rewarded, expected.state.Rewarded[H]) === '', `rewards[${H.slice(0, 10)}…].Rewarded (Get-Rewards)`, show(rewards?.Rewarded))
+  check(diffFlat(rewards?.Rewarded, nested.Rewarded[H]) === '', `rewards[${H.slice(0, 10)}…].Rewarded (Get-Rewards)`, show(rewards?.Rewarded))
   const claimedView = await view(`claimed?address=${H}`)
-  check(deepEq(claimedView?.claimed, expected.state.Claimed[H]), `claimed[${H.slice(0, 10)}…] (Get-Claimed)`, show(claimedView?.claimed))
+  check(deepEq(claimedView?.claimed, nested.Claimed[H]), `claimed[${H.slice(0, 10)}…] (Get-Claimed)`, show(claimedView?.claimed))
   // Was a base-addressed point read (now/state/Rewarded/<hodler>/<operator>). Under globals
   // state is not on the message, so the same fact is asserted through the view — which measured
   // FASTER than the base read it replaces (27.6 ms vs 148 ms, D31 §5a).
   const point = rewards?.Rewarded?.[O]
-  check(point === expected.state.Rewarded[H][O], `rewards[<hodler>].Rewarded[<operator>] point read`, String(point))
+  check(point === nested.Rewarded[H][O], `rewards[<hodler>].Rewarded[<operator>] point read`, String(point))
 
   // 5) the round — identical input to the luerl oracle, over the identical full seed
   console.log('\n5) byte-identical round vs the luerl oracle (same full 402KB seed, same input):')
@@ -206,16 +236,17 @@ const diffFlat = (got: any, want: any) => {
   check(dDetails === '', `every per-pair Score/Rating/Reward (${pairCount(oracle.Details)} pairs)`, dDetails || 'identical to oracle')
 
   const dumpAfter = await view('dump')
-  const dRewarded = diffTwoLevel(dumpAfter.Rewarded, oracle.Rewarded, 'Rewarded')
+  // dumpAfter is STORAGE (flat); the oracle emits the nested consumer shape — un-flatten to compare.
+  const dRewarded = diffTwoLevel(unflat(dumpAfter.Rewarded), oracle.Rewarded, 'Rewarded')
   check(dRewarded === '', `cumulative Rewarded, whole map (${Object.keys(oracle.Rewarded).length} hodlers / ${pairCount(oracle.Rewarded)} pairs)`, dRewarded || 'identical to oracle')
-  check(diffTwoLevel(dumpAfter.Claimed, expected.state.Claimed, 'Claimed') === '', 'Claimed untouched by a round', 'identical to seed')
+  check(diffFlat(dumpAfter.Claimed, expected.state.Claimed) === '', 'Claimed untouched by a round', 'identical to seed')
   check(Object.keys(dumpAfter.PendingRounds || {}).length === 0, 'PendingRounds cleared after settle', String(Object.keys(dumpAfter.PendingRounds || {}).length))
 
   // the accumulation must actually have moved, or "identical" is vacuous
   const moved = Object.keys(oracle.Rewarded).filter(h =>
-    !deepEq(oracle.Rewarded[h], expected.state.Rewarded[h])).length
+    !deepEq(oracle.Rewarded[h], nested.Rewarded[h])).length
   check(moved > 0, 'balances actually moved off the migrated priors', `${moved} hodlers changed`)
-  const grew = Object.keys(oracle.Rewarded).length - Object.keys(expected.state.Rewarded).length
+  const grew = Object.keys(oracle.Rewarded).length - Object.keys(nested.Rewarded).length
   console.log(`  (Rewarded grew by ${grew} hodlers — the fresh operators' own-cut self-keys)`)
   console.log(`  (Add-Scores ${addMs}ms, Complete-Round ${completeMs}ms, ${(scoresJson.length / 1024).toFixed(1)}KB score payload)`)
 

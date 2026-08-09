@@ -1,7 +1,11 @@
 // Build a SEED module for native staking-rewards from the REAL legacynet dump (migrate-on-spawn).
 // Transforms live-staking-rewards.state.json → native state shape:
-//   * every address key → EIP-55 via ethers.getAddress, at BOTH levels of the two-level maps
-//     (Rewarded/Claimed/Details[hodler][operator]) and in Shares/PendingShareChanges
+//   * every address key → EIP-55 via ethers.getAddress, at BOTH levels of the dump's two-level
+//     maps (Rewarded/Claimed/Details[hodler][operator]) and in Shares/PendingShareChanges
+//   * D32 FLATTENING: those pair maps are then emitted as `[hodler/operator]`, and Details as
+//     parallel typed maps (Staked/Restaked/Running/Share/Rating/RewardHodler/RewardOperator).
+//     The nested form cost 3,336 live Lua tables and luerl's GC mark is quadratic in that.
+//     Storage only — the contract's views reassemble the legacy nested shape.
 //   * PreviousRound: KEEP Details — unlike relay, staking's Details are PERSISTED (the whole state
 //     is ~322KB, so there is no size pressure and Last-Snapshot/Last-Round-Data stay plain views).
 //     Seeding them preserves the final legacynet round's per-hodler breakdown across the migration.
@@ -54,9 +58,43 @@ const twoLevel = <T>(src: Record<string, Record<string, T>>, label: string) => {
   return out
 }
 
+/** Nested EIP-55 pair map → the flat `[hodler/operator]` map the contract stores (D32). */
+const flatten = <T>(nested: Record<string, Record<string, T>>) => {
+  const out: Record<string, T> = {}
+  for (const [h, ops] of Object.entries(nested)) for (const [o, v] of Object.entries(ops)) out[`${h}/${o}`] = v
+  return out
+}
+/** Details records → seven parallel typed maps. Running/Share stay NUMBERS: stringifying a
+ *  float and parsing it back is not guaranteed to round-trip identically under luerl. */
+const splitDetails = (nested: Record<string, Record<string, any>>) => {
+  const d = {
+    Staked: {} as Record<string, string>, Restaked: {} as Record<string, string>,
+    Running: {} as Record<string, number>, Share: {} as Record<string, number>,
+    Rating: {} as Record<string, string>,
+    RewardHodler: {} as Record<string, string>, RewardOperator: {} as Record<string, string>,
+  }
+  for (const [h, ops] of Object.entries(nested)) {
+    for (const [o, rec] of Object.entries(ops)) {
+      const k = `${h}/${o}`
+      d.Staked[k] = rec?.Score?.Staked
+      d.Restaked[k] = rec?.Score?.Restaked
+      d.Running[k] = rec?.Score?.Running
+      d.Share[k] = rec?.Score?.Share
+      d.Rating[k] = rec?.Rating
+      d.RewardHodler[k] = rec?.Reward?.Hodler
+      d.RewardOperator[k] = rec?.Reward?.Operator
+    }
+  }
+  return d
+}
+
+const nestedClaimed = twoLevel(asMap(dump.Claimed), 'Claimed')
+const nestedRewarded = twoLevel(asMap(dump.Rewarded), 'Rewarded')
+const nestedDetails = twoLevel(asMap(dump.PreviousRound?.Details), 'PreviousRound.Details')
+
 const migrated = {
-  Claimed: twoLevel(asMap(dump.Claimed), 'Claimed'),
-  Rewarded: twoLevel(asMap(dump.Rewarded), 'Rewarded'),
+  Claimed: flatten(nestedClaimed),
+  Rewarded: flatten(nestedRewarded),
   Shares: oneLevel(asMap(dump.Shares), 'Shares'),
   PendingShareChanges: oneLevel(asMap(dump.PendingShareChanges), 'PendingShareChanges'),
   Configuration: dump.Configuration,
@@ -65,7 +103,7 @@ const migrated = {
     Period: dump.PreviousRound?.Period ?? 0,
     Summary: dump.PreviousRound?.Summary ?? {},
     Configuration: dump.PreviousRound?.Configuration ?? {},
-    Details: twoLevel(asMap(dump.PreviousRound?.Details), 'PreviousRound.Details'),
+    Details: splitDetails(nestedDetails),
   },
   PendingRounds: {},
 }
@@ -89,12 +127,29 @@ if (rejects.length) {
 const countPairs = (m: Record<string, Record<string, unknown>>) =>
   Object.values(m).reduce((n, ops) => n + Object.keys(ops).length, 0)
 for (const [label, src, out] of [
-  ['Rewarded', asMap(dump.Rewarded), migrated.Rewarded],
-  ['Claimed', asMap(dump.Claimed), migrated.Claimed],
-  ['PreviousRound.Details', asMap(dump.PreviousRound?.Details), migrated.PreviousRound.Details],
+  ['Rewarded', asMap(dump.Rewarded), nestedRewarded],
+  ['Claimed', asMap(dump.Claimed), nestedClaimed],
+  ['PreviousRound.Details', asMap(dump.PreviousRound?.Details), nestedDetails],
 ] as const) {
   if (Object.keys(src).length !== Object.keys(out).length || countPairs(src) !== countPairs(out)) {
     console.error(`FAIL: ${label} lost entries — ${Object.keys(src).length}/${countPairs(src)} in, ${Object.keys(out).length}/${countPairs(out)} out`)
+    process.exit(1)
+  }
+}
+// ...and that the D32 flattening is itself total. A collision or a dropped pair here would be
+// invisible in the counts above, because those check the NESTED intermediates.
+for (const [label, nested, flat] of [
+  ['Rewarded', nestedRewarded, migrated.Rewarded],
+  ['Claimed', nestedClaimed, migrated.Claimed],
+] as const) {
+  if (countPairs(nested) !== Object.keys(flat).length) {
+    console.error(`FAIL: ${label} flatten lost pairs — ${countPairs(nested)} nested, ${Object.keys(flat).length} flat`)
+    process.exit(1)
+  }
+}
+for (const [field, m] of Object.entries(migrated.PreviousRound.Details)) {
+  if (Object.keys(m).length !== countPairs(nestedDetails)) {
+    console.error(`FAIL: Details.${field} has ${Object.keys(m).length} keys, expected ${countPairs(nestedDetails)}`)
     process.exit(1)
   }
 }
@@ -111,9 +166,9 @@ fs.writeFileSync(path.join(dist, 'staking-rewards-seed.expected.json'), JSON.str
 
 console.log(`=== staking-rewards seed from ${NET} dump (2026-07-09) ===`)
 console.log('counts:', JSON.stringify({
-  Rewarded: `${Object.keys(migrated.Rewarded).length} hodlers / ${countPairs(migrated.Rewarded)} pairs`,
-  Claimed: `${Object.keys(migrated.Claimed).length} hodlers / ${countPairs(migrated.Claimed)} pairs`,
-  Details: `${Object.keys(migrated.PreviousRound.Details).length} hodlers / ${countPairs(migrated.PreviousRound.Details)} pairs`,
+  Rewarded: `${Object.keys(nestedRewarded).length} hodlers / ${Object.keys(migrated.Rewarded).length} pairs (flat)`,
+  Claimed: `${Object.keys(nestedClaimed).length} hodlers / ${Object.keys(migrated.Claimed).length} pairs (flat)`,
+  Details: `${Object.keys(nestedDetails).length} hodlers / ${Object.keys(migrated.PreviousRound.Details.Rating).length} pairs (7 parallel maps)`,
   Shares: Object.keys(migrated.Shares).length,
   PendingShareChanges: Object.keys(migrated.PendingShareChanges).length,
 }))
