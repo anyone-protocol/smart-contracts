@@ -25,7 +25,7 @@ const addr = (i: number) => '0x' + i.toString(16).padStart(40, '0')
 const send = (pid: string, action: string, tags: Record<string, string>, data = '') =>
   sendMessage({ url: HB, signer }, { pid, tags: [{ name: 'action', value: action }, ...Object.entries(tags).map(([name, value]) => ({ name, value }))], data })
 const timeSend = async (pid: string, action: string, tags: Record<string, string>, data = '') => { const t = now(); await send(pid, action, tags, data); return now() - t }
-const getTextNoop = (pid: string) => fetch(`${P(pid)}/now/~lua@5.3a/dump`).then(r => r.text())
+const getTextNoop = (pid: string) => fetch(`${P(pid)}/as/dump`).then(r => r.text())
 
 ;(async () => {
   const { pid } = await spawnLuaProcess({ url: HB, signer }, { moduleId: MODULE_ID, tags: [{ name: 'name', value: `mixed-${Date.now()}` }] })

@@ -9,7 +9,7 @@ const KEY = (process.env.DEPLOYER_PRIVATE_KEY || '80611882d38e5502d93305c88b64da
 const signer = new EthereumSigner(KEY)
 const P = (pid: string) => `${HB}/${pid}~process@1.0`
 const dump = async (pid: string) => {
-  const r = await fetch(`${P(pid)}/now/~lua@5.3a/dump`)
+  const r = await fetch(`${P(pid)}/as/dump`)
   return `[${r.status}] ${(await r.text()).slice(0, 240).replace(/\s+/g, ' ')}`
 }
 const A = 'A'.repeat(40), B = 'B'.repeat(40), ADDR = '0x' + 'A'.repeat(40)

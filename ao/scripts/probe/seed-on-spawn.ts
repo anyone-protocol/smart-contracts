@@ -85,7 +85,7 @@ const show = async (label: string, p: string) => {
   await show('compute/allowlistId (FIRST read)', `${pid}~process@1.0/compute/allowlistId`)
   await show('compute/allowlistId/~trie/<owner> (FIRST)',
     `${pid}~process@1.0/compute/allowlistId/~trie@1.0/${deployerAddr}`)
-  await show('now/status (state)', `${pid}~process@1.0/now/~lua@5.3a/status`)
+  await show('now/status (state)', `${pid}~process@1.0/as/status`)
   await show('now/allowlistId',     `${pid}~process@1.0/now/allowlistId`)
   const ownerRead = await show('compute/process/commitments/<pid>/committer',
     `${pid}~process@1.0/compute/process/commitments/${pid}/committer`)

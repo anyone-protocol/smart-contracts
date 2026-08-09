@@ -316,16 +316,16 @@ const ao = createAoClient({
   })
   console.log(`process id             ${processId}  (slot ${slot})`)
 
-  // Verify it MATERIALIZED, rather than trusting a 200. Migrate-on-spawn happens on
-  // first compute, so a broken seed surfaces here and nowhere earlier.
+  // Verify it MATERIALIZED, rather than trusting a 200. `spawnProcess` already forced the
+  // lazy first compute (that is a spawn-level guarantee now, not a caller's job), so this is
+  // the SEED-LANDED confirmation: `status.initialized` separates a computed-but-empty process
+  // from a seeded one, which the counts cannot. Migrate-on-spawn happens on that first
+  // compute, so a broken seed surfaces here and nowhere earlier.
   console.log('\nverifying materialization …')
   let status: any
-  for (let i = 0; i < 40; i++) {
-    try { status = await ao.readView(processId, 'status'); break }
-    catch { await new Promise(r => setTimeout(r, 1500)) }
-  }
-  if (!status) {
-    console.error('FAILED: the status view never answered — the process did not materialize.')
+  try { status = await ao.materialize(processId, { attempts: 40, delayMs: 1500 }) }
+  catch (e) {
+    console.error(`FAILED: the process did not materialize — ${(e as Error).message}`)
     process.exit(1)
   }
   console.log(`  status: ${JSON.stringify(status.counts ?? status)}`)
@@ -508,7 +508,7 @@ const ao = createAoClient({
     console.log(`  consul kv put smart-contracts/${env}/${contract}-address ${processId}`)
   }
   console.log('\nReads:')
-  console.log(`  ${HB_URL}/${processId}~process@1.0/now/~lua@5.3a/status`)
+  console.log(`  ${HB_URL}/${processId}~process@1.0/as/status`)
   process.exit(0)
 })().catch(e => {
   console.error('\nDEPLOY FAILED:', String(e?.message || e))

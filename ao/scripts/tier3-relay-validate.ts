@@ -42,7 +42,7 @@ const check = (ok: boolean, label: string, detail = '') => {
 }
 let pid: string
 const view = async (v: string) => {
-  const r = await fetch(`${HB}/${pid}~process@1.0/now/~lua@5.3a/${v}`)
+  const r = await fetch(`${HB}/${pid}~process@1.0/as/${v}`)
   const b = await r.text(); if (!r.ok) throw new Error(`view ${v} -> ${r.status}: ${b.slice(0, 120)}`)
   return JSON.parse(b)
 }
@@ -62,9 +62,16 @@ const diffMap = (got: Record<string, unknown>, want: Record<string, unknown>) =>
 
   // 1) materialization + counts
   console.log('1) materialization + counts (status):')
+  // spawnLuaProcess already forced the lazy first compute, so this is the SEED-LANDED check,
+  // not a materialization wait: `initialized` separates a computed-but-empty process from a
+  // seeded one, which the counts cannot.
   let status: any
   for (let i = 0; i < 40; i++) {
-    try { status = await view('status'); break } catch { await new Promise(z => setTimeout(z, 1500)) }
+    try {
+      const s = await view('status')
+      if (s?.initialized !== false) { status = s; break }
+    } catch { /* not up yet */ }
+    await new Promise(z => setTimeout(z, 1500))
   }
   if (!status) { console.log('  FAIL  status never answered'); process.exit(1) }
   const ec = {
@@ -95,8 +102,8 @@ const diffMap = (got: Record<string, unknown>, want: Record<string, unknown>) =>
 
   // fresh-address precondition (oracle assumes AA/BB/FP1-3 not in seed)
   console.log('\n4) fresh test keys (round rewards start from 0):')
-  const tarAApre = await readState({ url: HB }, pid, `state/TotalAddressReward/${AA}`).catch(() => '')
-  check(!tarAApre || tarAApre === 'not_found' || tarAApre.trim() === '', 'AA absent pre-round', tarAApre.slice(0, 20))
+  const tarAApre = (await view(`rewards?address=${AA}`).catch(() => ({})))?.reward
+  check(tarAApre === undefined || tarAApre === null, 'AA absent pre-round', String(tarAApre))
 
   // 5) BYTE-IDENTICAL round: drive the identical round, compare to the luerl oracle
   console.log('\n5) byte-identical round (drive on-node, compare to luerl oracle):')
@@ -114,13 +121,15 @@ const diffMap = (got: Record<string, unknown>, want: Record<string, unknown>) =>
     const gr = snap.Details?.[fp]?.Rating, wr = oracle.Details[fp].Rating
     check(!!gr && JSON.stringify(gr) === JSON.stringify(wr), `Details[${fp.slice(0, 4)}…].Rating`, gr ? JSON.stringify(gr) : 'missing')
   }
-  // cumulative maps (base-addressed point reads) == oracle
+  // Cumulative maps == oracle. Were base-addressed point reads (now/state/TotalAddressReward/…);
+  // under globals state is not on the message, so the same values come through the `rewards`
+  // view, which measured faster than the base read anyway (D31 §5a).
   for (const [addr, label] of [[AA, 'AA'], [BB, 'BB']] as const) {
-    const got = (await readState({ url: HB }, pid, `state/TotalAddressReward/${addr}`)).trim()
+    const got = (await view(`rewards?address=${addr}`))?.reward
     check(got === oracle.tar[addr], `TotalAddressReward[${label}]`, `${got}`)
   }
   for (const fp of [FP1, FP2, FP3]) {
-    const got = (await readState({ url: HB }, pid, `state/TotalFingerprintReward/${fp}`)).trim()
+    const got = (await view(`rewards?fingerprint=${fp}`))?.reward
     check(got === oracle.tfr[fp], `TotalFingerprintReward[${fp.slice(0, 4)}…]`, `${got}`)
   }
   console.log(`  (round add+complete ${roundMs}ms)`)

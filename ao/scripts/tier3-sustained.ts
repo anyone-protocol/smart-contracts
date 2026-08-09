@@ -82,7 +82,7 @@ let pid: string
 const P = () => `${HB}/${pid}~process@1.0`
 const raw = async (key: string) => (await fetch(`${P()}/now/${key}`)).text()
 const view = async (v: string) => {
-  const r = await fetch(`${P()}/now/~lua@5.3a/${v}`)
+  const r = await fetch(`${P()}/as/${v}`)
   const b = await r.text()
   if (!r.ok) throw new Error(`view ${v} -> ${r.status}: ${b.replace(/\s+/g, ' ').slice(0, 160)}`)
   return JSON.parse(b)

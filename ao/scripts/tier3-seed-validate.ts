@@ -31,7 +31,7 @@ const check = (ok: boolean, label: string, detail = '') => {
 }
 const view = async (v: string) => {
   const t0 = performance.now()
-  const r = await fetch(`${HB}/${p}~process@1.0/now/~lua@5.3a/${v}`)
+  const r = await fetch(`${HB}/${p}~process@1.0/as/${v}`)
   const body = await r.text()
   const ms = Math.round(performance.now() - t0)
   if (!r.ok) throw new Error(`view ${v} -> ${r.status}: ${body.slice(0, 200)}`)
@@ -60,11 +60,17 @@ let p: string
   console.log(`spawned pid=${p}\n`)
 
   // 1) counts (also the first compute -> materialization). Retry until it answers.
+  // spawnLuaProcess already forced the lazy first compute, so this is the SEED-LANDED check:
+  // `status.initialized` says whether a slot really ran, which the counts cannot — a
+  // never-computed process and a correctly seeded empty one both answer zero.
   console.log('1) materialization + counts (status view):')
   let status: any, statusMs = 0
   for (let i = 0; i < 30; i++) {
-    try { const s = await view('status'); status = s.data; statusMs = s.ms; break }
-    catch { await new Promise(r => setTimeout(r, 1000)) }
+    try {
+      const s = await view('status')
+      if (s.data?.initialized !== false) { status = s.data; statusMs = s.ms; break }
+    } catch { /* not up yet */ }
+    await new Promise(r => setTimeout(r, 1000))
   }
   if (!status) { console.log('  FAIL  status never answered (no materialization)'); process.exit(1) }
   const ec = {

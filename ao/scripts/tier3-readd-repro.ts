@@ -20,7 +20,7 @@ const raw = async (pid: string, key: string) => {
   return `[${r.status}] ${(await r.text()).slice(0, 60).replace(/\s+/g, ' ')}`
 }
 const dumpClaimable = async (pid: string) => {
-  const r = await fetch(`${P(pid)}/now/~lua@5.3a/dump`)
+  const r = await fetch(`${P(pid)}/as/dump`)
   const j: any = await r.json().catch(() => ({}))
   return JSON.stringify(j.claimable ?? null)
 }

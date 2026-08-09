@@ -95,7 +95,7 @@ let pid: string
 
   // read the Complete-Round output (all Details) + the cumulative maps (dump)
   const snap = JSON.parse(await readState({ url: HB }, pid, 'results/output/data'))
-  const dumpR = await fetch(`${HB}/${pid}~process@1.0/now/~lua@5.3a/dump`)
+  const dumpR = await fetch(`${HB}/${pid}~process@1.0/as/dump`)
   const dump = JSON.parse(await dumpR.text())
 
   console.log('\nA) per-round rewards byte-identical to oracle (realistic size):')

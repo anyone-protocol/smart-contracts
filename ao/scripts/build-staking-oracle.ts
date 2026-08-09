@@ -40,10 +40,10 @@ end
 local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 compute(base, assign('Add-Scores', [==[${scoresJson}]==], ${round.timestamp}))
 compute(base, assign('Complete-Round', nil, ${round.timestamp}))
-print('ORACLE_PERIOD=' .. json.encode(base.state.PreviousRound.Period))
-print('ORACLE_SUMMARY=' .. json.encode(base.state.PreviousRound.Summary))
-print('ORACLE_DETAILS=' .. json.encode(base.state.PreviousRound.Details))
-print('ORACLE_REWARDED=' .. json.encode(base.state.Rewarded))
+print('ORACLE_PERIOD=' .. json.encode(native.stateRoot().PreviousRound.Period))
+print('ORACLE_SUMMARY=' .. json.encode(native.stateRoot().PreviousRound.Summary))
+print('ORACLE_DETAILS=' .. json.encode(native.stateRoot().PreviousRound.Details))
+print('ORACLE_REWARDED=' .. json.encode(native.stateRoot().Rewarded))
 return { pass = 1, fail = 0, failures = {} }
 `
 const scenPath = path.join(AO, 'dist/staking-oracle-scen.lua')

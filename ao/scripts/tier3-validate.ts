@@ -46,12 +46,19 @@ const section = (s: string) => console.log(`\n=== ${s} ===`)
 const P = (pid: string) => `${HB}/${pid}~process@1.0`
 const raw = async (pid: string, key: string) => (await fetch(`${P(pid)}/now/${key}`)).text()
 async function viewGet (pid: string, view: string, qs = '') {
-  const r = await fetch(`${P(pid)}/now/~lua@5.3a/${view}${qs}`)
+  const r = await fetch(`${P(pid)}/as/${view}${qs}`)
   const body = await r.text()
   let json: any = null; try { json = JSON.parse(body) } catch { /* */ }
   return { status: r.status, ct: r.headers.get('content-type') || '', body, json }
 }
 const dump = async (pid: string) => (await viewGet(pid, 'dump')).json || {}
+// D32: state is a Lua global, not a message key — `now/state/<map>/<key>` is gone (it 404s to
+// the hyperbuddy HTML page, which is how this read failing looks). Point reads come off the
+// runtime `dump` view instead. Measured FASTER than the base read it replaces (D31 §5a).
+const stateAt = async (pid: string, map: string, key: string) => {
+  const v = (await dump(pid))?.[map]?.[key]
+  return v === undefined || v === null ? '' : String(v)
+}
 
 async function send (signer: EthereumSigner, pid: string, action: string, tags: Record<string, string> = {}, data = '') {
   const taglist = [{ name: 'action', value: action },
@@ -79,6 +86,9 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
   section('A. spawn (by module-id) + seed materialization')
   const { pid } = await spawn('validate')
   console.log(`pid = ${pid}`)
+  // No explicit materialization here: spawnLuaProcess forces the lazy first compute and
+  // verifies it (hb-client `verify`, default on). That is the ONLY place it should live —
+  // `as/` does not drive slot 0, and a per-caller reminder is exactly what got missed.
   eq('fresh state seeded empty', await dump(pid), {
     claimable: [], verified: [], blocked: [], verifiedHardware: [],
     registrationCredits: [], registrationCreditsRequired: false,
@@ -89,12 +99,12 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
   section('B. every write action (authorized) persists')
   eq('Admin-Submit → OK', await send(ownerSigner, pid, 'Admin-Submit-Operator-Certificates', {},
     JSON.stringify([{ f: FP_A, a: OP, hw: true }, { f: FP_B, a: OP }, { f: FP_C, a: OWNER }])), 'OK')
-  eq('  claimable[FP_A] = norm(OP)', await raw(pid, `state/claimable/${FP_A}`), norm(OP))
-  eq('  verifiedHardware[FP_A] = true', await raw(pid, `state/verifiedHardware/${FP_A}`), 'true')
+  eq('  claimable[FP_A] = norm(OP)', await stateAt(pid, 'claimable', `${FP_A}`), norm(OP))
+  eq('  verifiedHardware[FP_A] = true', await stateAt(pid, 'verifiedHardware', `${FP_A}`), 'true')
 
   eq('Submit-Fingerprint-Certificate (OP claims FP_A) → OK',
     await send(opSigner, pid, 'Submit-Fingerprint-Certificate', { 'fingerprint-certificate': FP_A }), 'OK')
-  eq('  verified[FP_A] = norm(OP)', await raw(pid, `state/verified/${FP_A}`), norm(OP))
+  eq('  verified[FP_A] = norm(OP)', await stateAt(pid, 'verified', `${FP_A}`), norm(OP))
   eq('  claimable[FP_A] cleared', (await dump(pid)).claimable[FP_A] ?? null, null)
 
   eq('Add-Registration-Credit → OK',
@@ -103,7 +113,7 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
 
   // Block/Unblock: pass norm() so the maps + views agree (address-form is legacy tech debt).
   eq('Block-Operator-Address → OK', await send(ownerSigner, pid, 'Block-Operator-Address', { address: norm(OP) }), 'OK')
-  eq('  blocked[norm(OP)] = true', await raw(pid, `state/blocked/${norm(OP)}`), 'true')
+  eq('  blocked[norm(OP)] = true', await stateAt(pid, 'blocked', `${norm(OP)}`), 'true')
   eq('Unblock-Operator-Address → OK', await send(ownerSigner, pid, 'Unblock-Operator-Address', { address: norm(OP) }), 'OK')
   eq('  blocked[norm(OP)] cleared', (await dump(pid)).blocked[norm(OP)] ?? null, null)
 
@@ -142,7 +152,7 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
   eq('  state unchanged after all error cases (revert)', await dump(pid), before)
   eq('  process NOT wedged — valid write after errors → OK',
     await send(ownerSigner, pid, 'Admin-Submit-Operator-Certificates', {}, JSON.stringify([{ f: FP_A, a: OWNER }])), 'OK')
-  eq('  and it persisted', await raw(pid, `state/claimable/${FP_A}`), norm(OWNER))
+  eq('  and it persisted', await stateAt(pid, 'claimable', `${FP_A}`), norm(OWNER))
 
   // atomicity: a batch that fails midway reverts the WHOLE batch
   section('C2. atomic batch revert')
@@ -163,7 +173,7 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
     await send(ownerSigner, pid, 'Update-Roles', {}, JSON.stringify({ Grant: { [OP]: ['admin'] } })), 'OK')
   eq('  roles.admin[OP] = true', (await viewGet(pid, 'roles')).json?.admin?.[OP], true)
   eq('  OP (now admin) Block → OK', await send(opSigner, pid, 'Block-Operator-Address', { address: norm(OWNER) }), 'OK')
-  eq('  OWNER now blocked', await raw(pid, `state/blocked/${norm(OWNER)}`), 'true')
+  eq('  OWNER now blocked', await stateAt(pid, 'blocked', `${norm(OWNER)}`), 'true')
   eq('  revoke OP admin → OK',
     await send(ownerSigner, pid, 'Update-Roles', {}, JSON.stringify({ Revoke: { [OP]: ['admin'] } })), 'OK')
   check(`  OP Block after revoke → Denied`, /denied/i.test(await send(opSigner, pid, 'Block-Operator-Address', { address: norm(OP) })))
@@ -196,9 +206,14 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
   eq('  fingerprints?ids: FP_A verified', fps?.[FP_A]?.verified, norm(OP))
   eq('  fingerprints?ids: FP_B claimable', fps?.[FP_B]?.claimable, norm(OWNER))
   eq('  fingerprints?ids: FP_D unknown', fps?.[FP_D]?.verified ?? null, null)
-  const collide = await fetch(`${P(vpid)}/now/~lua@5.3a/fingerprints?fingerprints=${FP_A}`)
-  check('  fingerprints?fingerprints= still shadows (documented footgun)',
-    !(collide.headers.get('content-type') || '').includes('application/json'))
+  // D26 recorded this as a footgun: under `now/~lua@5.3a/<view>`, a query param NAMED AFTER
+  // the view shadowed path resolution and returned the raw param string instead of invoking
+  // the view. Under `as/` (D32) it no longer does — the view runs normally and simply ignores
+  // a param it does not read. Asserted in the new direction so the fix stays pinned; the
+  // `ids` naming in the contract stays as documentation of where the hazard used to be.
+  const collide = await viewGet(vpid, 'fingerprints', `?fingerprints=${FP_A}`)
+  check('  fingerprints?fingerprints= no longer shadows (as/ fixes the D26 footgun)',
+    collide.ct.includes('application/json') && collide.json !== null)
 
   // == summary =================================================================
   console.log(`\n${'='.repeat(60)}\nVERTICAL VALIDATION: ${pass} passed / ${fail} failed`)

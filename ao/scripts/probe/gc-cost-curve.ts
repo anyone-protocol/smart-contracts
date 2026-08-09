@@ -105,7 +105,7 @@ async function submit (pid: string, fp: string) {
   console.log(`process ${pid}`)
 
   for (let i = 0; i < 40; i++) {
-    if ((await fetch(`${HB_URL}/${pid}~process@1.0/now/~lua@5.3a/status`)).status === 200) break
+    if ((await fetch(`${HB_URL}/${pid}~process@1.0/as/status`)).status === 200) break
     await sleep(1500)
   }
 

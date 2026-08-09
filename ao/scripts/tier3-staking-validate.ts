@@ -17,7 +17,7 @@
 // Run: HB_URL=http://localhost:8734 MODULE_ID=<seed id> bun run scripts/tier3-staking-validate.ts
 import { EthereumSigner } from '@dha-team/arbundles'
 import { Wallet } from 'ethers'
-import { fetchNodeAddress, spawnLuaProcess, sendMessage, readState } from './util/hb-client'
+import { fetchNodeAddress, spawnLuaProcess, sendMessage } from './util/hb-client'
 import { seedEnvelopeFor } from './util/native-bundle'
 import { buildRound } from './util/staking-round'
 import fs from 'fs'
@@ -58,7 +58,7 @@ const check = (ok: boolean, label: string, detail = '') => {
 }
 let pid: string
 const view = async (v: string) => {
-  const r = await fetch(`${HB}/${pid}~process@1.0/now/~lua@5.3a/${v}`)
+  const r = await fetch(`${HB}/${pid}~process@1.0/as/${v}`)
   const b = await r.text(); if (!r.ok) throw new Error(`view ${v} -> ${r.status}: ${b.slice(0, 160)}`)
   return JSON.parse(b)
 }
@@ -115,9 +115,16 @@ const diffFlat = (got: any, want: any) => {
 
   // 1) materialization + counts
   console.log('1) materialization + counts (status):')
+  // spawnLuaProcess already forced the lazy first compute, so this is the SEED-LANDED check,
+  // not a materialization wait: `initialized` separates a computed-but-empty process from a
+  // seeded one, which the counts cannot.
   let status: any
   for (let i = 0; i < 40; i++) {
-    try { status = await view('status'); break } catch { await new Promise(z => setTimeout(z, 1500)) }
+    try {
+      const s = await view('status')
+      if (s?.initialized !== false) { status = s; break }
+    } catch { /* not up yet */ }
+    await new Promise(z => setTimeout(z, 1500))
   }
   if (!status) { console.log('  FAIL  status never answered'); process.exit(1) }
   const ec = {
@@ -167,8 +174,11 @@ const diffFlat = (got: any, want: any) => {
   check(diffFlat(rewards?.Rewarded, expected.state.Rewarded[H]) === '', `rewards[${H.slice(0, 10)}…].Rewarded (Get-Rewards)`, show(rewards?.Rewarded))
   const claimedView = await view(`claimed?address=${H}`)
   check(deepEq(claimedView?.claimed, expected.state.Claimed[H]), `claimed[${H.slice(0, 10)}…] (Get-Claimed)`, show(claimedView?.claimed))
-  const point = (await readState({ url: HB }, pid, `state/Rewarded/${H}/${O}`)).trim()
-  check(point === expected.state.Rewarded[H][O], `base-addressed point read now/state/Rewarded/<hodler>/<operator>`, point)
+  // Was a base-addressed point read (now/state/Rewarded/<hodler>/<operator>). Under globals
+  // state is not on the message, so the same fact is asserted through the view — which measured
+  // FASTER than the base read it replaces (27.6 ms vs 148 ms, D31 §5a).
+  const point = rewards?.Rewarded?.[O]
+  check(point === expected.state.Rewarded[H][O], `rewards[<hodler>].Rewarded[<operator>] point read`, String(point))
 
   // 5) the round — identical input to the luerl oracle, over the identical full seed
   console.log('\n5) byte-identical round vs the luerl oracle (same full 402KB seed, same input):')

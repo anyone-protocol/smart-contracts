@@ -197,7 +197,7 @@ const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 
 
   let counts: any = null
   for (let i = 0; i < 60; i++) {
-    const r = await fetch(`${HB}/${pid}~process@1.0/now/~lua@5.3a/status`)
+    const r = await fetch(`${HB}/${pid}~process@1.0/as/status`)
     if (r.ok) { counts = JSON.parse(await r.text()).counts; break }
     await sleep(2000)
   }
@@ -327,7 +327,7 @@ const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 
 
   // --- lockdown: the node is not a free read service for processes we do not run ---------
   console.log(`\n  --- lockdown ---`)
-  const readOk = await fetch(`${HB}/${pid}~process@1.0/now/~lua@5.3a/status`)
+  const readOk = await fetch(`${HB}/${pid}~process@1.0/as/status`)
   check(readOk.ok, 'unsigned READ of a gated contract is free (D3 public reads)',
     `HTTP ${readOk.status}`)
 

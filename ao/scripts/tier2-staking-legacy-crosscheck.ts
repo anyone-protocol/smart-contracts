@@ -4,7 +4,7 @@
 // native reward math is a VERBATIM frozen copy of legacynet `Complete-Round`, so the residual risk
 // is a transcription typo that the busted/luerl specs (which assert the port against itself) cannot
 // see. This drives the SAME realistic round through the LEGACY contract (Handlers shape, luerl `run`
-// mode, `StakingRewards` global) AND the NATIVE port (D26 shape, luerl `native` mode, `base.state`),
+// mode, `StakingRewards` global) AND the NATIVE port (D26 shape, luerl `native` mode, the `StakingRewards` state-root global),
 // then diffs the per-pair Details, the round Summary, and the cumulative Rewarded map. Both compile
 // the frozen math against the SAME `.common.bigint`, so a match proves the transcription is faithful
 // across every branch.
@@ -180,16 +180,17 @@ function nativeScenario(r: Run) {
     PendingRounds: {},
   }
   return `${preamble}
-local base = { process = { id = 'PID', commitments = commit(OWNER) }, state = json.decode(${lit(state)}) }
+native.setStateRoot(json.decode(${lit(state)}))
+local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 compute(base, assign('Add-Scores', ${lit(JSON.parse(r.scoresJson))}, ${T}))
 compute(base, assign('Complete-Round', nil, ${T}))
-print('OUT_DETAILS=' .. json.encode(base.state.PreviousRound.Details))
-print('OUT_SUMMARY=' .. json.encode(base.state.PreviousRound.Summary))
-print('OUT_PERIOD=' .. json.encode(base.state.PreviousRound.Period))
-print('OUT_REWARDED=' .. json.encode(base.state.Rewarded))
-print('OUT_CLAIMED=' .. json.encode(base.state.Claimed))
-print('OUT_SHARES=' .. json.encode(base.state.Shares))
-print('OUT_PENDING=' .. json.encode(base.state.PendingShareChanges))
+print('OUT_DETAILS=' .. json.encode(native.stateRoot().PreviousRound.Details))
+print('OUT_SUMMARY=' .. json.encode(native.stateRoot().PreviousRound.Summary))
+print('OUT_PERIOD=' .. json.encode(native.stateRoot().PreviousRound.Period))
+print('OUT_REWARDED=' .. json.encode(native.stateRoot().Rewarded))
+print('OUT_CLAIMED=' .. json.encode(native.stateRoot().Claimed))
+print('OUT_SHARES=' .. json.encode(native.stateRoot().Shares))
+print('OUT_PENDING=' .. json.encode(native.stateRoot().PendingShareChanges))
 return { pass = 1, fail = 0, failures = {} }
 `
 }

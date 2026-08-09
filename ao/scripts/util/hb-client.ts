@@ -67,6 +67,25 @@ export interface SpawnLuaOptions {
    * `moduleId`; the `luaSource` path already uses `data` for the inline bundle.
    */
   spawnData?: string
+  /**
+   * Force the process's FIRST COMPUTE and confirm it resolves before returning (default
+   * true, one extra GET).
+   *
+   * `/push` only SCHEDULES slot 0 — HyperBEAM computes lazily. A never-computed process
+   * still answers 200 on most reads, it just has no state, so an unseeded or broken spawn
+   * is indistinguishable from a healthy one until something much later reads the wrong
+   * answer. `@permaweb/aoconnect` resolved `now` after a spawn for exactly this reason.
+   *
+   * Under the D32 globals model this is load-bearing: `as/<view>` does NOT drive slot 0, so
+   * without it a just-spawned process serves views from the contract's declared EMPTY shape
+   * — including a migrate-on-spawn seed, where a seed diff would compare against nothing.
+   *
+   * ⚠️ Proves the process COMPUTES, not that a seed LANDED — for that poll the native
+   * runtime's `status.initialized`.
+   */
+  verify?: boolean
+  verifyAttempts?: number
+  verifyDelayMs?: number
 }
 
 export interface SendOptions {
@@ -250,7 +269,33 @@ export async function spawnLuaProcess (
   }
   const { id, res } = await postAns104(config, '/push', { tags, data })
   const pid = res.headers.get('process') ?? id
+  if (opts.verify !== false) {
+    await forceFirstCompute(config, pid, opts.verifyAttempts, opts.verifyDelayMs)
+  }
   return { pid, slot: res.headers.get('slot') }
+}
+
+/**
+ * Drive a lazily-scheduled slot 0 by resolving `now/at-slot`, and confirm the node answers.
+ * Contract-agnostic on purpose: `at-slot` exists on every process, so this cannot depend on
+ * a `status` view that only the native runtime has.
+ */
+export async function forceFirstCompute (
+  config: Pick<HbConfig, 'url'>,
+  pid: string,
+  attempts = 30,
+  delayMs = 500
+): Promise<string> {
+  let last = ''
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(`${config.url}/${pid}~process@1.0/now/at-slot`)
+      if (res.ok) return (await res.text()).trim()
+      last = `HTTP ${res.status}`
+    } catch (e) { last = String((e as Error)?.message ?? e) }
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, delayMs))
+  }
+  throw new Error(`spawned ${pid} but it never computed after ${attempts} attempts (${last})`)
 }
 
 /**

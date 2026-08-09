@@ -102,7 +102,7 @@ const timed = async (pid: string, action: string, extra: Record<string, string> 
 
   let counts = null
   for (let i = 0; i < 60; i++) {
-    const r = await fetch(`${HB_URL}/${reg}~process@1.0/now/~lua@5.3a/status`)
+    const r = await fetch(`${HB_URL}/${reg}~process@1.0/as/status`)
     if (r.ok) { counts = JSON.parse(await r.text()).counts; break }
     await sleep(2000)
   }
@@ -110,7 +110,7 @@ const timed = async (pid: string, action: string, extra: Record<string, string> 
   console.log(`  seeded  ${JSON.stringify(counts)}`)
 
   // a real verified fingerprint to look up
-  const scoring = await (await fetch(`${HB_URL}/${reg}~process@1.0/now/~lua@5.3a/scoring`)).text()
+  const scoring = await (await fetch(`${HB_URL}/${reg}~process@1.0/as/scoring`)).text()
   const fp = (scoring.match(/"([A-F0-9]{40})"/) || [])[1]
   if (!fp) { console.log('  no verified fingerprint found'); process.exit(2) }
   console.log(`  lookup  verified/${fp}`)

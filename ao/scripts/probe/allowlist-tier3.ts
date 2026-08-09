@@ -70,7 +70,7 @@ const gateRead = async (pid: string, addr: string) => {
 
   let counts: any = null
   for (let i = 0; i < 90; i++) {
-    const r = await fetch(`${HB_URL}/${pid}~process@1.0/now/~lua@5.3a/status`)
+    const r = await fetch(`${HB_URL}/${pid}~process@1.0/as/status`)
     if (r.ok) { counts = JSON.parse(await r.text()).counts; break }
     await sleep(2000)
   }
@@ -90,7 +90,7 @@ const gateRead = async (pid: string, addr: string) => {
     trieId.slice(0, 50))
 
   // A genuine operator from the live seed.
-  const scoring = await (await fetch(`${HB_URL}/${pid}~process@1.0/now/~lua@5.3a/scoring`)).text()
+  const scoring = await (await fetch(`${HB_URL}/${pid}~process@1.0/as/scoring`)).text()
   const op = (scoring.match(/"(0x[0-9a-fA-F]{40})"/) || [])[1]
   const fp = (scoring.match(/"([A-F0-9]{40})"/) || [])[1]
   console.log(`  operator ${op}\n`)

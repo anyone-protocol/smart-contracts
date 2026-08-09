@@ -72,13 +72,13 @@ const ADDR = '0x' + 'a'.repeat(40)            // normalizes to 0x + 'A'*40
   show(`now/state/claimable/${FP_A}`, await raw(pid, `now/state/claimable/${FP_A}`))
   show('now/results/output/data', await raw(pid, 'now/results/output/data'))
 
-  console.log('\n5) computed views via now/~lua@5.3a/<view> (global wrappers, JSON codec):')
+  console.log('\n5) computed views via as/<view> (global wrappers, JSON codec):')
   const ADDR_STORED = '0x' + 'A'.repeat(40)
   for (const p of [
-    'now/~lua@5.3a/status/serialize~json@1.0',
-    'now/~lua@5.3a/operators/serialize~json@1.0',
-    `now/~lua@5.3a/operator/serialize~json@1.0?address=${ADDR_STORED}`,
-    `now/~lua@5.3a/operator/serialize~json@1.0&address=${ADDR_STORED}`,
+    'as/status/serialize~json@1.0',
+    'as/operators/serialize~json@1.0',
+    `as/operator/serialize~json@1.0?address=${ADDR_STORED}`,
+    `as/operator/serialize~json@1.0&address=${ADDR_STORED}`,
   ]) {
     show(p, await raw(pid, p))
   }

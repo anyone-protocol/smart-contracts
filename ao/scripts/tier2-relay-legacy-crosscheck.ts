@@ -110,7 +110,7 @@ print('LEGACY_TFR=' .. json.encode(RelayRewards.TotalFingerprintReward))
 return { pass = 1, fail = 0, failures = {} }
 `
 
-// --- NATIVE scenario (D26 shape, `native` mode). State injected on base.state (skips migrate-on-
+// --- NATIVE scenario (D26 shape, `native` mode). State injected via native.setStateRoot (skips migrate-on-
 //     spawn); Details ride the Complete-Round OUTPUT (never persisted).
 const nativeStateJson = JSON.stringify({
   Claimed: {},
@@ -122,13 +122,14 @@ const nativeStateJson = JSON.stringify({
 })
 const nativeScen = `${helpers}
 local stateJson = [==[${nativeStateJson}]==]
-local base = { process = { id = 'PID', commitments = commit(OWNER) }, state = json.decode(stateJson) }
+native.setStateRoot(json.decode(stateJson))
+local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 compute(base, assign('Add-Scores', scoresJson, ${T}))
 compute(base, assign('Complete-Round', nil, ${T}))
 local out = json.decode(base.results.output.data)
 print('NATIVE_DETAILS=' .. json.encode(out.Details))
 print('NATIVE_SUMMARY=' .. json.encode(out.Summary))
-print('NATIVE_TFR=' .. json.encode(base.state.TotalFingerprintReward))
+print('NATIVE_TFR=' .. json.encode(native.stateRoot().TotalFingerprintReward))
 return { pass = 1, fail = 0, failures = {} }
 `
 

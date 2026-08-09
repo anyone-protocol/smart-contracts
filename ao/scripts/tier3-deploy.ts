@@ -67,7 +67,7 @@ const FP4 = 'D'.repeat(40)   // dev — claimable
 
   const J = '/serialize~json@1.0'
   const P = `${HB_URL}/${pid}~process@1.0`
-  const V = `${P}/now/~lua@5.3a`   // views: pre-encoded JSON strings — NO serialize suffix.
+  const V = `${P}/as`   // views via as/ (D31 §5a): pre-encoded JSON — NO serialize suffix.
   console.log(`\n=========================  POKE MENU  =========================`)
   console.log(`pid: ${pid}`)
   console.log(`owner (dev wallet): ${NORM_DEV}\n`)

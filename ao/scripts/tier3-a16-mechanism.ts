@@ -18,7 +18,7 @@ const OWNER = new Wallet('0x' + KEY).address, OP = new Wallet('0x' + OP_KEY).add
 const norm = (a: string) => a   // addresses stored verbatim EIP-55; inputs are already EIP-55
 const P = (pid: string) => `${HB}/${pid}~process@1.0`
 const claimable = async (pid: string) => {
-  const r = await fetch(`${P(pid)}/now/~lua@5.3a/dump`); const j: any = await r.json().catch(() => ({}))
+  const r = await fetch(`${P(pid)}/as/dump`); const j: any = await r.json().catch(() => ({}))
   return j.claimable ?? {}
 }
 const submit = async (pid: string, certs: any[]) => {

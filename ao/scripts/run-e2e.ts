@@ -207,6 +207,12 @@ const admitted = await step('signer admitted (tiny throwaway spawn)', async () =
   const r = await spawnLuaProcess(config, {
     luaSource: probeSrc,
     tags: [{ name: 'name', value: `e2e-preflight-${stamp}` }],
+    // The ONLY place that opts out of spawn's first-compute verification, and deliberately:
+    // this source returns a module TABLE rather than defining the global `compute` the device
+    // calls, so it can never compute. That is fine — the question here is purely "did faff
+    // admit this signer", which the accepted push already answers. Verifying would turn a
+    // successful admission check into a 500 after 30 retries.
+    verify: false,
   })
   return `pid ${r.pid.slice(0, 12)}…`
 })
@@ -450,6 +456,8 @@ for (const v of VERTICALS) {
       spawnData: seedEnvelopeFor(v.migrates!),
       tags: [{ name: 'name', value: `e2e-verify-${v.key}-${stamp}` }],
     })
+    // spawnLuaProcess forces the lazy first compute and verifies it, so the seed has
+    // materialized by here — nothing extra to do before verify-migration reads.
     bun('scripts/verify-migration.ts', [v.migrates!, '--seed', 'live'],
       { HB_URL: HB, PID: fresh.pid, DEPLOYER_PRIVATE_KEY: KEY }, 900)
     return `fresh pid ${fresh.pid.slice(0, 12)}…`

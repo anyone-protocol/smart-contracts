@@ -70,7 +70,7 @@ const timed = async (pid: string, sub: string, n = 5) => {
 
   let counts: any = null
   for (let i = 0; i < 60; i++) {
-    const r = await fetch(`${HB_URL}/${pid}~process@1.0/now/~lua@5.3a/status`)
+    const r = await fetch(`${HB_URL}/${pid}~process@1.0/as/status`)
     if (r.ok) { counts = JSON.parse(await r.text()).counts; break }
     await sleep(2000)
   }
@@ -79,7 +79,7 @@ const timed = async (pid: string, sub: string, n = 5) => {
 
   // A real operator address and a real verified fingerprint, taken from live state so the
   // "hit" cases are genuine hits. A synthetic address would only ever exercise the miss path.
-  const scoring = await (await fetch(`${HB_URL}/${pid}~process@1.0/now/~lua@5.3a/scoring`)).text()
+  const scoring = await (await fetch(`${HB_URL}/${pid}~process@1.0/as/scoring`)).text()
   const fp = (scoring.match(/"([A-F0-9]{40})"/) || [])[1]
   const addr = (scoring.match(/"(0x[0-9a-fA-F]{40})"/) || [])[1]
   if (!fp || !addr) { console.log('  could not sample a fingerprint/address from state'); process.exit(2) }

@@ -24,7 +24,7 @@ const FP = (c: string) => c.repeat(40)
     console.log(`SPAWN FAILED: ${String(e?.message || e).slice(0, 300)}`); process.exit(1)
   }
 
-  const dump0 = await (await fetch(`${HB}/${pid}~process@1.0/now/~lua@5.3a/dump`)).text()
+  const dump0 = await (await fetch(`${HB}/${pid}~process@1.0/as/dump`)).text()
   console.log(`materialized? ${dump0.slice(0, 70).replace(/\s+/g, ' ')}`)
 
   let ok = 0, failed = 0

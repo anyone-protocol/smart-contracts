@@ -139,7 +139,7 @@ async function waitForNode (timeoutS = 240) {
   // Wait for the migrate-on-spawn seed to materialise.
   let seeded = false
   for (let i = 0; i < 40; i++) {
-    if ((await get(`/${pid}~process@1.0/now/~lua@5.3a/status`)).status === 200) { seeded = true; break }
+    if ((await get(`/${pid}~process@1.0/as/status`)).status === 200) { seeded = true; break }
     await sleep(1500)
   }
   if (!seeded) { console.log('ABORT: seed never materialised'); process.exit(2) }
@@ -149,7 +149,7 @@ async function waitForNode (timeoutS = 240) {
   for (let i = 1; i <= WRITES; i++) if ((await submit(pid, fpOf(i))) !== 200) bad++
   ok(`${WRITES} signed writes accepted`, bad === 0, bad ? `${bad} non-200` : `each in its own slot`)
 
-  const warmDump = await get(`/${pid}~process@1.0/now/~lua@5.3a/dump`)
+  const warmDump = await get(`/${pid}~process@1.0/as/dump`)
   ok('warm full-state dump readable', warmDump.status === 200, `${warmDump.body.length} B  sha=${sha(warmDump.body)}`)
 
   // Every write must be present warm, or the restart comparison is meaningless.
@@ -166,14 +166,14 @@ async function waitForNode (timeoutS = 240) {
   ok('post-idle write accepted (puts a snapshot on the last slot)', lateStatus === 200)
   await sleep(3000)
 
-  const preDump = await get(`/${pid}~process@1.0/now/~lua@5.3a/dump`)
+  const preDump = await get(`/${pid}~process@1.0/as/dump`)
   const preSha = sha(preDump.body)
 
   console.log(`\n[3] restart the node`)
   execFileSync('podman', ['restart', CONTAINER], { timeout: 300_000 })
   if (!await waitForNode()) { console.log('ABORT: node did not come back'); process.exit(2) }
 
-  const coldDump = await get(`/${pid}~process@1.0/now/~lua@5.3a/dump`)
+  const coldDump = await get(`/${pid}~process@1.0/as/dump`)
   const coldSha = sha(coldDump.body)
 
   // The tell for WHICH restore path ran. A replay of ~10 slots takes seconds; a snapshot resume is
@@ -203,7 +203,7 @@ async function waitForNode (timeoutS = 240) {
   const postGet = await get(`/${pid}~process@1.0/now/state/claimable/${fpOf(WRITES + 2)}`)
   ok('post-restore write persisted', postGet.status === 200)
 
-  const before = JSON.parse((await get(`/${pid}~process@1.0/now/~lua@5.3a/status`)).body)
+  const before = JSON.parse((await get(`/${pid}~process@1.0/as/status`)).body)
   ok('claimable count consistent with writes', typeof before?.counts?.claimable === 'number',
     `claimable=${before?.counts?.claimable}`)
 

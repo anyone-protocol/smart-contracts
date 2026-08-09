@@ -14,7 +14,7 @@ const OWNER = new Wallet('0x' + KEY).address
 const P = (pid: string) => `${HB}/${pid}~process@1.0`
 const atSlot = async (pid: string) => (await fetch(`${P(pid)}/now/at-slot`)).text().catch(() => '?')
 const claimable = async (pid: string) => {
-  const r = await fetch(`${P(pid)}/now/~lua@5.3a/dump`); const j: any = await r.json().catch(() => ({}))
+  const r = await fetch(`${P(pid)}/as/dump`); const j: any = await r.json().catch(() => ({}))
   return Object.keys(j.claimable ?? {}).map((k) => k[0]).sort().join('') || '∅'
 }
 const submit = async (pid: string, f: string, a = OWNER) => {
