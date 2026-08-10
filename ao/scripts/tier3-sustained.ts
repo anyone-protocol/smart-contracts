@@ -104,10 +104,25 @@ const diskBytes = () => {
   } catch { return 0 }
 }
 const mib = (b: number) => (b / 1024 / 1024).toFixed(0)
-// A base-addressed point read of an absent key answers with an HTML error page, not a number.
-// Coerce anything that is not a plain decimal integer to 0 so a missing balance reads as "no
-// reward yet" instead of throwing and killing the run.
-const amount = (s: string) => /^\d+$/.test(s.trim()) ? BigInt(s.trim()) : 0n
+
+/**
+ * A cumulative balance this suite asserts monotonicity on, read through `as/<view>`.
+ *
+ * It used to be a base-addressed point read (`now/state/TotalAddressReward/<addr>`). D32 moved
+ * the state root out of `base` and into Lua globals, so those paths resolve to nothing and the
+ * node answers with an HTML error page. The old reader coerced any non-numeric answer to 0,
+ * which turned that into ten rounds of "balance did not strictly increase" — a contract defect
+ * that never happened. So: absent is 0 (a hodler with no prior is legitimate), unreadable is a
+ * hard error.
+ */
+type TrackedRead = { view: string, pick: (v: any) => unknown }
+async function readTracked (t: TrackedRead): Promise<bigint> {
+  const picked = t.pick(await view(t.view))
+  if (picked === null || picked === undefined) return 0n
+  const s = String(picked)
+  if (!/^\d+$/.test(s)) throw new Error(`tracked read ${t.view} gave a non-amount: ${s.slice(0, 80)}`)
+  return BigInt(s)
+}
 const sleep = (s: number) => new Promise(r => setTimeout(r, s * 1000))
 async function waitUp () {
   for (let i = 0; i < 120; i++) {
@@ -129,7 +144,7 @@ const chunk = <T>(entries: [string, T][], size: number) => {
 type RoundPlan = {
   timestamp: number
   entries: [string, unknown][]      // top-level Scores entries, batched as-is
-  trackedReads: string[]            // base-addressed point reads that must strictly increase
+  trackedReads: TrackedRead[]       // cumulative balances that must strictly increase
   claimAddress: string              // the address whose claim semantics section D exercises
 }
 
@@ -147,7 +162,8 @@ const stakingSeedRound = RELAY ? null : buildStakingRound(expected.state, WIDTH)
 function pickTrackedPair (): [string, string] {
   for (const [h, ops] of Object.entries(stakingSeedRound!.scores)) {
     for (const [o, s] of Object.entries(ops)) {
-      if (s.Running === 1 && expected.state.Rewarded[h]?.[o] != null) return [h, o]
+      // D32 storage is pair-keyed (`hodler/operator`), not nested — see staking-rewards.lua.
+      if (s.Running === 1 && expected.state.Rewarded[`${h}/${o}`] != null) return [h, o]
     }
   }
   throw new Error('no ungated pair with a seeded prior to track')
@@ -161,8 +177,8 @@ function planRound (round: number): RoundPlan {
       timestamp: r.timestamp,
       entries: Object.entries(r.scores),
       trackedReads: [
-        ...r.tracked.map(fp => `state/TotalFingerprintReward/${fp}`),
-        `state/TotalAddressReward/${r.trackedAddress}`,
+        ...r.tracked.map(fp => ({ view: `rewards?fingerprint=${fp}`, pick: (v: any) => v?.reward })),
+        { view: `rewards?address=${r.trackedAddress}`, pick: (v: any) => v?.reward },
       ],
       claimAddress: r.trackedAddress,
     }
@@ -181,7 +197,10 @@ function planRound (round: number): RoundPlan {
   return {
     timestamp: expected.state.PreviousRound.Timestamp + round * 3600_000,
     entries: Object.entries(scores),
-    trackedReads: [`state/Rewarded/${STAKING_TRACKED_HODLER}/${STAKING_TRACKED_OP}`],
+    trackedReads: [{
+      view: `rewards?address=${STAKING_TRACKED_HODLER}`,
+      pick: (v: any) => v?.Rewarded?.[STAKING_TRACKED_OP],
+    }],
     claimAddress: STAKING_TRACKED_HODLER,
   }
 }
@@ -211,7 +230,7 @@ function planRound (round: number): RoundPlan {
 
   section(`B/C. ${ROUNDS} sustained rounds + cross-round accumulation`)
   const timings: { round: number, msgs: number, addMs: number, completeMs: number, disk: number }[] = []
-  let prevTracked: string[] = await Promise.all(planRound(1).trackedReads.map(k => raw(k).then(s => s.trim())))
+  let prevTracked: bigint[] = await Promise.all(planRound(1).trackedReads.map(readTracked))
   let restarted = false
 
   for (let round = 1; round <= ROUNDS; round++) {
@@ -237,10 +256,10 @@ function planRound (round: number): RoundPlan {
         : `t=${lastRound.Timestamp} period=${lastRound.Period} `
           + `add ${addMs}ms complete ${completed.ms}ms${disk ? ` disk ${mib(disk)}MiB` : ''}`)
 
-    const now = await Promise.all(plan.trackedReads.map(k => raw(k).then(s => s.trim())))
-    const grew = now.every((v, i) => amount(v) > amount(prevTracked[i] || '0'))
+    const now = await Promise.all(plan.trackedReads.map(readTracked))
+    const grew = now.every((v, i) => v > (prevTracked[i] ?? 0n))
     check(`round ${round}: every tracked balance strictly increased`, grew,
-      `${prevTracked[0]?.slice(0, 12)}… -> ${now[0]?.slice(0, 12)}…`)
+      `${prevTracked[0]} -> ${now[0]}`)
     prevTracked = now
 
     // G. Restart mid-life — the snapshot/restore path the rest of the suite never touches.
@@ -280,16 +299,17 @@ function planRound (round: number): RoundPlan {
 
   section('D. Claim-Rewards — claim, keep earning, re-claim')
   const claimAddr = planRound(1).claimAddress
-  const owedPath = RELAY
-    ? `state/TotalAddressReward/${claimAddr}`
-    : `state/Rewarded/${claimAddr}/${STAKING_TRACKED_OP}`
-  const claimedPath = RELAY
-    ? `state/Claimed/${claimAddr}`
-    : `state/Claimed/${claimAddr}/${STAKING_TRACKED_OP}`
+  // Staking serves both maps for a hodler keyed by operator; relay serves a scalar per address.
+  const owedRead: TrackedRead = RELAY
+    ? { view: `rewards?address=${claimAddr}`, pick: v => v?.reward }
+    : { view: `rewards?address=${claimAddr}`, pick: v => v?.Rewarded?.[STAKING_TRACKED_OP] }
+  const claimedRead: TrackedRead = RELAY
+    ? { view: `claimed?address=${claimAddr}`, pick: v => v?.claimed }
+    : { view: `claimed?address=${claimAddr}`, pick: v => v?.claimed?.[STAKING_TRACKED_OP] }
 
-  const owedBefore = (await raw(owedPath)).trim()
+  const owedBefore = await readTracked(owedRead)
   const claimOut = await send(owner, 'Claim-Rewards', { address: claimAddr })
-  const claimedAfter = (await raw(claimedPath)).trim()
+  const claimedAfter = await readTracked(claimedRead)
   check('Claim-Rewards succeeds on a live node', !/error|denied|No rewards/i.test(claimOut.out),
     claimOut.out.slice(0, 80))
   check('claimed == owed at claim time', claimedAfter === owedBefore, `${claimedAfter} vs ${owedBefore}`)
@@ -301,14 +321,14 @@ function planRound (round: number): RoundPlan {
       JSON.stringify({ Scores: Object.fromEntries(b) }))
   }
   await send(owner, 'Complete-Round', { 'round-timestamp': String(extra.timestamp) })
-  const owedLater = (await raw(owedPath)).trim()
-  const claimedLater = (await raw(claimedPath)).trim()
-  check('owed grew after a further round', amount(owedLater) > amount(owedBefore),
-    `${owedBefore} -> ${owedLater}`)
-  check('claimed stayed FROZEN while owed grew', claimedLater === claimedAfter, claimedLater)
+  const owedLater = await readTracked(owedRead)
+  const claimedLater = await readTracked(claimedRead)
+  check('owed grew after a further round', owedLater > owedBefore, `${owedBefore} -> ${owedLater}`)
+  check('claimed stayed FROZEN while owed grew', claimedLater === claimedAfter, String(claimedLater))
 
   await send(owner, 'Claim-Rewards', { address: claimAddr })
-  check('re-claim catches up to the new owed', (await raw(claimedPath)).trim() === owedLater, owedLater)
+  check('re-claim catches up to the new owed', (await readTracked(claimedRead)) === owedLater,
+    String(owedLater))
 
   section('E. the actions no live test has executed')
   // Cancel-Round: stage a round, then discard it. The timestamp must stay ahead of the settled one.
