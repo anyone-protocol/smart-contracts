@@ -5,7 +5,7 @@
 # single run produces every id you then need to pin.
 #
 # Run:
-#   nomad job run publish-modules-stage.hcl
+#   nomad job run publish-modules-live.hcl
 #   nomad alloc logs <alloc-id>
 #
 # ⚠️ RUN ONE OF THESE, NOT ALL THREE. The three jobs exist because Vault scopes a secret to
@@ -40,19 +40,19 @@
 # pinned by the image digest. The seed is not part of them — it rides the spawn message — so one
 # published id serves dev, stage and live alike.
 
-job "publish-modules-stage" {
+job "publish-modules-live" {
   datacenters = [ "ator-fin" ]
   type = "batch"
-  namespace = "stage-protocol"
+  namespace = "live-protocol"
 
   constraint {
     attribute = "${meta.pool}"
-    value = "stage"
+    value = "live-protocol"
   }
 
   reschedule { attempts = 0 }
 
-  task "publish-modules-stage" {
+  task "publish-modules-live" {
     env {
       SCRIPT = "scripts/publish-module.ts"
 
@@ -118,7 +118,7 @@ job "publish-modules-stage" {
       destination = "secrets/keys.env"
       env         = true
       data = <<-EOH
-      {{- with secret "kv/stage-protocol/publish-modules-stage" }}
+      {{- with secret "kv/live-protocol/publish-modules-live" }}
       PUBLISH_KEY="{{ .Data.data.PUBLISH_KEY }}"
       {{ end }}
       EOH
