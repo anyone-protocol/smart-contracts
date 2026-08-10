@@ -148,3 +148,20 @@ export async function createEthSigner(ethSigner: EthereumSigner) {
     return null;
   }
 }
+
+/**
+ * Where generated reports go. One knob, `REPORTS_DIR`, so the location is set in a single place
+ * rather than each script hard-coding a relative traversal out of the repo.
+ *
+ * Default is the migration working notes (`docs/hyperbeam-migration/reports/`), which is where
+ * the rest of the human-facing material lives — `dist/` is gitignored build output and reports
+ * are not build artifacts. That default assumes `docs/` sits beside this repo, which holds on a
+ * workstation checkout and does not in a container; set `REPORTS_DIR` there.
+ */
+export function reportPath (name: string): string {
+  const AO = resolve(import.meta.dir, '..', '..')
+  const dir = process.env.REPORTS_DIR
+    ? resolve(process.env.REPORTS_DIR)
+    : resolve(AO, '../../docs/hyperbeam-migration/reports')
+  return resolve(dir, name)
+}

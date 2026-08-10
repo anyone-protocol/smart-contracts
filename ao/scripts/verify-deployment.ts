@@ -10,7 +10,10 @@
 // writing to it is not verification, it is a second deployment.
 //
 //   CONTRACT=staking-rewards PID=<pid> HB_URL=https://hb-dev.anyone.tech \
-//     bun run scripts/verify-deployment.ts [--behavioral] [--report dist/report.md]
+//     bun run scripts/verify-deployment.ts [--behavioral] [--report <path>]
+//
+// Reports land in docs/hyperbeam-migration/reports/ by default — set REPORTS_DIR to
+// move them, or --report for a one-off. dist/ is gitignored build output, not this.
 //
 // Optional env:
 //   EXPECTED_MODULE_ID  fail loudly if the process is running different code than we published
@@ -20,6 +23,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { reportPath } from './util/helpers'
 
 const AO = path.resolve(import.meta.dir, '..')
 const HB = process.env.HB_URL
@@ -28,7 +32,9 @@ const CONTRACT = process.env.CONTRACT as ContractName
 const NET = process.env.SEED_NET || 'live'
 const BEHAVIORAL = process.argv.includes('--behavioral')
 const reportIdx = process.argv.indexOf('--report')
-const REPORT = reportIdx >= 0 ? process.argv[reportIdx + 1] : path.join(AO, `dist/verify-${CONTRACT}-report.md`)
+const REPORT = reportIdx >= 0
+  ? path.resolve(process.argv[reportIdx + 1])
+  : reportPath(`verify-${CONTRACT}-report.md`)
 
 type ContractName = 'operator-registry' | 'relay-rewards' | 'staking-rewards'
 const CONTRACTS: ContractName[] = ['operator-registry', 'relay-rewards', 'staking-rewards']

@@ -25,6 +25,9 @@
 // Run:
 //   HB_URL=https://hb-dev.anyone.tech bun run scripts/dev-walkthrough.ts
 //   HB_URL=… MODULE_ID_OPREG=… MODULE_ID_RELAY=… MODULE_ID_STAKING=… bun run …  # seeded
+//
+// The report lands in docs/hyperbeam-migration/reports/ by default — set REPORTS_DIR to
+// move them all, or REPORT for this one.
 import { EthereumSigner } from '@dha-team/arbundles'
 import { Wallet } from 'ethers'
 import crypto from 'node:crypto'
@@ -34,11 +37,13 @@ import { fetchNodeAddress, spawnLuaProcess, sendMessage } from './util/hb-client
 import { seedEnvelopeFor } from './util/native-bundle'
 import { buildRelayRound } from './util/relay-round'
 import { buildRound as buildStakingRound } from './util/staking-round'
-import { requireDeployerKey } from './util/helpers'
+import { requireDeployerKey, reportPath } from './util/helpers'
 
 const HB = (process.env.HB_URL || 'https://hb-dev.anyone.tech').replace(/\/+$/, '')
 const AO = path.resolve(import.meta.dir, '..')
-const REPORT = path.resolve(AO, process.env.REPORT || 'dist/dev-walkthrough-report.md')
+const REPORT = process.env.REPORT
+  ? path.resolve(process.env.REPORT)
+  : reportPath('dev-walkthrough-report.md')
 const WIDTH = Number(process.env.WIDTH || 60)
 
 const OWNER_KEY = requireDeployerKey()
