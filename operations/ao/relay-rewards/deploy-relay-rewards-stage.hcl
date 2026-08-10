@@ -55,7 +55,7 @@ job "relay-rewards-stage" {
       # TODO: the durable module id, from publishing this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "REPLACE_WITH_PUBLISHED_MODULE_ID"
+      MODULE_ID = "2NkHWA1fhkpTCIFXnCYf6qGmD-GE271wKRfISDGD-OU"
 
       # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
       # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
