@@ -294,7 +294,7 @@ return {
       local ok, addr = pcall(eip55.checksum, p.address)
       if not ok then return nil end
       local out = { address = addr, blocked = s.blocked[addr] == true,
-                    verified = {}, claimable = {}, hardware = {} }
+                    verified = {}, claimable = {}, hardware = {}, registrationCredits = {} }
       for fp, a in pairs(s.verified) do
         if a == addr then out.verified[fp] = true
           if s.verifiedHardware[fp] then out.hardware[fp] = true end end
@@ -302,6 +302,13 @@ return {
       for fp, a in pairs(s.claimable) do
         if a == addr then out.claimable[fp] = true
           if s.verifiedHardware[fp] then out.hardware[fp] = true end end
+      end
+      -- ADDED for the dashboard (2026-08-09). Its `get_relay_info_for_address` returns
+      -- claimable/verified/registrationCredits/verifiedHardware for one operator; this view
+      -- already covered the first three under different names, so only credits were missing.
+      -- Additive on purpose — nothing that reads this view today sees a changed shape.
+      for fp, a in pairs(s.registrationCredits) do
+        if a == addr then out.registrationCredits[fp] = true end
       end
       return out
     end,
