@@ -26,7 +26,7 @@ job "operator-registry-stage" {
     config {
       network_mode = "host"
       # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:REPLACE_WITH_COMMIT_SHA"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:b98e48dc7ccb91159ef754b13aedfbfbcae76608"
 
       entrypoint = ["bun"]
       command = "run"
