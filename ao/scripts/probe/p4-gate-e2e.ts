@@ -95,8 +95,13 @@ const writeConfig = (gatedPids: string[], opreg = '', gateModuleId = '', deployW
     // public reads, including ones we have nothing to do with. Everything not listed here goes
     // through the gate, which refuses anything unsigned or not aimed at a gated PID.
     // Six entries, matching the jobspec: three PID read carve-outs + the three node devices.
+    // The alternation must name EVERY read verb a consumer uses, because the gate itself
+    // refuses anything unsigned (`n == 0 -> REFUSE`) with no read/write discrimination — so a
+    // read verb missing here is not "slower", it is a 400. `as` is the D32 view path and was
+    // absent from this list until 2026-08-10; `now/at-slot` and `compute&slot=N/results/...`
+    // are the other two the client issues.
     'p4-non-chargable-routes': [
-      ...gatedPids.map(p => ({ template: `^/${p}~process@1.0/(now|compute|slot)` })),
+      ...gatedPids.map(p => ({ template: `^/${p}~process@1.0/(now|compute|slot|as)` })),
       { template: '^/~meta@1.0' },
       { template: '^/~hyperbuddy@1.0' },
       { template: '^/~query@1.0' },
@@ -219,7 +224,9 @@ const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 
   check(/^[A-Za-z0-9_-]{43}$/.test(seededId), 'allowlist seeded before the gate is enabled',
     seededId.slice(0, 46))
 
-  const roles = JSON.parse(await (await fetch(`${HB}/${pid}~process@1.0/compute/~lua@5.3a/roles`)).text())
+  // `roles` is a runtime-served view, so it is read through `as/` like any other. The old
+  // `compute/~lua@5.3a/roles` form predates D32 and now resolves to nothing.
+  const roles = JSON.parse(await (await fetch(`${HB}/${pid}~process@1.0/as/roles`)).text())
   const roleName = Object.keys(roles).find(k => Object.keys(roles[k] ?? {}).some(a => a.startsWith('0x')))!
   const roleAddr = Object.keys(roles[roleName]).find(a => a.startsWith('0x'))!
   console.log(`  role     ${roleName} -> ${roleAddr}\n`)
@@ -327,12 +334,16 @@ const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 
 
   // --- lockdown: the node is not a free read service for processes we do not run ---------
   console.log(`\n  --- lockdown ---`)
-  const readOk = await fetch(`${HB}/${pid}~process@1.0/as/status`)
-  check(readOk.ok, 'unsigned READ of a gated contract is free (D3 public reads)',
-    `HTTP ${readOk.status}`)
-
-  const slotOk = await fetch(`${HB}/${pid}~process@1.0/slot/current`)
-  check(slotOk.ok, 'unsigned /slot read of a gated contract is free', `HTTP ${slotOk.status}`)
+  // Every read verb a consumer actually issues, not just one: `as/<view>` is what ao-client,
+  // api-service and the dashboard use, `now/at-slot` is how sendMessage finds its slot, and
+  // `compute&slot=N/results/output/data` is readSlotOutput. Probing only one of these is how
+  // the missing `as` carve-out survived the D32 migration unnoticed.
+  const READ_PATHS = ['as/status', 'now/at-slot', 'compute/allowlistId', 'slot/current']
+  for (const rp of READ_PATHS) {
+    const r = await fetch(`${HB}/${pid}~process@1.0/${rp}`)
+    check(r.ok, `unsigned READ ${rp} of a gated contract is free (D3 public reads)`,
+      `HTTP ${r.status}`)
+  }
 
   const foreignRead = await fetch(`${HB}/${foreign}~process@1.0/now`)
   check(foreignRead.status === 400,

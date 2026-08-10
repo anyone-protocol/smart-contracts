@@ -296,16 +296,18 @@ for (const env of targets) {
   // Routes 1-3 carry the contract ids. UNGATED they are blanket `^/<pid>` — which exempts
   // WRITES as well as reads, and is the hole the gate closes. GATED they must be narrowed to
   // read verbs only, so `/push` and `/schedule` fall through to the gate.
+  // The read-verb alternation the narrowed routes must carry. It is a constant because the
+  // assertion below and the pid extraction have to agree; they drifted apart once already.
+  const READ_VERBS = '~process@1.0/(now|compute|slot|as)'
   const pids = routes.slice(0, 3).map(t =>
-    String(t).replace(/^\^\//, '').replace(/~process@1\.0\/\(now\|compute\|slot\)$/, ''))
+    String(t).replace(/^\^\//, '').replace(/~process@1\.0\/\((?:[a-z|]+)\)$/, ''))
   check(pids.length === 3 && pids.every(p => /^[A-Za-z0-9_-]{43}$/.test(p)),
     'routes 1-3 rendered real 43-char process ids from Consul KV',
     pids.join(' '))
-  const readOnly = routes.slice(0, 3).every(t =>
-    String(t).endsWith('~process@1.0/(now|compute|slot)'))
+  const readOnly = routes.slice(0, 3).every(t => String(t).endsWith(READ_VERBS))
   if (gated) {
     check(readOnly,
-      'contract routes are narrowed to READ verbs — writes reach the gate',
+      `contract routes are narrowed to READ verbs ${READ_VERBS} — writes reach the gate`,
       routes.slice(0, 3).join(' '))
   } else {
     check(!readOnly,
@@ -352,10 +354,16 @@ for (const env of targets) {
     // The lockdown, stated directly: our contracts keep free public reads (D3), and nothing
     // else on the node does. A generic read carve-out would quietly make this node a free read
     // service for processes we have nothing to do with.
-    const ourReads = await Promise.all(
-      pids.map(p => statusOf(host, `/${p}~process@1.0/now/serialize~json@1.0`)))
-    check(ourReads.every(s => s !== 400), 'unsigned reads of OUR contracts stay free',
-      ourReads.join(' '))
+    // Probe EVERY read verb consumers use, not just `now`. The gate refuses anything unsigned
+    // outright, with no read/write discrimination, so a verb missing from the carve-out is a
+    // hard 400 rather than a slow path. Checking only `now` is what let the D32 move to
+    // `as/<view>` go unnoticed here: `now` stayed in the carve-out the whole time.
+    for (const rp of ['as/status', 'now/serialize~json@1.0', 'compute/allowlistId', 'slot/current']) {
+      const ourReads = await Promise.all(
+        pids.map(p => statusOf(host, `/${p}~process@1.0/${rp}`)))
+      check(ourReads.every(s => s !== 400), `unsigned reads of OUR contracts stay free (${rp})`,
+        ourReads.join(' '))
+    }
   }
 
   const foreignStatus = await statusOf(host, `/${FOREIGN_PID}~process@1.0/now`)
