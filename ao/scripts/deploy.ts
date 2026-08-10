@@ -130,8 +130,31 @@ const envelopePath = path.join(dist, `${contract}-seed.envelope.json`)
 const expectedPath = path.join(dist, `${contract}-seed.expected.json`)
 
 console.log(`=== deploy ${contract} (seed: ${seed}) ===`)
-fs.writeFileSync(bundlePath, buildBundle(`src/contracts/native/${contract}.lua`))
-console.log(`built module (source)  ${path.relative(AO, bundlePath)}`)
+
+// The image BAKES the bundles in at build time and leaves them root-owned and read-only to the
+// runtime user on purpose (Dockerfile-Mainnet): the bytes that get signed should be the bytes
+// that were reviewed, not something this process rewrote a moment before signing them. So do
+// not overwrite one that is already there — VERIFY it instead.
+//
+// That turns two failures into loud ones. Overwriting used to EACCES in the container, because
+// `chown bun:bun dist` changes the directory and not the root-owned files inside it. And on a
+// workstation, blindly reusing whatever sat in dist/ would silently deploy a stale bundle,
+// which is the same landmine build-native-bundle.ts already carries.
+const built = buildBundle(`src/contracts/native/${contract}.lua`)
+if (!fs.existsSync(bundlePath)) {
+  fs.writeFileSync(bundlePath, built)
+  console.log(`built module (source)  ${path.relative(AO, bundlePath)}`)
+} else if (fs.readFileSync(bundlePath, 'utf8') !== built) {
+  console.error(
+    `\n${path.relative(AO, bundlePath)} does not match src/contracts/native/${contract}.lua.\n` +
+    `  In the container that means the image is stale against its own source — rebuild it.\n` +
+    `  On a workstation, rebuild with: bun run scripts/build-native-bundle.ts ${contract}\n` +
+    `  Refusing to deploy bytes that differ from the source they claim to be.`
+  )
+  process.exit(1)
+} else {
+  console.log(`module verified        ${path.relative(AO, bundlePath)} matches source`)
+}
 
 let seedEnvelope: string | undefined
 if (seed !== 'none') {
