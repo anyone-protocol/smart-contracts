@@ -191,6 +191,11 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
     { f: FP_A, a: OP, hw: true }, { f: FP_B, a: OWNER }, { f: FP_C, a: OP }]))
   await send(opSigner, vpid, 'Submit-Fingerprint-Certificate', { 'fingerprint-certificate': FP_A })
   await send(ownerSigner, vpid, 'Block-Operator-Address', { address: norm(OWNER) })
+  // A registration credit for OP, so `operator.registrationCredits` is asserted with real
+  // content rather than as an empty map. That field is what the dashboard's
+  // `get_relay_info_for_address` needs (CONSUMER-REGISTRY.md), so an empty assertion would
+  // not prove it reports anything.
+  await send(ownerSigner, vpid, 'Add-Registration-Credit', { address: norm(OP), fingerprint: FP_C })
 
   for (const v of ['status', 'operators', 'scoring', 'roles', 'version', 'dump']) {
     const r = await viewGet(vpid, v)
@@ -198,10 +203,11 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
     check(`  ${v}: no commitments/+link leak`, !/commitments|\+link/.test(r.body))
   }
   eq('  status counts exact', (await viewGet(vpid, 'status')).json?.counts,
-    { claimable: 2, verified: 1, blocked: 1, hardware: 1, credits: 0 })
+    { claimable: 2, verified: 1, blocked: 1, hardware: 1, credits: 1 })
   eq('  operators = verified − blocked (OP only)', (await viewGet(vpid, 'operators')).json, { [norm(OP)]: true })
   eq('  operator?address=OP footprint', (await viewGet(vpid, 'operator', `?address=${OP}`)).json, {
-    address: norm(OP), blocked: false, verified: { [FP_A]: true }, claimable: { [FP_C]: true }, hardware: { [FP_A]: true } })
+    address: norm(OP), blocked: false, verified: { [FP_A]: true }, claimable: { [FP_C]: true },
+    hardware: { [FP_A]: true }, registrationCredits: { [FP_C]: true } })
   const fps = (await viewGet(vpid, 'fingerprints', `?ids=${FP_A},${FP_B},${FP_D}`)).json
   eq('  fingerprints?ids: FP_A verified', fps?.[FP_A]?.verified, norm(OP))
   eq('  fingerprints?ids: FP_B claimable', fps?.[FP_B]?.claimable, norm(OWNER))
