@@ -50,9 +50,9 @@ job "operator-registry-stage" {
     # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
     # rides the spawn message, selected by `--seed` above.
     env {
-      # Our own node. The client has no default — falling back to a public endpoint is the
-      # failure it exists to prevent.
-      HB_URL = "https://hb-stage.anyone.tech"
+      # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
+      # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
+      # rendered in the template block below instead.
 
       # TODO: the durable module id, from publishing this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
@@ -77,6 +77,9 @@ job "operator-registry-stage" {
       {{- end }}
       {{- range service "loki" }}
       LOKI_URL="http://{{ .Address }}:{{ .Port }}/loki/api/v1/push"
+      {{- end }}
+      {{- range service "hyperbeam-stage-node" }}
+      HB_URL="http://{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
     }
