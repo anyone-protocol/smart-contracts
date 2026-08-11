@@ -26,7 +26,7 @@ job "staking-rewards-stage" {
     config {
       network_mode = "host"
       # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:d6e137a7104b16c1955c9a5db737de5c27ce77d9@sha256:35af094c450f9d602932ca50d5b0f6821930a393fc789017d67458726188ca57"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:081d81e01d7d5d9498235115fb6b8e475812c4aa@sha256:3f74b2b6b0b509a6ac9b73dd210b90a61dc004b3109d2528e625ed8b28c78eba"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "staking-rewards", "--seed", "stage"]
