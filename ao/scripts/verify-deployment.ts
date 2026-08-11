@@ -214,9 +214,25 @@ const timings: { label: string, ms: number }[] = []
   timings.push({ label: 'dump', ms: dumpRes.ms })
   const live = dumpRes.json ?? {}
 
+  // REBUILD the oracle for the requested net rather than trusting whatever is in dist/.
+  // SEED_NET used to only label the report, so a dist/ left over from another net was compared
+  // silently: a stage process checked against a live oracle reported five CRITICAL state
+  // mismatches, all of them the two dumps simply being different. An oracle whose provenance is
+  // "whatever ran here last" cannot support a CRITICAL finding.
+  const seedScript = CONTRACT === 'operator-registry'
+    ? 'build-seed.ts' : `build-${CONTRACT.split('-')[0]}-seed.ts`
+  try {
+    execFileSync('bun', ['run', path.join(AO, 'scripts', seedScript), NET],
+      { cwd: AO, stdio: 'pipe', timeout: 600_000 })
+    console.log(`  rebuilt the ${NET} seed oracle from the dump`)
+  } catch (e: any) {
+    add('MEDIUM', 'state', `could not rebuild the ${NET} seed oracle`,
+      String(e?.stderr ?? e?.message).slice(0, 200))
+  }
+
   if (!fs.existsSync(expectedPath)) {
     add('MEDIUM', 'state', 'no local seed oracle to compare against',
-      `run scripts/build-${CONTRACT === 'operator-registry' ? '' : CONTRACT.split('-')[0] + '-'}seed.ts ${NET} first`)
+      `run scripts/${seedScript} ${NET} first`)
   } else {
     const expectedState = JSON.parse(fs.readFileSync(expectedPath, 'utf8')).state
     let mismatched = 0, missing = 0, checked = 0

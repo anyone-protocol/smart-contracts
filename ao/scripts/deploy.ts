@@ -362,27 +362,36 @@ const ao = createAoClient({
     // Each contract's `status` view names its counts differently, so the mapping is
     // per-contract rather than inferred. Getting this wrong is silent: an unmatched
     // name yields undefined, and undefined === undefined would "pass".
-    const COUNT_MAP: Record<ContractName, [stateKey: string, countKey: string, label: string][]> = {
+    // How the EXPECTED count is derived from the builder's state. `KEYS` is right wherever a key
+    // IS the thing being counted. Staking is not one of those: D32 flattened its storage to
+    // pair keys (`hodler/operator`) while `status` still counts HODLERS, so counting keys there
+    // compares 45 pairs against 24 hodlers and fails a perfectly good deploy.
+    const KEYS = (o: Record<string, unknown>) => Object.keys(o).length
+    const HODLERS = (o: Record<string, unknown>) =>
+      new Set(Object.keys(o).map(k => k.slice(0, k.indexOf('/')))).size
+    type Count = (o: Record<string, unknown>) => number
+    const COUNT_MAP: Record<ContractName,
+      [stateKey: string, countKey: string, label: string, count: Count][]> = {
       'operator-registry': [
-        ['claimable', 'claimable', 'claimable'],
-        ['verified', 'verified', 'verified'],
-        ['blocked', 'blocked', 'blocked'],
-        ['verifiedHardware', 'hardware', 'verified hardware'],
-        ['registrationCredits', 'credits', 'registration credits'],
+        ['claimable', 'claimable', 'claimable', KEYS],
+        ['verified', 'verified', 'verified', KEYS],
+        ['blocked', 'blocked', 'blocked', KEYS],
+        ['verifiedHardware', 'hardware', 'verified hardware', KEYS],
+        ['registrationCredits', 'credits', 'registration credits', KEYS],
       ],
       'relay-rewards': [
-        ['TotalAddressReward', 'addresses', 'addresses'],
-        ['TotalFingerprintReward', 'fingerprints', 'fingerprints'],
-        ['Claimed', 'claimed', 'claimed'],
+        ['TotalAddressReward', 'addresses', 'addresses', KEYS],
+        ['TotalFingerprintReward', 'fingerprints', 'fingerprints', KEYS],
+        ['Claimed', 'claimed', 'claimed', KEYS],
       ],
       'staking-rewards': [
-        ['Rewarded', 'rewardedHodlers', 'Rewarded hodlers'],
-        ['Claimed', 'claimedHodlers', 'Claimed hodlers'],
+        ['Rewarded', 'rewardedHodlers', 'Rewarded hodlers', HODLERS],
+        ['Claimed', 'claimedHodlers', 'Claimed hodlers', HODLERS],
       ],
     }
     let bad = 0, ran = 0
-    for (const [stateKey, countKey, label] of COUNT_MAP[contract]) {
-      const want = expected[stateKey] ? Object.keys(expected[stateKey]).length : undefined
+    for (const [stateKey, countKey, label, count] of COUNT_MAP[contract]) {
+      const want = expected[stateKey] ? count(expected[stateKey]) : undefined
       const got = counts[countKey]
       if (want === undefined || got === undefined) {
         console.log(`  SKIP ${label}: not reported (state=${want}, status=${got})`)
