@@ -70,7 +70,7 @@ job "publish-modules-stage" {
       # Actions -> "Build & Publish AO Mainnet Contracts Image" -> Run workflow -> pick the
       # branch; it tags by commit SHA. The bytes signed below come from this image, so this line
       # is what makes a published id traceable to a commit.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:b98e48dc7ccb91159ef754b13aedfbfbcae76608"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:2fbd8470678523ad6b4e2c9049ceb51d83abff1d"
 
       entrypoint = ["bun"]
       command = "run"
@@ -78,7 +78,9 @@ job "publish-modules-stage" {
         "${SCRIPT}",
 
         # Comment out anything you are not publishing this run.
-        "runtime/write-gate.lua",
+        # write-gate is UNCHANGED since it was published as Jo_Ur2HyzPjlhmt7OGZyfNyTrmwhmySWwo4Mo8bcyZw
+        # (it does not embed runtime/native.lua, so the 2026-08-12 runtime change does not reach it).
+        # "runtime/write-gate.lua",
         "dist/operator-registry-native.lua",
         "dist/relay-rewards-native.lua",
         "dist/staking-rewards-native.lua",
