@@ -70,7 +70,7 @@ job "publish-modules-stage" {
       # Actions -> "Build & Publish AO Mainnet Contracts Image" -> Run workflow -> pick the
       # branch; it tags by commit SHA. The bytes signed below come from this image, so this line
       # is what makes a published id traceable to a commit.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:8739c4b6d49bc65ce6ad08cd2598faa87f245194"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:d1cbc8feab33a68bafd7a87e683f768915fb934d"
 
       entrypoint = ["bun"]
       command = "run"
