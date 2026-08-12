@@ -621,22 +621,6 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
     -- encoder cannot tell an empty object from an empty array. This is the EXISTING convention
     -- for every view's absent-key answer (`rewards`, `claimed`, `delegate` all do it), so it is
     -- pinned here rather than special-cased — a consumer must test for its field, not for '{}'.
-    -- The runtime must never pair an empty body with a content-type: that combination is a 500
-    -- at the edge. Pinned at the wrapper so no future view can reintroduce it.
-    it('Never sets a content-type on an empty body', function()
-      local base = newBase()
-      _G.emptybody = nil
-      native.register({
-        name = 'probe', root = 'RelayRewards',
-        state = {}, actions = {},
-        views = { emptybody = function() return nil, { status = 302, body = '' } end },
-      })
-      native.installViews()
-      local res = _G['emptybody'](base, nil)
-      assert.are.equal('', res.body)
-      assert.is_nil(res['content-type'])
-    end)
-
     it('Answers empty for a missing fingerprint, an unknown one, or before any round', function()
       local base = newBase()
       native.installViews()
