@@ -55,7 +55,7 @@ job "staking-rewards-stage" {
       # TODO: the durable module id, from publishing this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "aV5R_U1R-saSd3_ozxA98XooZ-KSfgE_uivOhOrHdEw"
+      MODULE_ID = "86WPpt4cR5ljwNjH3zN6NhxL_GWcRdN2o1YYdsRezH0"
 
       # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
       # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
