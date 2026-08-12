@@ -621,6 +621,22 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
     -- encoder cannot tell an empty object from an empty array. This is the EXISTING convention
     -- for every view's absent-key answer (`rewards`, `claimed`, `delegate` all do it), so it is
     -- pinned here rather than special-cased — a consumer must test for its field, not for '{}'.
+    -- The runtime must never pair an empty body with a content-type: that combination is a 500
+    -- at the edge. Pinned at the wrapper so no future view can reintroduce it.
+    it('Never sets a content-type on an empty body', function()
+      local base = newBase()
+      _G.emptybody = nil
+      native.register({
+        name = 'probe', root = 'RelayRewards',
+        state = {}, actions = {},
+        views = { emptybody = function() return nil, { status = 302, body = '' } end },
+      })
+      native.installViews()
+      local res = _G['emptybody'](base, nil)
+      assert.are.equal('', res.body)
+      assert.is_nil(res['content-type'])
+    end)
+
     it('Answers empty for a missing fingerprint, an unknown one, or before any round', function()
       local base = newBase()
       native.installViews()
@@ -655,6 +671,11 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       local res = _G['last_snapshot'](base, { redirect = 'true' })
       assert.are.equal(302, res.status)
       assert.are.equal('../compute&slot=9/results/output/data', res.location)
+      -- The body must be NON-EMPTY. Empty + a content-type answers 500 through the nginx edge
+      -- while HEAD still returns 302, so it looks healthy until a browser GETs it.
+      assert.is_truthy(res.body and #res.body > 0)
+      assert.are.equal(9, json.decode(res.body).Slot)
+      assert.are.equal('compute&slot=9/results/output/data', json.decode(res.body).Path)
       -- the slot must render as an integer: '9.0' would 404 the follow-up fetch
       assert.is_falsy(res.location:find('9.0', 1, true))
       -- '1' is also accepted, and anything else is NOT a redirect

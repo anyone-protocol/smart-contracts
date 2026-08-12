@@ -732,10 +732,18 @@ return {
       if slot <= 0 then
         return nil, { status = 404, body = '{"error":"no round has settled yet"}' }
       end
+      -- 🚨 The body must NOT be empty. An empty body combined with an explicit content-type
+      -- (which the view wrapper always sets) answers 500 through the nginx edge, while HEAD
+      -- still returns 302 — so it looks fine until a browser actually GETs it. Verified on
+      -- hb-dev 2026-08-12: empty+content-type 500s, non-empty+content-type is a clean 302.
+      -- A direct-to-node request does NOT reproduce it, which is why Tier-3 missed it.
+      -- Carrying the pointer as the body is useful anyway: a client that does not follow
+      -- redirects still gets the answer.
+      local path = 'compute&slot=' .. tostring(slot) .. '/results/output/data'
       return nil, {
         status = 302,
-        location = '../compute&slot=' .. tostring(slot) .. '/results/output/data',
-        body = '',
+        location = '../' .. path,
+        body = '{"Slot":' .. tostring(slot) .. ',"Path":"' .. path .. '"}',
       }
     end,
 
