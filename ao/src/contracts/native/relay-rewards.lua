@@ -15,11 +15,18 @@
 ---     ingress (Add-Scores `score.Address`, Set-Delegate, Claim/Get `Address`) runs through
 ---     `eip55.checksum` (validate + canonicalize; rejects a mixed-case bad checksum). `Complete-Round`
 ---     then uses the already-canonical stored addresses verbatim.
----   * `PreviousRound.Details` (the 3.6 MB per-fingerprint breakdown) is NOT persisted. `Complete-Round`
----     returns the full snapshot (Timestamp/Period/Summary/Configuration/Details) as its OUTPUT — a
----     per-slot result, addressable at the settle slot, never re-serialized into base.state. Only the
----     small `PreviousRound` summary persists. Consumers (controller persistRound, dashboard
----     Last-Round-Data) read Details from the Complete-Round slot output. See D27.
+---   * `PreviousRound.Details` (the per-fingerprint breakdown, 3.25 MB / 6,010 entries in the live
+---     dump) IS persisted — but as a PRE-ENCODED JSON STRING, `PreviousRound.DetailsJson`, never as
+---     a Lua table. D27 originally dropped it because a live table cost ~30,000 Lua tables that every
+---     slot re-serializes; a string costs ONE value, stores each fingerprint key once, and needs no
+---     `json.encode` on read. Nothing computes on Details (the reward math uses the LOCAL `roundData`
+---     built during settlement), so a string loses nothing. Served by the `last_round_details` view,
+---     which returns it as the response body verbatim. See `Complete-Round` for the full rationale.
+---   * `Complete-Round` ALSO still returns the whole snapshot (incl. Details) as its OUTPUT, for
+---     archival consumers that want the entire round (controller persistRound). `PreviousRound.Slot`
+---     records the settle slot so that payload stays findable in one read (`last_round` →
+---     `compute&slot=<Slot>/results/output/data`). Note you cannot base-address INTO that output —
+---     `.../data` is the whole JSON, `.../data/Details` 404s (D29 §2b).
 ---   * Dropped: the Handlers registry + tag-matching, all `patch@1.0` sends, all `*-Response` sends,
 ---     the `Get-*/View-*/Last-*` read handlers (now `views` / base-addressing). Update-Roles/View-Roles
 ---     are runtime built-ins.
@@ -180,6 +187,14 @@ return {
     },
     PreviousRound = {   -- summary ONLY (no Details — see header)
       Timestamp = 0,
+      -- The slot `Complete-Round` settled on, i.e. where the full Details payload can be read
+      -- (`compute&slot=<Slot>/results/output/data`). 0 = no round has settled yet, the same
+      -- "unset" convention Timestamp already uses — a consumer must gate on Timestamp > 0
+      -- before fetching, because slot 0 is the spawn and would return unrelated output.
+      Slot = 0,
+      -- [fingerprint] = pre-encoded JSON string for that relay's line in the last round. Strings,
+      -- never nested tables — see the rationale in `Complete-Round`. Empty until a round settles.
+      DetailsJson = {},
       Period = 0,
       Summary = {
         Ratings = { Network = '0', Uptime = '0', ExitBonus = '0' },
@@ -489,6 +504,9 @@ return {
         end
 
         local roundDataWithStringRewards = {}
+        -- Per-fingerprint PRE-ENCODED JSON, the persisted read surface (see below). Built in the
+        -- same pass so the two shapes cannot diverge: same table, encoded once, right here.
+        local detailsJson = {}
 
         for fingerprint, ratedData in pairs(roundData) do
           roundDataWithStringRewards[fingerprint] = {}
@@ -505,6 +523,7 @@ return {
             Uptime = tostring(ratedData.Reward.Uptime),
             ExitBonus = tostring(ratedData.Reward.ExitBonus)
           }
+          detailsJson[fingerprint] = json.encode(roundDataWithStringRewards[fingerprint])
         end
 
         local summaryOut = {
@@ -522,12 +541,37 @@ return {
           }
         }
 
-        -- PERSIST the summary only (no Details). Details ride the output below.
+        -- PERSIST the summary, plus Details as PER-FINGERPRINT PRE-ENCODED JSON STRINGS.
+        --
+        -- Details are read-only reporting — no contract logic computes on them (audited: the
+        -- reward math works on the LOCAL `roundData` above, and the only legacynet read was the
+        -- `Last-Round-Data` handler). Since nothing indexes it in Lua and every consumer wants
+        -- JSON anyway, strings are strictly the cheapest representation:
+        --   * ONE table of strings, not ~30,000 live Lua tables (6,010 fingerprints x 5 nested
+        --     maps) for every slot to re-serialize.
+        --   * Keyed by fingerprint because that is how it is READ — the dashboard asks for one
+        --     relay at a time (legacynet `Last-Round-Data` took a Fingerprint tag). A point
+        --     read is ~570 B instead of the 3.25 MB a single whole-round blob would force.
+        --   * NOTHING to encode on read: the view returns the stored string as the response
+        --     body. Every other view pays a `json.encode` per request.
+        --   * Float fidelity is exact by construction — encoded ONCE, above, from the same
+        --     table that produces the settle-slot output, so the multipliers never make a
+        --     float -> string -> float trip (the trap D28's header calls out).
+        --   * NOT parallel typed maps (staking's D28 pattern): that shape duplicates the
+        --     40-char fingerprint key per leaf field, measuring 120,200 stored keys / 4.6 MB of
+        --     keys alone at this cardinality. It fits staking's 636 pairs, not relay's 6,010.
+        --
+        -- `Slot` records this settlement's own slot so the WHOLE round stays retrievable from
+        -- `compute&slot=<Slot>/results/output/data` — that is the path the controller uses to
+        -- publish each round's full Details to Arweave, which state deliberately does not serve.
+        -- `or 0` covers the Tier-1/2 harness, which has no assignment.
         state.PreviousRound = {
           Timestamp = timestamp,
+          Slot = ctx.slot or 0,
           Period = bint.tonumber(roundLength),
           Summary = summaryOut,
           Configuration = state.Configuration,
+          DetailsJson = detailsJson,
         }
 
         for roundStamp, _ in pairs(state.PendingRounds) do
@@ -540,6 +584,7 @@ return {
         -- dashboard Last-Round-Data). Matches legacynet Last-Snapshot's payload.
         return json.encode({
           Timestamp = timestamp,
+          Slot = ctx.slot or 0,   -- self-identifying: confirms a fetch landed on the right slot
           Period = bint.tonumber(roundLength),
           Summary = summaryOut,
           Configuration = state.Configuration,
@@ -632,10 +677,27 @@ return {
     last_round = function(s)
       return {
         Timestamp = s.PreviousRound.Timestamp,
+        Slot = s.PreviousRound.Slot,   -- the settle slot, for whole-round archival consumers
         Period = s.PreviousRound.Period,
         Summary = s.PreviousRound.Summary,
         Configuration = s.PreviousRound.Configuration,
       }
+    end,
+
+    -- ONE relay's line in the last round — the legacynet `Last-Round-Data` read, which also
+    -- took a Fingerprint. Kept OUT of `last_round` deliberately: that view is small metadata
+    -- polled often, this one is per-relay detail.
+    --
+    -- Returns the STORED STRING as the response body, with no encode step: `DetailsJson[fp]`
+    -- was encoded at settle time. That is the point of storing strings — the read path does no
+    -- work proportional to the round's size.
+    --
+    -- Missing/unknown fingerprint returns nil (the wrapper answers `{}`), matching what
+    -- `rewards`/`claimed`/`delegate` already do for an absent key. The WHOLE round is not
+    -- served here; it lives at the settle slot (see `last_round.Slot`).
+    last_round_details = function(s, p)
+      if not (p and p.fingerprint) then return nil end
+      return s.PreviousRound.DetailsJson[p.fingerprint]
     end,
 
     -- Operational visibility + liveness/wedge probe.

@@ -68,6 +68,45 @@ local function deepcopy(v)
 end
 native.deepcopy = deepcopy
 
+--- Integer coercion for ASSIGNMENT fields (`slot`, `timestamp`), which arrive as strings.
+---
+--- NOT `tonumber`. Under luerl — the VM the node actually runs — `tonumber('7')` returns the
+--- FLOAT 7.0, where Lua 5.3 returns the integer 7. Tier-1 therefore cannot see this at all.
+--- A float leaks into anything a contract persists or emits from these fields: `tostring` gives
+--- '7.0', so a consumer that builds `compute&slot=7.0` from the `last_round` view gets a 404
+--- instead of the round Details, and staking's `RequestedTimestamp` would be stored as a float
+--- alongside the integers the migration seed carries.
+---
+--- Mirrors `utils.parseInt` (A12) rather than requiring it: the runtime deliberately has no
+--- contract-side dependencies, and this must work before any contract module is loaded.
+--- Returns nil for nil, a non-integral number, or anything that is not all digits.
+local function toInt(v)
+  if type(v) == 'number' then
+    if v % 1 ~= 0 then return nil end
+    -- Normalize the SUBTYPE via tostring ('7.0' → 7), not string.format or math.tointeger.
+    -- luerl rejects an INTEGER argument to a %f directive outright — `string.format('%.0f', 7)`
+    -- throws `badarg` there while working fine on 5.3 — and its math table is partial. tostring
+    -- is safe on both. Anything tostring renders in exponent form falls through to `v`, which is
+    -- already integral: no throw, worst case an unconverted float from a harness. The node only
+    -- ever delivers these fields as strings, so that path is defensive only.
+    local digits = tostring(v):match('^(%-?%d+)%.?0*$')
+    return digits and toInt(digits) or v
+  end
+  if type(v) ~= 'string' then return nil end
+  local a, neg = v, false
+  if a:sub(1, 1) == '-' then neg, a = true, a:sub(2) end
+  if #a == 0 then return nil end
+  local n = 0                             -- integer accumulator: stays integer under both VMs
+  for k = 1, #a do
+    local b = a:byte(k)
+    if b < 48 or b > 57 then return nil end
+    n = n * 10 + (b - 48)
+  end
+  if neg then n = -n end
+  return n
+end
+native.toInt = toInt
+
 -- ===========================================================================
 -- Section R — the state root (D31/D32)
 -- ===========================================================================
@@ -560,7 +599,10 @@ function native.view(base, name, params)
   local c = native._contract
   local v = c and c.views and c.views[name]
   if not v then return nil, 'unknown view: ' .. tostring(name) end
-  local result = v(viewState(), params)
+  -- A view MAY return a second value: a response message it wants to control (content-type,
+  -- status, any header). Forwarded verbatim to installViews — the runtime's JSON default is a
+  -- default, not a mandate. Views that return one value are unaffected.
+  local result, response = v(viewState(), params)
   -- Enrich the operational `status` view with runtime-owned identity/version so one
   -- GET answers "who owns this, what code is live, is it initialized, and its shape".
   if name == 'status' and type(result) == 'table' then
@@ -576,7 +618,7 @@ function native.view(base, name, params)
     -- — it polls this view to know when a spawn has materialized before diffing the seed.
     result.initialized = stateRoot() ~= nil
   end
-  return result
+  return result, response
 end
 
 -- ===========================================================================
@@ -689,8 +731,23 @@ function native.installViews()
   if c and c.views then for name in pairs(c.views) do names[#names + 1] = name end end
   for _, name in ipairs(names) do
     _G[name] = function(base, req)
-      return { body = require('json').encode(native.view(base, name, req) or {}),
-               ['content-type'] = 'application/json' }
+      local v, response = native.view(base, name, req)
+      -- The response message the view asked for, if any. A view returning a second value owns
+      -- the response: content-type, HTTP status (`status = 302` IS honoured — hb_http reads it
+      -- off this message and defaults to 200), Location, any header. Everything below is a
+      -- DEFAULT applied only where the view stayed silent.
+      local res = type(response) == 'table' and response or {}
+      if type(v) == 'string' then
+        -- Already encoded by the view — pass through verbatim. This is what lets a contract
+        -- hold a large read-only block as ONE pre-encoded JSON string instead of a live Lua
+        -- table: nothing to walk on write, nothing to encode on read. Re-encoding here would
+        -- turn it into a quoted string literal.
+        res.body = v
+      elseif res.body == nil then
+        res.body = require('json').encode(v or {})
+      end
+      if res['content-type'] == nil then res['content-type'] = 'application/json' end
+      return res
     end
   end
 end
@@ -759,7 +816,10 @@ local function protectedCompute(base, req)
   -- backdating assert. Comparing this wall clock against a round timestamp mixes two independent
   -- clocks (SU host vs controller host), so host skew shifts the result — accepted deliberately in
   -- staking-rewards to keep that port faithful to legacynet; see its header.
-  local timestamp = tonumber(req['timestamp'])
+  -- toInt, not tonumber: see Section U. `or tonumber(...)` keeps the previous behaviour for any
+  -- value that is not a plain integer string, so this can only tighten the type, never drop a
+  -- timestamp the contracts used to receive.
+  local timestamp = toInt(req['timestamp']) or tonumber(req['timestamp'])
 
   local ctx = {
     from   = from,
@@ -768,6 +828,13 @@ local function protectedCompute(base, req)
     tags   = tags,
     data   = body.data,
     timestamp = timestamp,                       -- ms, or nil if unassigned (read path/harness)
+    -- THIS SLOT's number, for a contract that needs to record where its own output landed
+    -- (relay-rewards `Complete-Round` → `PreviousRound.Slot`, so a consumer can fetch the full
+    -- round breakdown from `compute&slot=<n>/results/output/data` without Details ever entering
+    -- state). Same provenance class as `timestamp`: present on the assignment and INSIDE the
+    -- signed commitment (D29 §2), so it is deterministic across replay and not sender-forgeable.
+    -- nil off the write path (Tier-1/2 harness), exactly like `timestamp`.
+    slot   = toInt(req['slot']),
     state  = stateRoot(),                        -- the mutable contract state tree (_G[root])
     send   = function(m) table.insert(ao.outbox.Messages, m); return m end,
     -- Contract-side allowlist maintenance, for writers implied by STATE rather than by an ACL

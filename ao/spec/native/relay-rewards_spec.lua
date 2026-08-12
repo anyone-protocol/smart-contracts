@@ -567,6 +567,76 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.are.equal('0', RelayRewards.TotalFingerprintReward[FP_A])
       assert.is_nil(RelayRewards.PreviousRound.Details)   -- Details NOT persisted
     end)
+
+    -- The settle-slot pointer (D29 §2). Because Details are never persisted, the settlement has
+    -- to record WHERE its own output landed or consumers would have to scan backwards for the
+    -- last Complete-Round. `slot` rides the ASSIGNMENT (req), not req.body — the same level as
+    -- `timestamp` — and the node delivers it as a string.
+    it('Records its own settle slot, on the output and the persisted summary', function()
+      local base = newBase()
+      assert.are.equal(0, view(base, 'last_round').Slot)   -- unset until a round settles
+      addScores(base, { [FP_A] = score(ALICE) }, 1000)
+      local req = assign('Complete-Round', OWNER, nil, { ['Round-Timestamp'] = '1000' })
+      req.slot = '7'
+      local snap = json.decode(outData(compute(base, req)))
+      assert.are.equal(7, snap.Slot)                       -- self-identifying output
+      assert.are.equal(7, RelayRewards.PreviousRound.Slot)
+      assert.are.equal(7, view(base, 'last_round').Slot)
+    end)
+
+    -- Details are persisted as PER-FINGERPRINT pre-encoded JSON strings, so nothing walks or
+    -- re-encodes them, and a point read costs one key lookup.
+    it('Persists Details as per-fingerprint JSON strings matching the output', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE), [FP_B] = score(BOB) }, 1000)
+      local snap = json.decode(outData(completeRound(base, 1000)))
+      local stored = RelayRewards.PreviousRound.DetailsJson
+      assert.is_nil(RelayRewards.PreviousRound.Details)          -- not under the old name
+      assert.are.equal('string', type(stored[FP_A]))             -- VALUES are strings...
+      assert.are.equal('string', type(stored[FP_B]))
+      -- ...and each decodes to exactly that fingerprint's line in the output, so the settle-slot
+      -- payload and the state read cannot diverge.
+      assert.are.same(snap.Details[FP_A], json.decode(stored[FP_A]))
+      assert.are.same(snap.Details[FP_B], json.decode(stored[FP_B]))
+    end)
+
+    it('Serves one fingerprint through the view with no re-encoding', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE) }, 1000)
+      completeRound(base, 1000)
+      -- native.view hands back the raw stored string...
+      local raw = view(base, 'last_round_details', { fingerprint = FP_A })
+      assert.are.equal('string', type(raw))
+      assert.are.equal(ALICE, json.decode(raw).Address)
+      -- ...and the installed global wraps it as the BODY verbatim. Re-encoding would yield a
+      -- quoted string literal ('"{\\"...\\"}"'), so assert the body still parses as an object.
+      native.installViews()
+      local res = _G['last_round_details'](base, { fingerprint = FP_A })
+      assert.are.equal(raw, res.body)
+      assert.are.equal('application/json', res['content-type'])
+      assert.are.equal(ALICE, json.decode(res.body).Address)
+    end)
+
+    -- Empty answers are '[]', not '{}': the wrapper's default is `json.encode({})` and the
+    -- encoder cannot tell an empty object from an empty array. This is the EXISTING convention
+    -- for every view's absent-key answer (`rewards`, `claimed`, `delegate` all do it), so it is
+    -- pinned here rather than special-cased — a consumer must test for its field, not for '{}'.
+    it('Answers empty for a missing fingerprint, an unknown one, or before any round', function()
+      local base = newBase()
+      native.installViews()
+      assert.are.equal('[]', _G['last_round_details'](base, nil).body)              -- no param
+      assert.are.equal('[]', _G['last_round_details'](base, { fingerprint = FP_A }).body)
+      addScores(base, { [FP_A] = score(ALICE) }, 1000); completeRound(base, 1000)
+      assert.are.equal('[]', _G['last_round_details'](base, { fingerprint = FP_C }).body)
+      assert.is_not_nil(view(base, 'last_round_details', { fingerprint = FP_A }))
+    end)
+
+    it('Falls back to slot 0 with no assignment (Tier-1/2 harness path)', function()
+      local base = newBase()
+      addScores(base, { [FP_A] = score(ALICE) }, 1000)
+      assert.are.equal(0, json.decode(outData(completeRound(base, 1000))).Slot)
+      assert.are.equal(0, RelayRewards.PreviousRound.Slot)
+    end)
   end)
 
   -- =========================================================================

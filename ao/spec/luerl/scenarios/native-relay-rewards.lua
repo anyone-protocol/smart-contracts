@@ -55,4 +55,50 @@ local key = eip55.checksum(ADDR)
 check('TotalAddressReward[eip55(addr)]', S().TotalAddressReward[key] == '1215277736400000000', S().TotalAddressReward[key])
 check('address key is EIP-55 (not legacy ALLCAPS)', key ~= string.upper(ADDR), key)
 
+-- === Details persisted as a PRE-ENCODED JSON STRING ===
+-- Belongs here as well as Tier-1 because the float multipliers must survive luerl's encoder:
+-- storing the string means they are encoded ONCE, by the same call that builds the output, so
+-- the two read paths cannot drift. Tier-1 runs a different encoder host.
+local dj = pr.DetailsJson
+check('DetailsJson values are strings', type(dj) == 'table' and type(dj[FP]) == 'string',
+  type(dj) == 'table' and type(dj[FP]) or type(dj))
+check('Details NOT persisted as a table', pr.Details == nil, tostring(pr.Details))
+local djDecoded = type(dj) == 'table' and type(dj[FP]) == 'string' and json.decode(dj[FP]) or {}
+check('DetailsJson[fp] matches the output Details[fp]',
+  json.encode(djDecoded) == json.encode(snap.Details[FP]), json.encode(djDecoded))
+check('float multipliers survive verbatim',
+  djDecoded.Variables and djDecoded.Variables.FamilyMultiplier == snap.Details[FP].Variables.FamilyMultiplier,
+  tostring(djDecoded.Variables and djDecoded.Variables.FamilyMultiplier))
+-- The view must hand back the body VERBATIM. A re-encode would produce a quoted string literal,
+-- so the body would start with '"' instead of '{'.
+native.installViews()
+local djRes = _G['last_round_details'](base, { fingerprint = FP })
+check('view body is the stored string', djRes.body == dj[FP], string.sub(tostring(djRes.body), 1, 40))
+check('view body is an object, not a quoted string', string.sub(djRes.body, 1, 1) == '{',
+  string.sub(djRes.body, 1, 40))
+check('view content-type', djRes['content-type'] == 'application/json', djRes['content-type'])
+check('unknown fingerprint answers empty',
+  _G['last_round_details'](base, { fingerprint = string.rep('F', 40) }).body == '[]',
+  _G['last_round_details'](base, { fingerprint = string.rep('F', 40) }).body)
+
+-- === settle-slot pointer (D29 §2) — MUST be an integer end to end ===
+-- The node delivers `slot` on the assignment as a STRING, and under luerl `tonumber('7')` is
+-- where this can go wrong: a float would serialize as `7.0`, and a consumer building
+-- `compute&slot=7.0` from the view gets a 404 rather than the Details payload. Tier-1 cannot
+-- see this — it runs Lua 5.3, not the device VM — so the type check belongs here.
+local T3 = 1120000
+run('Add-Scores', scores(1000), T3)
+local slotReq = assign('Complete-Round', nil, T3)
+slotReq.slot = '7'                                  -- assignment level, as the scheduler sends it
+compute(base, slotReq)
+local pr3 = S().PreviousRound
+local snap3 = json.decode(base.results.output.data)
+check('PreviousRound.Slot == 7', pr3.Slot == 7, pr3.Slot)
+check('Slot is an INTEGER, not 7.0', tostring(pr3.Slot) == '7', tostring(pr3.Slot))
+check('last_round view exposes Slot', native.view(base, 'last_round').Slot == 7,
+  native.view(base, 'last_round').Slot)
+check('Complete-Round output carries Slot', snap3.Slot == 7, snap3.Slot)
+check('Slot survives JSON encode as 7', json.encode({ s = pr3.Slot }):find('"s":7', 1, true) ~= nil,
+  json.encode({ s = pr3.Slot }))
+
 return { pass = pass, fail = fail, failures = failures }

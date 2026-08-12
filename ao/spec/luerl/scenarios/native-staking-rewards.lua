@@ -109,6 +109,13 @@ run('Set-Share', json.encode({ Share = 0.42 }), nil, T2 + 1000)                 
 check('queued, not applied', S().Shares[OWNER] == nil, tostring(S().Shares[OWNER]))
 check('pending recorded ms', S().PendingShareChanges[OWNER].RequestedTimestamp == T2 + 1000,
   tostring(S().PendingShareChanges[OWNER].RequestedTimestamp))
+-- ...and as an INTEGER. `ctx.timestamp` used to be `tonumber(req['timestamp'])`, which under
+-- luerl yields a FLOAT — so this PERSISTED field would read back '1783064051855.0' while the
+-- same field arriving from the migration seed is an integer. `==` cannot see the difference;
+-- tostring can. Tier-1 is blind to it entirely (Lua 5.3 returns an integer there).
+check('RequestedTimestamp is an INTEGER, not <ms>.0',
+  tostring(S().PendingShareChanges[OWNER].RequestedTimestamp) == tostring(T2 + 1000),
+  tostring(S().PendingShareChanges[OWNER].RequestedTimestamp))
 
 round(T2 + 3600 * 1000, all)   -- one hour later: under the legacy ms+seconds bug this would apply
 check('7-day delay NOT elapsed after 1h', S().Shares[OWNER] == nil, tostring(S().Shares[OWNER]))

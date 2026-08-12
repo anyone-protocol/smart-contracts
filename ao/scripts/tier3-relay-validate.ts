@@ -135,7 +135,55 @@ const diffMap = (got: Record<string, unknown>, want: Record<string, unknown>) =>
   console.log(`  (round add+complete ${roundMs}ms)`)
 
   // Details NOT persisted
-  check(dump.PreviousRound?.Details === undefined, 'Details never persisted in state', 'ok')
+  // Details ARE persisted now, but only as the pre-encoded `DetailsJson` string — never as a
+  // live Lua table, which is the shape that cost ~30,000 tables per slot.
+  // NB: `dump` above is the PRE-round (seeded) state, so this asserts the legacynet dump's
+  // nested Details never made it into state at seed time.
+  check(dump.PreviousRound?.Details === undefined, 'Details never persisted as a TABLE', 'ok')
+  // Post-round shape needs a FRESH dump. DetailsJson is fingerprint -> pre-encoded STRING; the
+  // values being strings is the whole point — no nested tables for a slot to walk, no encode on
+  // the read path.
+  const postDump = await view('dump')
+  const dj = postDump.PreviousRound?.DetailsJson
+  const djVals = dj && typeof dj === 'object' ? Object.values(dj) : []
+  check(djVals.length === 3 && djVals.every(v => typeof v === 'string'),
+    'DetailsJson persisted as per-fingerprint strings',
+    `${djVals.length} entries, all strings: ${djVals.every(v => typeof v === 'string')}`)
+
+  // 6) SETTLE-SLOT POINTER round trip. Details are deliberately absent from state, so the only
+  // thing making them retrievable is `Complete-Round` recording the slot it landed on. This is
+  // the read a consumer actually performs: view -> slot number -> that slot's output. It is
+  // asserted here rather than in Tier-1/2 because the slot only exists on a real assignment.
+  // 6a) The DASHBOARD read path: one relay's line, straight from state, no encode on read.
+  // This is the legacynet `Last-Round-Data` shape (it took a Fingerprint too).
+  console.log('\n6a) last_round_details?fingerprint= (per-relay point read):')
+  for (const fp of [FP1, FP2, FP3]) {
+    const r = await fetch(`${HB}/${pid}~process@1.0/as/last_round_details?fingerprint=${fp}`)
+    const t = await r.text()
+    check(r.ok, `Details[${fp.slice(0, 4)}…] readable`, `${r.status} ${t.length}B`)
+    // A re-encode would hand back a quoted string literal rather than an object.
+    check(t.startsWith('{'), `Details[${fp.slice(0, 4)}…] is an object, not a quoted string`,
+      t.slice(0, 32))
+    // Byte-identical to what the settle-slot output carries: one encode, two read paths.
+    check(JSON.stringify(JSON.parse(t)) === JSON.stringify(snap.Details[fp]),
+      `Details[${fp.slice(0, 4)}…] matches the settle-slot output exactly`, 'ok')
+  }
+  const dRes = await fetch(`${HB}/${pid}~process@1.0/as/last_round_details?fingerprint=${'F'.repeat(40)}`)
+  check((await dRes.text()) === '[]', 'unknown fingerprint answers empty', 'ok')
+
+  console.log('\n6b) settle-slot pointer (last_round.Slot -> that slot\'s output):')
+  const lastRound = await view('last_round')
+  const slot = lastRound?.Slot
+  check(Number.isInteger(slot) && slot > 0, 'last_round.Slot is a positive integer', String(slot))
+  const atSlot = await fetch(`${HB}/${pid}~process@1.0/compute&slot=${slot}/results/output/data`)
+  const atSlotText = await atSlot.text()
+  check(atSlot.ok, `slot ${slot} output readable`, `${atSlot.status}`)
+  const atSlotJson = atSlot.ok ? JSON.parse(atSlotText) : {}
+  check(atSlotJson.Timestamp === T, 'slot output is THIS round', `${atSlotJson.Timestamp} vs ${T}`)
+  check(atSlotJson.Slot === slot, 'slot output self-identifies', `${atSlotJson.Slot}`)
+  for (const fp of [FP1, FP2, FP3]) {
+    check(!!atSlotJson.Details?.[fp], `Details[${fp.slice(0, 4)}…] retrievable from the slot`, 'ok')
+  }
 
   console.log(`\n${fails === 0 ? 'ALL PASS' : fails + ' FAILURE(S)'}  —  pid=${pid}`)
   process.exit(fails ? 1 : 0)
