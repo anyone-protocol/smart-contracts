@@ -26,7 +26,7 @@ job "relay-rewards-stage" {
     config {
       network_mode = "host"
       # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:081d81e01d7d5d9498235115fb6b8e475812c4aa@sha256:3f74b2b6b0b509a6ac9b73dd210b90a61dc004b3109d2528e625ed8b28c78eba"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:2fbd8470678523ad6b4e2c9049ceb51d83abff1d@sha256:78650f21aea24286d9855a3e9b19c1b36379d283084c94bae2b0ba273119539f"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage"]
