@@ -700,6 +700,45 @@ return {
       return s.PreviousRound.DetailsJson[p.fingerprint]
     end,
 
+    -- legacynet `Last-Snapshot`: the WHOLE last round, Details included. That payload is not in
+    -- state by design (state carries only the per-fingerprint `DetailsJson` strings), so it
+    -- lives at the slot `Complete-Round` settled on. This view is the convenience hop to it.
+    --
+    --   as/last_snapshot                -> { Slot, Timestamp, Period, Path }, so a caller can
+    --                                      build the fetch itself
+    --   as/last_snapshot?redirect=true  -> 302 straight at that slot's output
+    --
+    -- The Location is RELATIVE on purpose. A view is handed (state, params) and never sees the
+    -- process id, so it cannot build an absolute URL; `../compute&…` resolves against the
+    -- request path `/<pid>~process@1.0/as/last_snapshot` back to
+    -- `/<pid>~process@1.0/compute&slot=<n>/results/output/data`, which is the same hop without
+    -- the contract having to know who it is.
+    --
+    -- Redirecting before any round has settled would point at slot 0 (the spawn) and hand back
+    -- unrelated output, so that answers 404 rather than a wrong 200.
+    last_snapshot = function(s, p)
+      local pr = s.PreviousRound
+      local slot = pr.Slot or 0
+      local wants = p and (p.redirect == 'true' or p.redirect == '1')
+      if not wants then
+        return {
+          Slot = slot,
+          Timestamp = pr.Timestamp,
+          Period = pr.Period,
+          -- relative to `/<pid>~process@1.0/`
+          Path = 'compute&slot=' .. tostring(slot) .. '/results/output/data',
+        }
+      end
+      if slot <= 0 then
+        return nil, { status = 404, body = '{"error":"no round has settled yet"}' }
+      end
+      return nil, {
+        status = 302,
+        location = '../compute&slot=' .. tostring(slot) .. '/results/output/data',
+        body = '',
+      }
+    end,
+
     -- Operational visibility + liveness/wedge probe.
     status = function(s)
       local function count(t) local n = 0; for _ in pairs(t) do n = n + 1 end; return n end

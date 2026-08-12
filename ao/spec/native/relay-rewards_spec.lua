@@ -631,6 +631,38 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       assert.is_not_nil(view(base, 'last_round_details', { fingerprint = FP_A }))
     end)
 
+    -- The convenience hop to the whole round, which lives at the settle slot rather than state.
+    it('last_snapshot points at the settle slot, and redirects on request', function()
+      local base = newBase()
+      native.installViews()
+      -- before any round: no redirect, because slot 0 is the spawn and would serve wrong data
+      local pre = _G['last_snapshot'](base, { redirect = 'true' })
+      assert.are.equal(404, pre.status)
+      assert.is_truthy(has(pre.body, 'no round has settled'))
+
+      addScores(base, { [FP_A] = score(ALICE) }, 1000)
+      local req = assign('Complete-Round', OWNER, nil, { ['Round-Timestamp'] = '1000' })
+      req.slot = '9'
+      compute(base, req)
+
+      -- plain read: enough for a caller to build the fetch itself
+      local ptr = view(base, 'last_snapshot')
+      assert.are.equal(9, ptr.Slot)
+      assert.are.equal(1000, ptr.Timestamp)
+      assert.are.equal('compute&slot=9/results/output/data', ptr.Path)
+
+      -- redirect: 302 with a RELATIVE location that resolves back to the process root
+      local res = _G['last_snapshot'](base, { redirect = 'true' })
+      assert.are.equal(302, res.status)
+      assert.are.equal('../compute&slot=9/results/output/data', res.location)
+      -- the slot must render as an integer: '9.0' would 404 the follow-up fetch
+      assert.is_falsy(res.location:find('9.0', 1, true))
+      -- '1' is also accepted, and anything else is NOT a redirect
+      assert.are.equal(302, _G['last_snapshot'](base, { redirect = '1' }).status)
+      assert.is_nil(_G['last_snapshot'](base, { redirect = 'no' }).status)
+      assert.is_nil(_G['last_snapshot'](base, nil).status)
+    end)
+
     it('Falls back to slot 0 with no assignment (Tier-1/2 harness path)', function()
       local base = newBase()
       addScores(base, { [FP_A] = score(ALICE) }, 1000)

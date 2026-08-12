@@ -81,6 +81,12 @@ check('unknown fingerprint answers empty',
   _G['last_round_details'](base, { fingerprint = string.rep('F', 40) }).body == '[]',
   _G['last_round_details'](base, { fingerprint = string.rep('F', 40) }).body)
 
+-- No round has recorded a slot yet at this point, and redirecting to slot 0 would serve the
+-- spawn's output, so this must refuse rather than answer wrongly.
+check('last_snapshot refuses to redirect before a slot is recorded',
+  _G['last_snapshot'](base, { redirect = 'true' }).status == 404,
+  tostring(_G['last_snapshot'](base, { redirect = 'true' }).status))
+
 -- === settle-slot pointer (D29 §2) — MUST be an integer end to end ===
 -- The node delivers `slot` on the assignment as a STRING, and under luerl `tonumber('7')` is
 -- where this can go wrong: a float would serialize as `7.0`, and a consumer building
@@ -98,6 +104,17 @@ check('Slot is an INTEGER, not 7.0', tostring(pr3.Slot) == '7', tostring(pr3.Slo
 check('last_round view exposes Slot', native.view(base, 'last_round').Slot == 7,
   native.view(base, 'last_round').Slot)
 check('Complete-Round output carries Slot', snap3.Slot == 7, snap3.Slot)
+-- Now that a slot IS recorded, last_snapshot can hop to it. The redirect builds the slot into a
+-- URL with tostring, so a float Slot would emit '7.0' and 404 the follow-up fetch. Tier-1 cannot
+-- see that (Lua 5.3 hands back integers); this VM can.
+local snapRes = _G['last_snapshot'](base, { redirect = 'true' })
+check('last_snapshot redirects with 302', snapRes.status == 302, tostring(snapRes.status))
+check('Location carries an INTEGER slot, not 7.0',
+  snapRes.location == '../compute&slot=7/results/output/data', tostring(snapRes.location))
+check('last_snapshot without redirect returns a composable Path',
+  native.view(base, 'last_snapshot').Path == 'compute&slot=7/results/output/data',
+  tostring(native.view(base, 'last_snapshot').Path))
+
 check('Slot survives JSON encode as 7', json.encode({ s = pr3.Slot }):find('"s":7', 1, true) ~= nil,
   json.encode({ s = pr3.Slot }))
 

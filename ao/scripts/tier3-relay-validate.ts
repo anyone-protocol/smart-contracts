@@ -171,6 +171,28 @@ const diffMap = (got: Record<string, unknown>, want: Record<string, unknown>) =>
   const dRes = await fetch(`${HB}/${pid}~process@1.0/as/last_round_details?fingerprint=${'F'.repeat(40)}`)
   check((await dRes.text()) === '[]', 'unknown fingerprint answers empty', 'ok')
 
+  // 6c) The convenience hop: last_snapshot, and its 302. The Location is RELATIVE (a view never
+  // sees the process id), so the only thing that proves it works is following it for real.
+  console.log('\n6c) last_snapshot (+ ?redirect=true):')
+  const ptrRes = await fetch(`${HB}/${pid}~process@1.0/as/last_snapshot`)
+  const ptr = JSON.parse(await ptrRes.text())
+  check(ptrRes.ok && ptr.Slot > 0, 'last_snapshot returns the settle slot', `slot ${ptr.Slot}`)
+  check(ptr.Path === `compute&slot=${ptr.Slot}/results/output/data`, 'Path is composable', ptr.Path)
+
+  const redirUrl = `${HB}/${pid}~process@1.0/as/last_snapshot?redirect=true`
+  const noFollow = await fetch(redirUrl, { redirect: 'manual' })
+  const loc = noFollow.headers.get('location')
+  check(noFollow.status === 302, 'redirect=true answers 302', `${noFollow.status}`)
+  check(loc === `../compute&slot=${ptr.Slot}/results/output/data`, 'relative Location', String(loc))
+  // Follow it the way a browser or fetch() would — this is the actual claim under test.
+  const followed = await fetch(redirUrl)
+  const fText = await followed.text()
+  check(followed.ok, 'following the redirect lands on the slot output', `${followed.status}`)
+  const fJson = followed.ok ? JSON.parse(fText) : {}
+  check(fJson.Timestamp === T, 'redirect target is THIS round', `${fJson.Timestamp}`)
+  check(!!fJson.Details && Object.keys(fJson.Details).length === 3,
+    'redirect target carries the full Details', `${Object.keys(fJson.Details || {}).length} entries`)
+
   console.log('\n6b) settle-slot pointer (last_round.Slot -> that slot\'s output):')
   const lastRound = await view('last_round')
   const slot = lastRound?.Slot
