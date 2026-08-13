@@ -82,8 +82,10 @@ const check = (ok: boolean, label: string, detail = '') => {
   console.log('\nthe /data leaf is unchanged (what the controller reads):')
   const leaf = await fetch(`${HB}/${pid}~process@1.0/compute&slot=${ptr.Slot}/results/output/data`)
   const leafText = await leaf.text()
-  const lCt = leaf.headers.get('content-type') || ''
-  check(lCt.includes('text/plain'), 'leaf still text/plain', lCt)
+  // NOT "the leaf is text/plain" — direct-to-node it has NO content-type, and the
+  // `text/plain; charset=utf-8` seen through the nginx edge is the edge's default.
+  const lCt = leaf.headers.get('content-type') || '(none)'
+  check(!lCt.includes('application/json'), 'leaf is NOT typed json', lCt)
   check(leafText === fText, 'parent and leaf are byte-identical', `${leafText.length} B both`)
 
   // The dashboard's actual read: ONE request for every relay an operator owns.

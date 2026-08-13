@@ -201,8 +201,13 @@ const diffMap = (got: Record<string, unknown>, want: Record<string, unknown>) =>
   const leaf = await fetch(`${HB}/${pid}~process@1.0/compute&slot=${ptr.Slot}/results/output/data`)
   const leafText = await leaf.text()
   check(leafText === fText, 'parent and leaf return identical bytes', `${leafText.length} B`)
-  check((leaf.headers.get('content-type') || '').includes('text/plain'),
-    'the leaf is still text/plain (unchanged for the controller)', String(leaf.headers.get('content-type')))
+  // The claim is that the declared type does NOT leak to the leaf — NOT that the leaf is
+  // text/plain. Direct-to-node the leaf carries NO content-type at all; the
+  // `text/plain; charset=utf-8` seen through the nginx edge is the edge supplying a default.
+  // Asserting the edge's value fails against a bare node (which is what CI runs).
+  check(!(leaf.headers.get('content-type') || '').includes('application/json'),
+    'the leaf is NOT typed json (unchanged for the controller)',
+    String(leaf.headers.get('content-type')))
 
   console.log('\n6b) settle-slot pointer (last_round.Slot -> that slot\'s output):')
   const lastRound = await view('last_round')
