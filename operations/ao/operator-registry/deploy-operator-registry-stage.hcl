@@ -26,7 +26,7 @@ job "operator-registry-stage" {
     config {
       network_mode = "host"
       # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:2fbd8470678523ad6b4e2c9049ceb51d83abff1d@sha256:78650f21aea24286d9855a3e9b19c1b36379d283084c94bae2b0ba273119539f"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
 
       entrypoint = ["bun"]
       command = "run"
@@ -57,7 +57,7 @@ job "operator-registry-stage" {
       # TODO: the durable module id, from publishing this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "iBgTUrtcdyqn6t_VgpoUP7JC74MW_OnuE8SGKHG9bCE"
+      MODULE_ID = "2vWsI194X4gmK66fhWQdRsBnQJIoG8nFBqnSazW_cgA"
 
       # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
       # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
