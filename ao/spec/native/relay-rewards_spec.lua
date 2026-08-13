@@ -436,6 +436,62 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       addScores(base, { [FP_A] = score('not-an-address') }, 1000)
       assert.is_true(has(outData(base), 'Invalid Address'))
     end)
+
+    -- The keccak fast path skips eip55.checksum for an address ALREADY a key of
+    -- TotalAddressReward, and memoizes per distinct raw string otherwise. checksum is the ONLY
+    -- address validator in Add-Scores, so these pin that nothing gets in by skipping it.
+    describe('address canonicalization fast path', function()
+      -- make ALICE a known key: one settled round puts her in TotalAddressReward
+      local function withKnownAlice()
+        local base = newBase()
+        addScores(base, { [FP_A] = score(ALICE) }, 1000)
+        completeRound(base, 1000)
+        assert.is_not_nil(RelayRewards.TotalAddressReward[ALICE])
+        return base
+      end
+
+      it('still REJECTS a bad checksum, even once other addresses are known', function()
+        local base = withKnownAlice()
+        -- ALICE with two characters case-flipped: same letters, wrong checksum, NOT a stored key
+        local bad = ALICE:sub(1, 2) .. ALICE:sub(3):gsub('%a', function(c)
+          return c:match('%u') and c:lower() or c:upper()
+        end, 2)
+        assert.are_not.equal(ALICE, bad)
+        addScores(base, { [FP_B] = score(bad) }, 2000)
+        assert.is_true(has(outData(base), 'Invalid Address'))
+      end)
+
+      it('still CANONICALIZES a lowercase address (does not match a key, so it keccaks)', function()
+        local base = withKnownAlice()
+        assert.are.equal('OK', outData(addScores(base, { [FP_B] = score(string.lower(ALICE)) }, 2000)))
+        -- stored canonical, not as given
+        assert.are.equal(ALICE, RelayRewards.PendingRounds['2000'][FP_B].Address)
+      end)
+
+      it('fast path and slow path agree, and a repeat address is memoized', function()
+        -- BOB is NOT yet a key, so his first relay keccaks and the rest hit the memo;
+        -- ALICE IS a key, so hers take the fast path. Both must store the canonical form.
+        local base = withKnownAlice()
+        addScores(base, {
+          [FP_B] = score(ALICE), [FP_C] = score(BOB),
+          [string.rep('D', 40)] = score(BOB), [string.rep('E', 40)] = score(ALICE),
+        }, 2000)
+        assert.are.equal('OK', outData(base))
+        local pending = RelayRewards.PendingRounds['2000']
+        assert.are.equal(ALICE, pending[FP_B].Address)
+        assert.are.equal(ALICE, pending[string.rep('E', 40)].Address)
+        assert.are.equal(BOB, pending[FP_C].Address)
+        assert.are.equal(BOB, pending[string.rep('D', 40)].Address)
+      end)
+
+      it('a nil Address still raises the validation error, not a table-index error', function()
+        local base = withKnownAlice()
+        local s = score(ALICE); s.Address = nil
+        addScores(base, { [FP_B] = s }, 2000)
+        assert.is_true(has(outData(base), 'Invalid Address'))
+        assert.is_false(has(outData(base), 'table index is nil'))
+      end)
+    end)
     it('Each score - Network must be an integer >= 0', function()
       local base = newBase()
       local s = score(ALICE); s.Network = -100
@@ -598,6 +654,67 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       -- payload and the state read cannot diverge.
       assert.are.same(snap.Details[FP_A], json.decode(stored[FP_A]))
       assert.are.same(snap.Details[FP_B], json.decode(stored[FP_B]))
+    end)
+
+    -- The runtime must never pair an empty body with a content-type: that combination is a 500
+    -- at the edge. Pinned at the wrapper so no future view can reintroduce it.
+    it('Never sets a content-type on an empty body', function()
+      local base = newBase()
+      _G.emptybody = nil
+      native.register({
+        name = 'probe', root = 'RelayRewards',
+        state = {}, actions = {},
+        views = { emptybody = function() return nil, { status = 302, body = '' } end },
+      })
+      native.installViews()
+      local res = _G['emptybody'](base, nil)
+      assert.are.equal('', res.body)
+      assert.is_nil(res['content-type'])
+    end)
+
+    -- The dashboard authenticates as ONE address and renders every relay it owns, so the
+    -- address form is what keeps a 100-relay operator at ONE request instead of 100.
+    it('Serves every relay an operator owns from one address read', function()
+      local base = newBase()
+      -- ALICE owns two relays this round, BOB one.
+      addScores(base, { [FP_A] = score(ALICE), [FP_B] = score(ALICE), [FP_C] = score(BOB) }, 1000)
+      completeRound(base, 1000)
+
+      local raw = view(base, 'last_round_details', { address = ALICE })
+      assert.are.equal('string', type(raw))
+      local got = json.decode(raw)
+      -- exactly ALICE's relays — BOB's must not leak in
+      assert.is_not_nil(got[FP_A])
+      assert.is_not_nil(got[FP_B])
+      assert.is_nil(got[FP_C])
+      assert.are.equal(ALICE, got[FP_A].Address)
+
+      -- byte-for-byte the same lines the per-fingerprint form serves: assembled by
+      -- concatenation, never re-encoded, so floats cannot drift between the two shapes
+      assert.are.same(json.decode(view(base, 'last_round_details', { fingerprint = FP_A })), got[FP_A])
+      assert.are.same(json.decode(view(base, 'last_round_details', { fingerprint = FP_B })), got[FP_B])
+
+      -- a single-relay operator still gets an object, not a bare line
+      assert.is_not_nil(json.decode(view(base, 'last_round_details', { address = BOB }))[FP_C])
+    end)
+
+    it('Address form: canonicalizes, and answers an empty OBJECT when there is nothing', function()
+      local base = newBase()
+      native.installViews()
+      -- before any round
+      assert.are.equal('{}', view(base, 'last_round_details', { address = ALICE }))
+
+      addScores(base, { [FP_A] = score(ALICE) }, 1000)
+      completeRound(base, 1000)
+
+      -- a known operator asked in lowercase still resolves (eip55.checksum canonicalizes)
+      local lower = string.lower(ALICE)
+      assert.is_not_nil(json.decode(view(base, 'last_round_details', { address = lower }))[FP_A])
+      -- an address with no relays this round, and a malformed one, are both empty/nil
+      assert.are.equal('{}', view(base, 'last_round_details', { address = BOB }))
+      assert.is_nil(view(base, 'last_round_details', { address = 'not-an-address' }))
+      -- '{}' is deliberate here, NOT the '[]' the wrapper produces for a nil return
+      assert.are.equal('{}', _G['last_round_details'](base, { address = BOB }).body)
     end)
 
     it('Serves one fingerprint through the view with no re-encoding', function()

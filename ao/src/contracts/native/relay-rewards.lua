@@ -195,6 +195,9 @@ return {
       -- [fingerprint] = pre-encoded JSON string for that relay's line in the last round. Strings,
       -- never nested tables — see the rationale in `Complete-Round`. Empty until a round settles.
       DetailsJson = {},
+      -- [operator EIP-55 address] = 'FP1,FP2,…' — an INDEX into DetailsJson, so one read can
+      -- answer "everything this operator owns". Empty until a round settles.
+      AddressFingerprints = {},
       Period = 0,
       Summary = {
         Ratings = { Network = '0', Uptime = '0', ExitBonus = '0' },
@@ -260,9 +263,40 @@ return {
         -- validate-before-mutate: validate every score (+ canonicalize its address once) and
         -- dup-check, THEN stage. A thrown assert reverts (nothing staged).
         local canonAddr = {}
+        -- `eip55.checksum` is a keccak and it DOMINATES this handler: measured at 92% of
+        -- Add-Scores (1,351 ms of 1,473 ms at a 420 batch — 19.3 s of a live round, against
+        -- 1.6 s for the JSON decode). A live round is 6,010 relays sharing only 563 distinct
+        -- addresses, so the same digest is recomputed ~11x per address. Two cheap outs, tried
+        -- in order. Neither weakens validation: checksum remains the ONLY address validator,
+        -- and every address that skips it is one already proven canonical.
+        --
+        --   1. ALREADY A KEY of TotalAddressReward ⇒ canonical by construction. Operator
+        --      addresses are checksummed at this very ingress, delegate addresses at
+        --      Set-Delegate / Update-Configuration, and the seed is canonicalized by
+        --      build-relay-seed.ts. A byte-equal match to a correct checksum IS a correct
+        --      checksum — a WRONG one cannot match one, and a lowercase one does not match,
+        --      so both still fall through to the keccak and are still rejected/canonicalized.
+        --   2. otherwise MEMOIZE per distinct raw string, for this call only. Pure function:
+        --      same input, same output. Collapses 6,010 calls to 563.
+        --
+        -- ⚠️ The fast path is gated on `type(raw) == 'string'`. A nil or non-string Address must
+        -- reach `eip55.checksum` so it throws the real validation error — and `canonOf[nil] = …`
+        -- would itself raise a confusing 'table index is nil' instead.
+        local canonOf = {}
+        local knownAddr = ctx.state.TotalAddressReward
         for fingerprint, score in pairs(request.Scores) do
           assertScore(score, fingerprint)
-          canonAddr[fingerprint] = eip55.checksum(score.Address)   -- validate + canonicalize (one keccak)
+          local raw = score.Address
+          local canon = (type(raw) == 'string') and canonOf[raw] or nil
+          if canon == nil then
+            if type(raw) == 'string' and knownAddr[raw] ~= nil then
+              canon = raw
+            else
+              canon = eip55.checksum(raw)                          -- validate + canonicalize
+            end
+            if type(raw) == 'string' then canonOf[raw] = canon end
+          end
+          canonAddr[fingerprint] = canon
           if ctx.state.PendingRounds[tsKey] then
             assert(ctx.state.PendingRounds[tsKey][fingerprint] == nil, 'Duplicated score for ' .. fingerprint)
           end
@@ -507,6 +541,16 @@ return {
         -- Per-fingerprint PRE-ENCODED JSON, the persisted read surface (see below). Built in the
         -- same pass so the two shapes cannot diverge: same table, encoded once, right here.
         local detailsJson = {}
+        -- Operator address -> that operator's fingerprints, as a comma-joined string.
+        --
+        -- An INDEX, not a second copy. The dashboard authenticates as ONE EVM address and wants
+        -- every relay it owns, so keying only by fingerprint forces it into one request per relay
+        -- (100+ for a large operator — the N+1 fan-out). Storing each relay's Details a second
+        -- time under its address would answer that but DOUBLE the persisted Details (~3.14 MB ->
+        -- ~6.3 MB at live width), and persisting Details is already the expensive part of a round.
+        -- Storing just the fingerprint list is ~41 B per relay (~246 KB at live width) and lets
+        -- the view concatenate the strings that already exist.
+        local addressFingerprints = {}
 
         for fingerprint, ratedData in pairs(roundData) do
           roundDataWithStringRewards[fingerprint] = {}
@@ -524,6 +568,12 @@ return {
             ExitBonus = tostring(ratedData.Reward.ExitBonus)
           }
           detailsJson[fingerprint] = json.encode(roundDataWithStringRewards[fingerprint])
+
+          -- ratedData.Address is ALREADY canonical EIP-55 (Add-Scores checksums on the way in),
+          -- so the index needs no keccak here and its keys match what a caller passes.
+          local addr = ratedData.Address
+          local list = addressFingerprints[addr]
+          addressFingerprints[addr] = list and (list .. ',' .. fingerprint) or fingerprint
         end
 
         local summaryOut = {
@@ -572,6 +622,7 @@ return {
           Summary = summaryOut,
           Configuration = state.Configuration,
           DetailsJson = detailsJson,
+          AddressFingerprints = addressFingerprints,
         }
 
         for roundStamp, _ in pairs(state.PendingRounds) do
@@ -701,9 +752,48 @@ return {
     -- Missing/unknown fingerprint returns nil (the wrapper answers `{}`), matching what
     -- `rewards`/`claimed`/`delegate` already do for an absent key. The WHOLE round is not
     -- served here; it lives at the settle slot (see `last_round.Slot`).
+    -- Last round's per-relay breakdown, by ONE relay or by EVERY relay an operator owns.
+    --
+    --   ?fingerprint=<fp>   -> that relay's line, verbatim (~523 B)
+    --   ?address=<0x…>      -> { "<fp>": {…}, … } for all of that operator's relays, ONE request
+    --
+    -- The address form exists because the dashboard authenticates as a single EVM address and
+    -- renders every relay it owns. Asking per fingerprint costs one request per relay — 100+ for
+    -- a large operator, which is the N+1 fan-out this read surface is meant to kill.
+    --
+    -- Assembly is CONCATENATION of strings that already exist: nothing is re-encoded on read, so
+    -- float fidelity is identical to the single-fingerprint form by construction. Fingerprints
+    -- come from `AddressFingerprints` (state), never from the caller, so no id can inject
+    -- structure into the response — the only caller-supplied value is the address, and that is
+    -- validated by `eip55.checksum` before it is used as a key.
     last_round_details = function(s, p)
-      if not (p and p.fingerprint) then return nil end
-      return s.PreviousRound.DetailsJson[p.fingerprint]
+      if not p then return nil end
+      if p.fingerprint then return s.PreviousRound.DetailsJson[p.fingerprint] end
+      if p.address then
+        local ok, addr = pcall(eip55.checksum, p.address)
+        if not ok then return nil end
+        local list = s.PreviousRound.AddressFingerprints[addr]
+        -- A known operator with no scored relays last round and an unknown address are the same
+        -- answer: an empty object. '{}' — NOT json.encode({}), which yields '[]'.
+        if not list or list == '' then return '{}' end
+        local parts, n = {}, 0
+        -- Split on ',' with a PLAIN find. `gmatch('[^,]+')` throws under luerl (character
+        -- classes are unsupported there) and surfaces as an opaque HTTP 400.
+        local init = 1
+        while true do
+          local comma = string.find(list, ',', init, true)
+          local fp = string.sub(list, init, comma and (comma - 1) or #list)
+          local detail = s.PreviousRound.DetailsJson[fp]
+          if detail then
+            n = n + 1
+            parts[n] = '"' .. fp .. '":' .. detail
+          end
+          if not comma then break end
+          init = comma + 1
+        end
+        return '{' .. table.concat(parts, ',') .. '}'
+      end
+      return nil
     end,
 
     -- legacynet `Last-Snapshot`: the WHOLE last round, Details included. That payload is not in

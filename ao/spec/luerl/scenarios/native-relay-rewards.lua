@@ -118,4 +118,44 @@ check('last_snapshot without redirect returns a composable Path',
 check('Slot survives JSON encode as 7', json.encode({ s = pr3.Slot }):find('"s":7', 1, true) ~= nil,
   json.encode({ s = pr3.Slot }))
 
+-- === last_round_details BY ADDRESS (the dashboard's one-request read) ===
+-- Belongs in Tier-2 specifically: the view splits the fingerprint index with a PLAIN string.find
+-- because luerl has no character classes in gmatch — `[^,]+` throws HERE and nowhere in Tier-1,
+-- and it surfaces as an opaque HTTP 400 on a node. A single-relay round cannot catch that, so
+-- this round gives ONE address TWO relays and asserts the concatenation.
+local FP2 = string.rep('B', 40)
+local T4 = 1180000
+run('Add-Scores', json.encode({ Scores = {
+  [FP]  = { Address = ADDR, Network = 1000, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 },
+  [FP2] = { Address = ADDR, Network = 1000, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 },
+} }), T4)
+run('Complete-Round', nil, T4)
+local snap4 = json.decode(base.results.output.data)   -- THIS round's output, not round 2's
+
+local key2 = eip55.checksum(ADDR)
+local byAddr = native.view(base, 'last_round_details', { address = ADDR })
+check('address form returns a string', type(byAddr) == 'string', type(byAddr))
+local byAddrDecoded = type(byAddr) == 'string' and json.decode(byAddr) or {}
+check('address form carries BOTH relays', byAddrDecoded[FP] ~= nil and byAddrDecoded[FP2] ~= nil,
+  tostring(byAddr and string.sub(byAddr, 1, 60)))
+check('address index is keyed EIP-55', S().PreviousRound.AddressFingerprints[key2] ~= nil,
+  tostring(S().PreviousRound.AddressFingerprints[key2]))
+-- assembled by concatenation, so each line must equal the per-fingerprint read byte for byte
+check('address form matches the per-fingerprint form',
+  json.encode(byAddrDecoded[FP]) == json.encode(json.decode(native.view(base, 'last_round_details', { fingerprint = FP }))),
+  json.encode(byAddrDecoded[FP]))
+check('float multipliers survive the address form',
+  byAddrDecoded[FP] and byAddrDecoded[FP].Variables
+    and byAddrDecoded[FP].Variables.LocationMultiplier == snap4.Details[FP].Variables.LocationMultiplier,
+  tostring(byAddrDecoded[FP] and byAddrDecoded[FP].Variables and byAddrDecoded[FP].Variables.LocationMultiplier))
+check('lowercase address still resolves (eip55 canonicalizes)',
+  type(native.view(base, 'last_round_details', { address = string.lower(ADDR) })) == 'string',
+  type(native.view(base, 'last_round_details', { address = string.lower(ADDR) })))
+check('unknown address answers an empty OBJECT',
+  native.view(base, 'last_round_details', { address = '0x' .. string.rep('9', 40) }) == '{}',
+  tostring(native.view(base, 'last_round_details', { address = '0x' .. string.rep('9', 40) })))
+check('malformed address answers nil',
+  native.view(base, 'last_round_details', { address = 'nope' }) == nil,
+  tostring(native.view(base, 'last_round_details', { address = 'nope' })))
+
 return { pass = pass, fail = fail, failures = failures }

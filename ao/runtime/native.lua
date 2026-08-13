@@ -746,7 +746,15 @@ function native.installViews()
       elseif res.body == nil then
         res.body = require('json').encode(v or {})
       end
-      if res['content-type'] == nil then res['content-type'] = 'application/json' end
+      -- 🚨 Only declare a content-type when there is a body to describe. An EMPTY body carrying
+      -- an explicit content-type answers 500 through the nginx edge — and HEAD still returns the
+      -- intended status, so it reads as working until a browser GETs it. Verified on hb-dev
+      -- 2026-08-12 against a real edge; a direct-to-node request does not reproduce it, which is
+      -- why the local Tier-3 check passed. Relevant to any view that answers a bare redirect or
+      -- a no-content status.
+      if res['content-type'] == nil and res.body ~= nil and res.body ~= '' then
+        res['content-type'] = 'application/json'
+      end
       return res
     end
   end
