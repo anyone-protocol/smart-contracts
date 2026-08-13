@@ -26,7 +26,7 @@ job "relay-rewards-stage" {
     config {
       network_mode = "host"
       # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:2fbd8470678523ad6b4e2c9049ceb51d83abff1d@sha256:78650f21aea24286d9855a3e9b19c1b36379d283084c94bae2b0ba273119539f"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:d1cbc8feab33a68bafd7a87e683f768915fb934d@sha256:fb88f6417dfab84fab25ad7d903b64626e5c1574b832e4b0b9198892a3edea54"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage"]
@@ -55,7 +55,7 @@ job "relay-rewards-stage" {
       # TODO: the durable module id, from publishing this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "Imf_DMcG133U7FDt-H7qUiOpdFbz8BuiqawO8Sw491U"
+      MODULE_ID = "AqQ7-Rg7U8vTF8ZgC4XALMkrzE5s6LFl4zuOFLisudw"
 
       # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
       # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
