@@ -773,6 +773,31 @@ local function restoreState(base, snap)
   base.allowlistSeeded = snap.allowlistSeeded
 end
 
+--- Build a handler's output message.
+---
+--- A contract action MAY return a second value: extra keys for its OWN output message, the same
+--- courtesy `native.view` already extends to views. The only use today is `content-type`, so the
+--- settle-slot round advertises `application/json` instead of the `text/plain` a bare string gets.
+---
+--- ⚠️ These keys take effect on `compute&slot=<n>/results/output` — the PARENT — and are IGNORED
+--- on the `.../results/output/data` leaf, which always serves `text/plain`. Both paths return
+--- byte-identical bytes (verified: same sha256, 75,738 B on a real stage round), so a consumer
+--- that wants the type reads the parent. Probed on hb-dev, see scripts/probe/output-content-type.ts.
+---
+--- `data` stays authoritative — a handler cannot overwrite its own payload through the response
+--- table. Opt-in by design: handlers returning 'OK' must keep `text/plain`.
+local function handlerOutput(res, response)
+  local out = { data = res ~= nil and res or '' }
+  -- An EMPTY body carrying a content-type answers 500 through the nginx edge (see the view path
+  -- and D-notes). Nothing to describe means no descriptive keys, ever.
+  if type(response) == 'table' and out.data ~= '' then
+    for k, v in pairs(response) do
+      if k ~= 'data' then out[k] = v end
+    end
+  end
+  return out
+end
+
 --- Everything fallible for a slot runs here, under the caller's pcall.
 local function protectedCompute(base, req)
   initEnv(base)                                  -- AXIS 4 (+ env)
@@ -830,7 +855,7 @@ local function protectedCompute(base, req)
     timestamp = timestamp,                       -- ms, or nil if unassigned (read path/harness)
     -- THIS SLOT's number, for a contract that needs to record where its own output landed
     -- (relay-rewards `Complete-Round` → `PreviousRound.Slot`, so a consumer can fetch the full
-    -- round breakdown from `compute&slot=<n>/results/output/data` without Details ever entering
+    -- round breakdown from `compute&slot=<n>/results/output` without Details ever entering
     -- state). Same provenance class as `timestamp`: present on the assignment and INSIDE the
     -- signed commitment (D29 §2), so it is deterministic across replay and not sender-forgeable.
     -- nil off the write path (Tier-1/2 harness), exactly like `timestamp`.
@@ -876,8 +901,8 @@ local function protectedCompute(base, req)
   if spec.roles and not hasRole(from, spec.roles) then          -- ACL
     error('Permission Denied')
   end
-  local res = spec.handler(ctx)                  -- mutates ctx.state; may throw → revert
-  return { data = res ~= nil and res or '' }
+  local res, response = spec.handler(ctx)        -- mutates ctx.state; may throw → revert
+  return handlerOutput(res, response)
 end
 
 --- The trampoline. TRIVIALLY INFALLIBLE by construction.

@@ -649,23 +649,41 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
       local ptr = view(base, 'last_snapshot')
       assert.are.equal(9, ptr.Slot)
       assert.are.equal(1000, ptr.Timestamp)
-      assert.are.equal('compute&slot=9/results/output/data', ptr.Path)
+      assert.are.equal('compute&slot=9/results/output', ptr.Path)
 
       -- redirect: 302 with a RELATIVE location that resolves back to the process root
       local res = _G['last_snapshot'](base, { redirect = 'true' })
       assert.are.equal(302, res.status)
-      assert.are.equal('../compute&slot=9/results/output/data', res.location)
+      assert.are.equal('../compute&slot=9/results/output', res.location)
       -- The body must be NON-EMPTY. Empty + a content-type answers 500 through the nginx edge
       -- while HEAD still returns 302, so it looks healthy until a browser GETs it.
       assert.is_truthy(res.body and #res.body > 0)
       assert.are.equal(9, json.decode(res.body).Slot)
-      assert.are.equal('compute&slot=9/results/output/data', json.decode(res.body).Path)
+      assert.are.equal('compute&slot=9/results/output', json.decode(res.body).Path)
       -- the slot must render as an integer: '9.0' would 404 the follow-up fetch
       assert.is_falsy(res.location:find('9.0', 1, true))
       -- '1' is also accepted, and anything else is NOT a redirect
       assert.are.equal(302, _G['last_snapshot'](base, { redirect = '1' }).status)
       assert.is_nil(_G['last_snapshot'](base, { redirect = 'no' }).status)
       assert.is_nil(_G['last_snapshot'](base, nil).status)
+    end)
+
+    -- The settle-slot round is JSON, so it should SAY so. The declared type takes effect on
+    -- `compute&slot=<n>/results/output` (the parent) and is ignored on the `.../data` leaf —
+    -- which is why last_snapshot points at the parent. Opt-in: 'OK' handlers stay untyped.
+    it('Complete-Round declares application/json; plain handlers declare nothing', function()
+      local base = newBase()
+
+      local function outMsg(b) return b.results and b.results.output or {} end
+
+      local addOut = outMsg(addScores(base, { [FP_A] = score(ALICE) }, 1000))
+      assert.are.equal('OK', addOut.data)
+      assert.is_nil(addOut['content-type'])
+
+      local out = outMsg(completeRound(base, 1000))
+      assert.are.equal('application/json', out['content-type'])
+      -- the payload is untouched by declaring a type
+      assert.are.equal(1000, json.decode(out.data).Timestamp)
     end)
 
     it('Falls back to slot 0 with no assignment (Tier-1/2 harness path)', function()

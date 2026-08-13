@@ -582,6 +582,12 @@ return {
 
         -- OUTPUT the full snapshot (incl. Details) for the settle-slot read path (persistRound +
         -- dashboard Last-Round-Data). Matches legacynet Last-Snapshot's payload.
+        --
+        -- The second return declares this output's content-type, so a reader of
+        -- `compute&slot=<n>/results/output` gets `application/json` rather than the `text/plain`
+        -- a bare string is served as. Payload is unchanged — same bytes either way — and the
+        -- `.../results/output/data` leaf the controller reads is unaffected, since the type only
+        -- takes effect on the parent.
         return json.encode({
           Timestamp = timestamp,
           Slot = ctx.slot or 0,   -- self-identifying: confirms a fetch landed on the right slot
@@ -589,7 +595,7 @@ return {
           Summary = summaryOut,
           Configuration = state.Configuration,
           Details = roundDataWithStringRewards,
-        })
+        }), { ['content-type'] = 'application/json' }
       end,
     },
 
@@ -711,8 +717,14 @@ return {
     -- The Location is RELATIVE on purpose. A view is handed (state, params) and never sees the
     -- process id, so it cannot build an absolute URL; `../compute&…` resolves against the
     -- request path `/<pid>~process@1.0/as/last_snapshot` back to
-    -- `/<pid>~process@1.0/compute&slot=<n>/results/output/data`, which is the same hop without
+    -- `/<pid>~process@1.0/compute&slot=<n>/results/output`, which is the same hop without
     -- the contract having to know who it is.
+    --
+    -- ⚠️ The target is `results/output` — the PARENT — NOT `results/output/data`. Both return
+    -- byte-identical bytes (same sha256, 75,738 B on a real stage round), but only the parent
+    -- honours the `content-type` `Complete-Round` declares on its output message, so this is
+    -- the path that serves `application/json` instead of `text/plain`. Probed on hb-dev; see
+    -- scripts/probe/output-content-type.ts.
     --
     -- Redirecting before any round has settled would point at slot 0 (the spawn) and hand back
     -- unrelated output, so that answers 404 rather than a wrong 200.
@@ -725,8 +737,8 @@ return {
           Slot = slot,
           Timestamp = pr.Timestamp,
           Period = pr.Period,
-          -- relative to `/<pid>~process@1.0/`
-          Path = 'compute&slot=' .. tostring(slot) .. '/results/output/data',
+          -- relative to `/<pid>~process@1.0/`; the PARENT, see the note above
+          Path = 'compute&slot=' .. tostring(slot) .. '/results/output',
         }
       end
       if slot <= 0 then
@@ -739,7 +751,7 @@ return {
       -- A direct-to-node request does NOT reproduce it, which is why Tier-3 missed it.
       -- Carrying the pointer as the body is useful anyway: a client that does not follow
       -- redirects still gets the answer.
-      local path = 'compute&slot=' .. tostring(slot) .. '/results/output/data'
+      local path = 'compute&slot=' .. tostring(slot) .. '/results/output'
       return nil, {
         status = 302,
         location = '../' .. path,

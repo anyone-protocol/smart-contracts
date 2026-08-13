@@ -110,9 +110,9 @@ check('Complete-Round output carries Slot', snap3.Slot == 7, snap3.Slot)
 local snapRes = _G['last_snapshot'](base, { redirect = 'true' })
 check('last_snapshot redirects with 302', snapRes.status == 302, tostring(snapRes.status))
 check('Location carries an INTEGER slot, not 7.0',
-  snapRes.location == '../compute&slot=7/results/output/data', tostring(snapRes.location))
+  snapRes.location == '../compute&slot=7/results/output', tostring(snapRes.location))
 check('last_snapshot without redirect returns a composable Path',
-  native.view(base, 'last_snapshot').Path == 'compute&slot=7/results/output/data',
+  native.view(base, 'last_snapshot').Path == 'compute&slot=7/results/output',
   tostring(native.view(base, 'last_snapshot').Path))
 
 check('Slot survives JSON encode as 7', json.encode({ s = pr3.Slot }):find('"s":7', 1, true) ~= nil,
