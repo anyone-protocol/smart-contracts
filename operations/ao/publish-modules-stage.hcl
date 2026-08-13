@@ -79,11 +79,15 @@ job "publish-modules-stage" {
 
         # Comment out anything you are not publishing this run.
         # write-gate is UNCHANGED since it was published as Jo_Ur2HyzPjlhmt7OGZyfNyTrmwhmySWwo4Mo8bcyZw
-        # (it does not embed runtime/native.lua, so the 2026-08-12 runtime change does not reach it).
+        # (it does not embed runtime/native.lua, so the runtime changes do not reach it).
         # "runtime/write-gate.lua",
-        # "dist/operator-registry-native.lua",   # UNCHANGED this run
+        #
+        # ALL THREE this run: runtime/native.lua changed (handler-declared output content-type
+        # + the empty-body content-type guard) and it is bundled into every contract, so the
+        # opreg and staking bundles differ even though neither contract's own source moved.
+        "dist/operator-registry-native.lua",
         "dist/relay-rewards-native.lua",
-        # "dist/staking-rewards-native.lua",   # UNCHANGED this run
+        "dist/staking-rewards-native.lua",
 
         # Block until the GraphQL index confirms settlement, rather than reporting an id that
         # may never land.
