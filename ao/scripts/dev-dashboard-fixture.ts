@@ -45,6 +45,7 @@ const MINE = [fp(1), fp(2), fp(3), fp(4)]      // scored in the rounds -> have l
 const CLAIMABLE = [fp(5), fp(6)]               // never scored -> claimable but no round detail
 const THEIRS = fp(99)
 const STRANGER = '0x1111111111111111111111111111111111111111'
+const UNSTAKED = '0x2222222222222222222222222222222222222222'  // relays up, nobody staked to them
 
 const bundle = (name: string) =>
   fs.readFileSync(path.join(AO, `dist/${name}-native.lua`), 'utf8')
@@ -113,6 +114,18 @@ const send = (pid: string, action: string, data?: any, tags: Record<string, stri
           [STRANGER]: { Staked: '50000000000000000000', Running: 1 },
         },
       },
+      // Per-operator relay counts, keyed by OPERATOR (Scores is keyed by hodler).
+      //
+      // The counts deliberately disagree with the `Running: 1` above so the dashboard cannot pass
+      // by accident: 5/6 is 0.8333, so a page still reading the old quotient shows 100%.
+      //
+      // UNSTAKED is the case the quotient could never express — relays up, nobody staked to them,
+      // so no Details entry at all. It must still show as running.
+      Network: {
+        [OPERATOR]: { Expected: 6, Running: 5, Found: 6 },
+        [STRANGER]: { Expected: 4, Running: 1, Found: 4 },
+        [UNSTAKED]: { Expected: 3, Running: 3, Found: 3 },
+      },
     }, { 'round-timestamp': String(T) })
     await send(staking, 'Complete-Round', undefined, { 'round-timestamp': String(T) })
   }
@@ -144,7 +157,19 @@ const send = (pid: string, action: string, data?: any, tags: Record<string, stri
   checks.push(['staking rewards', Object.keys(srewj.Rewarded || {}).length > 0,
     `${Object.keys(srewj.Rewarded || {}).length} operators`])
   const snap = await get(staking, 'last_snapshot')
-  checks.push(['staking last_snapshot Details', !!JSON.parse(snap.body).Details, 'present'])
+  const snapj = JSON.parse(snap.body)
+  checks.push(['staking last_snapshot Details', !!snapj.Details, 'present'])
+  // The per-operator relay counts, and the two properties the dashboard depends on: the ratio it
+  // derives must come from these counts (not the `Running: 1` in Scores), and an operator nobody
+  // has staked to must survive the round even though it has no Details entry.
+  const net = snapj.Network || {}
+  const opCounts = net[OPERATOR]
+  checks.push(['staking last_snapshot Network', !!opCounts,
+    opCounts ? `${opCounts.Running}/${opCounts.Expected} running, ${opCounts.Found} found` : 'MISSING'])
+  checks.push(['  ratio comes from counts', opCounts?.Running / opCounts?.Expected < 1,
+    `${((opCounts?.Running / opCounts?.Expected) * 100).toFixed(2)}% (100% would mean the old quotient)`])
+  checks.push(['  unstaked operator present', !!net[UNSTAKED] && !snapj.Details?.[UNSTAKED],
+    'in Network, absent from Details'])
 
   let bad = 0
   for (const [label, ok, detail] of checks) {
