@@ -66,11 +66,11 @@ job "publish-modules-stage" {
     config {
       network_mode = "host"
 
-      # TODO: pin the commit that built this image before running.
-      # Actions -> "Build & Publish AO Mainnet Contracts Image" -> Run workflow -> pick the
-      # branch; it tags by commit SHA. The bytes signed below come from this image, so this line
-      # is what makes a published id traceable to a commit.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
+      # Pinned to 8e02154 — the commit carrying the per-operator relay counts (`Network`) in
+      # staking-rewards. Actions -> "Build & Publish AO Mainnet Contracts Image" -> Run workflow ->
+      # pick the branch; it tags by commit SHA. The bytes signed below come from this image, so
+      # this line is what makes a published id traceable to a commit.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:8e021544396f707fdffb2db53c8f96dc1e2d8236@sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0"
 
       entrypoint = ["bun"]
       command = "run"
@@ -82,11 +82,15 @@ job "publish-modules-stage" {
         # (it does not embed runtime/native.lua, so the runtime changes do not reach it).
         # "runtime/write-gate.lua",
         #
-        # ALL THREE this run: runtime/native.lua changed (handler-declared output content-type
-        # + the empty-body content-type guard) and it is bundled into every contract, so the
-        # opreg and staking bundles differ even though neither contract's own source moved.
-        "dist/operator-registry-native.lua",
-        "dist/relay-rewards-native.lua",
+        # STAKING ONLY this run. The change is confined to
+        # src/contracts/native/staking-rewards.lua (per-operator relay counts); runtime/native.lua
+        # did NOT move, so the other two bundles are byte-identical to what is already published
+        # and republishing them would only mint new ids for the same bytes.
+        #
+        # Verified rather than assumed: rebuilt both from this commit and compared sha256 against
+        # the published modules (kTf0r-R_… and 2vWsI194…) — identical.
+        # "dist/operator-registry-native.lua",
+        # "dist/relay-rewards-native.lua",
         "dist/staking-rewards-native.lua",
 
         # Block until the GraphQL index confirms settlement, rather than reporting an id that
