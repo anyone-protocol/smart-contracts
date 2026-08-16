@@ -125,4 +125,36 @@ check('7-day delay elapsed at 7d', S().Shares[OWNER] == 0.42, tostring(S().Share
 check('pending cleared', S().PendingShareChanges[OWNER] == nil,
   tostring(S().PendingShareChanges[OWNER]))
 
+-- Per-operator relay counts. THE reason this needs a Tier-2 assertion rather than Tier-1 alone:
+-- luerl decodes a JSON integer as a FLOAT, so `5` arrives as `5.0`. Tier-1 on Lua 5.3 cannot see
+-- that at all. Stored unfolded, the count would persist as `5.0` and read back as a non-integer,
+-- which is the same class of bug as the RequestedTimestamp one asserted above. `tostring` is the
+-- only reliable way to tell the two apart here.
+local NT = T2 + 2 * 604800 * 1000
+run('Add-Scores', json.encode({
+  Scores = { [ALICE] = { [BOB] = stake('1000', 0.6) } },
+  Network = { [BOB] = { Expected = 5, Running = 3, Found = 4 } },
+}), { ['Round-Timestamp'] = tostring(NT) })
+run('Complete-Round', nil, { ['Round-Timestamp'] = tostring(NT) })
+check('network round settled', out() == 'OK', out())
+
+local net = native.view(base, 'last_snapshot').Network
+check('Network Expected is an INTEGER, not 5.0',
+  tostring(net[BOB].Expected) == '5', tostring(net[BOB].Expected))
+check('Network Running survives the device VM', net[BOB].Running == 3, tostring(net[BOB].Running))
+check('Network Found survives the device VM', net[BOB].Found == 4, tostring(net[BOB].Found))
+
+-- An operator with relay counts but no stake is the case the old `Running` quotient could not
+-- express, so it must survive the round rather than being dropped with the unstaked pairs.
+run('Add-Scores', json.encode({
+  Scores = { [ALICE] = { [BOB] = stake('1000', 0.6) } },
+  Network = { [CHARLS] = { Expected = 2, Running = 2, Found = 2 } },
+}), { ['Round-Timestamp'] = tostring(NT + 1000) })
+run('Complete-Round', nil, { ['Round-Timestamp'] = tostring(NT + 1000) })
+local snap = native.view(base, 'last_snapshot')
+check('unstaked operator kept in Network', snap.Network[CHARLS] ~= nil,
+  tostring(snap.Network[CHARLS]))
+check('unstaked operator absent from Details', snap.Details[CHARLS] == nil,
+  tostring(snap.Details[CHARLS]))
+
 return { pass = pass, fail = fail, failures = failures }

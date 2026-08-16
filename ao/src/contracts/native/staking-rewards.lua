@@ -184,6 +184,25 @@ local function detailsNested(d)
   return out
 end
 
+--- The per-operator relay counts as `{ [operator] = { Expected, Running, Found } }`.
+---
+--- Driven by `Expected`, not by the union of all three: an operator is in the round because the
+--- registry expected relays of them, and a missing `Running`/`Found` means zero rather than
+--- unknown. `or 0` therefore reports a real count instead of leaving a hole a consumer has to
+--- guess at.
+local function networkNested(n)
+  if type(n) ~= 'table' or type(n.Expected) ~= 'table' then return {} end
+  local out = {}
+  for operator, expected in pairs(n.Expected) do
+    out[operator] = {
+      Expected = expected,
+      Running = (n.Running or {})[operator] or 0,
+      Found = (n.Found or {})[operator] or 0,
+    }
+  end
+  return out
+end
+
 --- Validate + canonicalize an address, preserving a caller-supplied legacynet error message.
 local function checksum(addr, message)
   local ok, out = pcall(eip55.checksum, addr)
@@ -312,6 +331,16 @@ return {
       -- and `last_round_data` rebuild the `{ Score, Rating, Reward }` records.
       Details = { Staked = {}, Restaked = {}, Running = {}, Share = {},
                   Rating = {}, RewardHodler = {}, RewardOperator = {} },
+      -- Per-OPERATOR relay counts for the round, keyed by operator address. Parallel typed maps
+      -- for the same reason as `Details` above, though the pressure is far lower here: this is
+      -- per operator, not per hodler/operator pair.
+      --
+      -- The controller already computes these to derive each pair's `Running` share, but that
+      -- share is a lossy quotient — it cannot answer "3 of 5 relays up", and it is absent for an
+      -- operator nobody has staked to. Carrying the counts in the round makes the network state
+      -- part of the signed record instead of a side-channel, and it replaces the `staking/snapshot`
+      -- Arweave publication the dashboard used to read.
+      Network = { Expected = {}, Running = {}, Found = {} },
     },
     -- [tostring(Timestamp)] = { Staked/Running/Share = { [hodler/operator] = v } }. The
     -- timestamp stays the outer key (rounds in flight are few, and Cancel/Complete drop one by
@@ -440,10 +469,57 @@ return {
           end
         end
 
+        -- OPTIONAL per-operator relay counts. Optional on purpose: a round submitted by an older
+        -- controller stages exactly as before rather than failing, so contract and controller can
+        -- deploy in either order.
+        --
+        -- Keyed by OPERATOR, so unlike Scores it is not nested under a hodler — an operator with
+        -- no stake at all still has relay counts worth recording, which is precisely the case the
+        -- old `Running` quotient could not express.
+        local canonNet = {}
+        if request.Network ~= nil then
+          assert(type(request.Network) == 'table', 'Network has to be a table')
+          for operatorAddress, counts in pairs(request.Network) do
+            local nOperatorAddress = checksum(operatorAddress,
+              'Invalid Operator address: Network[' .. tostring(operatorAddress) .. ']')
+            assert(type(counts) == 'table', 'Network[' .. operatorAddress .. '] must be a table')
+            for _, field in ipairs({ 'Expected', 'Running', 'Found' }) do
+              local label = 'Network[' .. operatorAddress .. '].' .. field
+              utils.assertNumber(counts[field], label)
+              -- parseInt, NOT assertInteger: luerl decodes JSON `5` as the FLOAT 5.0, and
+              -- assertInteger rejects floats outright — so asserting integerness directly would
+              -- fail on-device while passing under 5.3. parseInt folds a whole-valued float back
+              -- to an integer and returns nil for a genuinely fractional count.
+              local n = utils.parseInt(counts[field])
+              assert(n ~= nil, label .. ' must be an integer')
+              assert(n >= 0, label .. ' has to be >= 0')
+            end
+            canonNet[operatorAddress] = nOperatorAddress
+          end
+        end
+
         if state.PendingRounds[tsKey] == nil then
-          state.PendingRounds[tsKey] = { Staked = {}, Running = {}, Share = {} }
+          state.PendingRounds[tsKey] = {
+            Staked = {}, Running = {}, Share = {},
+            NetExpected = {}, NetRunning = {}, NetFound = {},
+          }
         end
         local pending = state.PendingRounds[tsKey]
+        -- A round staged before this field existed has no Net* maps; create them on demand so an
+        -- in-flight round upgraded mid-flight still completes.
+        if pending.NetExpected == nil then
+          pending.NetExpected, pending.NetRunning, pending.NetFound = {}, {}, {}
+        end
+
+        -- Last writer wins per operator, matching how a re-sent batch behaves elsewhere. These
+        -- are counts of the same underlying relays, so a second submission is a correction rather
+        -- than something to accumulate.
+        for operatorAddress, counts in pairs(request.Network or {}) do
+          local op = canonNet[operatorAddress]
+          pending.NetExpected[op] = utils.parseInt(counts.Expected)
+          pending.NetRunning[op]  = utils.parseInt(counts.Running)
+          pending.NetFound[op]    = utils.parseInt(counts.Found)
+        end
 
         for hodlerAddress, scores in pairs(request.Scores) do
           local nHodlerAddress = canon[hodlerAddress].hodler
@@ -600,7 +676,14 @@ return {
             Rewards = tostring(summary.Rewards)
           },
           Configuration = state.Configuration,
-          Details = details
+          Details = details,
+          -- Carried verbatim from the pending round. `or {}` keeps a round staged by a controller
+          -- that does not send Network completing normally, with empty counts rather than nil.
+          Network = {
+            Expected = pending.NetExpected or {},
+            Running  = pending.NetRunning or {},
+            Found    = pending.NetFound or {},
+          },
         }
 
         for roundStamp, _ in pairs(state.PendingRounds) do
@@ -721,6 +804,7 @@ return {
         Summary = s.PreviousRound.Summary,
         Configuration = s.PreviousRound.Configuration,
         Details = detailsNested(s.PreviousRound.Details),
+        Network = networkNested(s.PreviousRound.Network),
       }
     end,
 

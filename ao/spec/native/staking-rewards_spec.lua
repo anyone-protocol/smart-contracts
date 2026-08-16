@@ -285,6 +285,88 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
   end)
 
   -- =========================================================================
+  -- Per-operator relay counts (Network). Replaces the `staking/snapshot` Arweave
+  -- publication the dashboard used to read: the controller already computes these to
+  -- derive each pair's `Running` quotient, and that quotient cannot express "3 of 5 up"
+  -- nor cover an operator nobody has staked to.
+  -- =========================================================================
+  describe('Add-Scores Network counts', function()
+    local function addWithNetwork(base, scores, network, ts, from)
+      return compute(base, assign('Add-Scores', from or OWNER,
+        json.encode({ Scores = scores, Network = network }),
+        { ['Round-Timestamp'] = tostring(ts) }))
+    end
+    local function counts(e, r, f) return { Expected = e, Running = r, Found = f } end
+
+    it('carries the counts through to last_snapshot', function()
+      local base = newBase()
+      addWithNetwork(base, { [ALICE] = { [BOB] = stake('1000', 1.0) } },
+        { [BOB] = counts(5, 3, 4) }, 1000)
+      completeRound(base, 1000)
+      local net = snapshot(base).Network
+      assert.are.equal(5, net[BOB].Expected)
+      assert.are.equal(3, net[BOB].Running)
+      assert.are.equal(4, net[BOB].Found)
+    end)
+
+    it('is OPTIONAL — a round without it still completes, with empty counts', function()
+      local base = newBase()
+      addScores(base, { [ALICE] = { [BOB] = stake('1000', 1.0) } }, 1000)
+      completeRound(base, 1000)
+      local snap = snapshot(base)
+      assert.are.same({}, snap.Network)
+      -- the rest of the round is untouched
+      assert.are.equal('1000', snap.Details[ALICE][BOB].Score.Staked)
+    end)
+
+    it('records an operator NOBODY has staked to — the case the quotient could not', function()
+      local base = newBase()
+      addWithNetwork(base, { [ALICE] = { [BOB] = stake('1000', 1.0) } },
+        { [BOB] = counts(5, 3, 4), [CHARLS] = counts(2, 2, 2) }, 1000)
+      completeRound(base, 1000)
+      local net = snapshot(base).Network
+      assert.are.equal(2, net[CHARLS].Running)
+      -- CHARLS has relay counts but no stake, so no Details entry
+      assert.is_nil(snapshot(base).Details[CHARLS])
+    end)
+
+    it('accepts whole-valued FLOATS, which is what luerl decodes JSON integers as', function()
+      local base = newBase()
+      addWithNetwork(base, { [ALICE] = { [BOB] = stake('1000', 1.0) } },
+        { [BOB] = counts(5.0, 3.0, 0.0) }, 1000)
+      completeRound(base, 1000)
+      local net = snapshot(base).Network
+      assert.are.equal(5, net[BOB].Expected)
+      assert.are.equal(0, net[BOB].Found)
+    end)
+
+    it('rejects a bad operator address, a negative count and a fractional count', function()
+      local base = newBase()
+      local s = { [ALICE] = { [BOB] = stake('1000', 1.0) } }
+      addWithNetwork(base, s, { ['asd'] = counts(1, 1, 1) }, 1000)
+      assert.is_true(has(outData(base), 'Invalid Operator address: Network[asd]'))
+      addWithNetwork(base, s, { [BOB] = counts(-1, 0, 0) }, 1000)
+      assert.is_true(has(outData(base), 'has to be >= 0'))
+      addWithNetwork(base, s, { [BOB] = counts(1.5, 0, 0) }, 1000)
+      assert.is_true(has(outData(base), 'must be an integer'))
+      addWithNetwork(base, s, { [BOB] = { Expected = 1, Running = 0 } }, 1000)
+      assert.is_true(has(outData(base), 'Number value required'))
+      -- validate-before-mutate: nothing staged by any of the above
+      assert.is_nil(StakingRewards.PendingRounds['1000'])
+    end)
+
+    it('takes the last submission per operator rather than accumulating', function()
+      local base = newBase()
+      addWithNetwork(base, { [ALICE] = { [BOB] = stake('1000', 1.0) } },
+        { [BOB] = counts(5, 3, 4) }, 1000)
+      addWithNetwork(base, { [CHARLS] = { [BOB] = stake('1000', 1.0) } },
+        { [BOB] = counts(6, 6, 6) }, 1000)
+      completeRound(base, 1000)
+      assert.are.equal(6, snapshot(base).Network[BOB].Expected)
+    end)
+  end)
+
+  -- =========================================================================
   -- round-cancel.spec.ts (4)
   -- =========================================================================
   describe('Cancel-Round', function()
