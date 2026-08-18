@@ -4,8 +4,8 @@ job "relay-rewards-live" {
   namespace = "live-protocol"
 
   constraint {
-      attribute = "${meta.pool}"
-      value = "live-protocol"
+    attribute = "${meta.pool}"
+    value = "live-protocol"
   }
 
   reschedule { attempts = 0 }
@@ -25,10 +25,14 @@ job "relay-rewards-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
-      entrypoint = ["npm"]
+      # Pinned to 8e02154 — the same commit that built the modules published below. The deploy
+      # tooling (deploy.ts and the three seed builders) is byte-identical to the 0e1566b image
+      # stage ran, so this pin costs nothing and keeps the seed builder and the contract source
+      # on one commit.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:8e021544396f707fdffb2db53c8f96dc1e2d8236@sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0"
+      entrypoint = ["bun"]
       command = "run"
-      args = ["deploy"]
+      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "live"]
       logging {
         type = "loki"
         config {
@@ -42,30 +46,34 @@ job "relay-rewards-live" {
 
     consul {}
 
+    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
+    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
+    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
+    # rides the spawn message, selected by `--seed` above.
     env {
-      PHASE = "live"
+      # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
+      # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
+      # rendered in the template block below instead.
+
+      # The durable module id. This is the id published from the STAGE publish job and already
+      # running on stage — deliberately reused rather than republished under the live key.
+      #
+      # A module id is the id of the SIGNED item, so publishing identical bytes under the live
+      # key would mint a different id for the same module. Reusing gains two things: live runs
+      # bytes that have been settling rounds on stage since 2026-08-11, and the id is directly
+      # comparable across environments. The signer holds no authority over a published module,
+      # so nothing is given up by it being the stage key.
+      #
+      # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
+      # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
+      MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
+
+      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
+      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
+      # template gated-processes from.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
-      CONTRACT_NAME = "relay-rewards"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/relay-rewards-address"
-      CU_URL="https://cu.anyone.tech"
-
-      ## NB: Spawn a new process & migrate state from an existing one
-      ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
-      ##     existing process ID to migrate from
-      IS_MIGRATION_DEPLOYMENT = "true"
-
-      ## NB: Call Init with data from file at INIT_DATA_PATH
-      # CALL_INIT_HANDLER="true"
-    }
-
-    template {
-      data = <<-EOF
-      # MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/live/relay-rewards-address" }}
-      MIGRATION_SOURCE_PROCESS_ID="hZyEmQHHvl6Jne_4FMpiX7AiIe5QZeV-x1AZngfhMV0"
-      EOF
-      destination = "local/config.env"
-      env = true
     }
 
     template {
@@ -75,6 +83,9 @@ job "relay-rewards-live" {
       {{- with secret "kv/live-protocol/relay-rewards-live" }}
       DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+      {{- end }}
+      {{- range service "hyperbeam-live-node" }}
+      HB_URL="http://{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
     }

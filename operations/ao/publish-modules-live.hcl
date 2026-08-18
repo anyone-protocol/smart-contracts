@@ -15,6 +15,14 @@
 # "dev, stage and live run the same module" stops being visible at a glance. Publish once, then
 # pin that single id in all three environments.
 #
+# 🚫 DO NOT RUN THIS FOR THE LIVE CUTOVER (decided 2026-08-16). That is the rule above applied:
+# `deploy-*-live.hcl` pin the ids published from the STAGE job, so live runs the same bytes that
+# have been settling rounds on stage since 2026-08-11. Running this would mint new ids for
+# identical source and cost that comparability for nothing. The image pin below is deliberately
+# left stale for the same reason — it is not part of the cutover.
+#
+# This job stays for a FUTURE contract change published from the live network.
+#
 # ─── What gets pinned where ─────────────────────────────────────────────────────────────────
 #   write-gate         -> `module` in the hyperbeam jobspecs (infra-arweave)
 #   <contract>-native  -> MODULE_ID in that contract's deploy job

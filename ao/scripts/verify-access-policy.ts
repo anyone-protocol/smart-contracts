@@ -68,7 +68,11 @@ const ENVS = {
   },
   stage: {
     host: 'hb-stage.anyone.tech',
-    gated: false,
+    // GATED since 2026-08-16. Flipping this asserts the whole gated posture: pricing-device
+    // lua@5.3a, exactly the 3 contract ids in gated-processes, operator-registry set and among
+    // them, every gated contract computable HERE with a seeded allowlist, and routes 1-3
+    // narrowed to READ_VERBS so /push and /schedule fall through to the gate.
+    gated: true,
     edgeLocked: true,
     allowList: [
       '0xFC995EDe0DEE85203DB143314A35468d91583a52',
