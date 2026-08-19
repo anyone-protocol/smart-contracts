@@ -102,7 +102,10 @@ const ENVS = {
 type EnvName = keyof typeof ENVS
 
 // Non-chargable routes 4-6 are the same everywhere; 1-3 render from Consul KV.
-const STATIC_ROUTES = ['^/~meta@1.0', '^/~hyperbuddy@1.0', '^/~query@1.0']
+// `^/$` is exactly the root path: it is what produces the 307 to /~hyperbuddy@1.0/index, and
+// with the gate on a chargeable root request is refused with 400, costing the explorer its
+// landing page. That regressed on stage 2026-08-19 because nothing here checked root.
+const STATIC_ROUTES = ['^/$', '^/~meta@1.0', '^/~hyperbuddy@1.0', '^/~query@1.0']
 const RATE_LIMIT = { 'rate-limit-requests': 100000, 'rate-limit-max': 100000, 'rate-limit-period': 60 }
 
 // PERTURB=1 corrupts the EXPECTATIONS (never the live nodes) and asserts the run then
@@ -291,7 +294,7 @@ for (const env of targets) {
 
   // --- native: p4 carve-outs ---------------------------------------------
   const routes = (await listOf(host, 'p4-non-chargable-routes')).map(r => r?.template)
-  check(routes.length === 6, 'p4-non-chargable-routes has exactly 6 entries', `got ${routes.length}`)
+  check(routes.length === 7, 'p4-non-chargable-routes has exactly 7 entries', `got ${routes.length}`)
   // `.every()` is true for an empty list, so each assertion below is paired with a
   // length guard — otherwise a container that failed to parse reads as a clean pass.
   check(routes.length > 0 && routes.every(t => typeof t === 'string' && t.startsWith('^/')),
@@ -319,8 +322,17 @@ for (const env of targets) {
   }
   pidSets[env] = pids
   check(STATIC_ROUTES.every(s => routes.includes(s)),
-    'routes 4-6 are ~meta@1.0, ~hyperbuddy@1.0, ~query@1.0',
+    'routes 4-7 are ^/$, ~meta@1.0, ~hyperbuddy@1.0, ~query@1.0',
     routes.slice(3).join(' '))
+
+  // BEHAVIOURAL, not just config: the root request must still redirect to Hyperbuddy. The gate
+  // refuses a chargeable root with 400, and asserting the route list alone would not prove the
+  // redirect survives. 307 is the healthy answer; 400 means the gate ate it, 404 means node-host
+  // regressed.
+  const rootCode = await statusOf(host, '/')
+  check(rootCode === 307,
+    'root redirects to Hyperbuddy (307), not eaten by the gate (400) or node-host (404)',
+    `got ${rootCode}`)
 
   // --- native: hyphenation canary ----------------------------------------
   // These read back only if canonical_key resolved them; an underscored spelling
