@@ -25,11 +25,13 @@ job "staking-rewards-live" {
 
     config {
       network_mode = "host"
-      # Pinned to 8e02154 — the same commit that built the modules published below. The deploy
-      # tooling (deploy.ts and the three seed builders) is byte-identical to the 0e1566b image
-      # stage ran, so this pin costs nothing and keeps the seed builder and the contract source
-      # on one commit.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:8e021544396f707fdffb2db53c8f96dc1e2d8236@sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0"
+      # Pinned to 48d4cb5 (2026-08-20). Carries the HARDENED `assertModuleIsDurable`: a module id
+      # must be indexed, its containing bundle mined, >=50 confirmations deep, and its bytes must
+      # sha256-MATCH the bundle this image builds. Safe to repin because 8e02154..48d4cb5 changed
+      # ZERO Lua — only TypeScript tooling, docs and jobspecs — so this image builds byte-identical
+      # bundles to the one that published the modules below, and the new check still passes.
+      # Rollback: 8e02154 @sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48d4cb5a2dd59498489441d3f15294ecd2f53658@sha256:893fdecab1a7dc78642598cf962bb4ba22407a181a5b5048195af4749af53d4a"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "staking-rewards", "--seed", "live"]
