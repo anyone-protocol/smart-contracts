@@ -47,6 +47,7 @@
 //   --dry-run    build and report; touch nothing on the network
 import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EthereumSigner } from '@dha-team/arbundles/web'
@@ -262,35 +263,123 @@ if (!MODULE_ID) {
  * exactly what D5 is supposed to guarantee against. Checked here because this is the last
  * point where it is cheap to fix.
  */
-async function assertModuleIsDurable (id: string) {
+const MIN_CONFIRMATIONS = 50
+
+/**
+ * Prove the published module is BOTH durable and the one this image built.
+ *
+ * The old form asked GraphQL `{ transaction(id) { id } }` and reported "durability". That is a
+ * metadata lookup, not a durability guarantee, and it is weaker than its name in two ways that
+ * both bit us on 2026-08-19:
+ *
+ *   - A BUNDLED data item can be indexed from a bundler's optimistic view before the containing
+ *     bundle is mined anywhere. Indexed is not seeded. (Jim's point, and correct.)
+ *   - Nothing tied MODULE_ID to the bytes this image builds. A jobspec pairing an image with a
+ *     module id from a DIFFERENT commit deployed happily, because `module verified ... matches
+ *     source` only compares the image's dist/ to the image's own src/.
+ *
+ * So check what actually matters, cheapest-and-most-decisive last:
+ *   1. indexed at all
+ *   2. it is bundled, and the CONTAINING BUNDLE tx is in a block  (the real L1 object)
+ *   3. that block has confirmation depth
+ *   4. the bytes are retrievable AND sha256-match the bundle we are about to spawn against
+ *
+ * (4) is the one that would have caught both failures. It is also the only check that proves the
+ * module can be FETCHED, as opposed to merely described — which is exactly what a node has to do
+ * on cold start, and exactly what a rate-limited gateway prevented on live.
+ */
+async function assertModuleIsDurable (id: string, localBundle: string) {
   if (flag('allow-unpublished-module')) {
     console.warn('  ! --allow-unpublished-module: NOT checking that the module is on Arweave.')
     console.warn('  ! If this module is node-local, the process dies with that node\'s cache.')
     return
   }
-  const res = await fetch('https://arweave.net/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: `{ transaction(id: "${id}") { id } }` }),
-    signal: AbortSignal.timeout(45_000),
-  }).catch(() => null)
-  const found = res?.ok && !!(await res.json().catch(() => null) as any)?.data?.transaction
-  if (found) {
-    console.log(`module durability      on Arweave (indexed)`)
-    return
+
+  const gql = async (query: string) => {
+    const res = await fetch('https://arweave.net/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(45_000),
+    }).catch(() => null)
+    if (!res?.ok) return null
+    return (await res.json().catch(() => null) as any)?.data ?? null
   }
-  console.error(`\nrefusing to spawn: module ${id} is not indexed on Arweave.`)
-  console.error('  A node-local module id (from --publish-cmd) exists in exactly one node\'s')
-  console.error('  cache. Spawning against it produces a process that a rebuilt node can never')
-  console.error('  compute — the D5 cold-start guarantee would be silently void.')
-  console.error('')
-  console.error('  Publish it durably first:')
-  console.error(`    BUNDLER=… PUBLISH_KEY=… bun run scripts/deploy.ts ${contract} --seed ${seed} --publish`)
-  console.error('  Settlement takes hours; re-check with:')
-  console.error(`    bun run scripts/publish-module.ts --check-only ${id}`)
-  console.error('')
-  console.error('  For a throwaway test deploy, pass --allow-unpublished-module.')
-  process.exit(1)
+
+  const fail = (why: string, ...detail: string[]) => {
+    console.error(`\nrefusing to spawn: ${why}`)
+    for (const d of detail) console.error(`  ${d}`)
+    console.error('')
+    console.error('  A module the network cannot serve produces a process that computes on THIS')
+    console.error('  node until its cache is lost, then never again — the D5 cold-start guarantee')
+    console.error('  would be silently void.')
+    console.error('')
+    console.error('  Publish it durably first:')
+    console.error(`    BUNDLER=… PUBLISH_KEY=… bun run scripts/deploy.ts ${contract} --seed ${seed} --publish`)
+    console.error(`  Settlement takes hours; re-check with:`)
+    console.error(`    bun run scripts/publish-module.ts --check-only ${id}`)
+    console.error('')
+    console.error('  For a throwaway test deploy, pass --allow-unpublished-module.')
+    process.exit(1)
+  }
+
+  // 1 + 2 — indexed, and which bundle contains it
+  const d = await gql(`{ transaction(id: "${id}") { bundledIn { id } block { height } } }`)
+  const tx = d?.transaction
+  if (!tx) fail(`module ${id} is not indexed on Arweave.`)
+
+  const bundleId = tx.bundledIn?.id
+  if (!bundleId) {
+    // A direct L1 tx is fine; it just has no containing bundle to check.
+    console.log(`module durability      indexed, not bundled (direct L1 tx)`)
+  } else {
+    const b = await gql(`{ transaction(id: "${bundleId}") { block { height } } }`)
+    const bundleHeight = b?.transaction?.block?.height
+    if (!bundleHeight) {
+      fail(
+        `module ${id} is indexed but its containing bundle is NOT mined.`,
+        `bundle ${bundleId} has no block — the item is catalogued, not seeded.`,
+        'This is precisely the case a bare index lookup reports as durable.')
+    }
+    // 3 — confirmation depth
+    const info = await fetch('https://arweave.net/info', { signal: AbortSignal.timeout(30_000) })
+      .then(r => r.ok ? r.json() as any : null).catch(() => null)
+    const head = info?.height
+    const confirmations = head ? head - bundleHeight : null
+    if (confirmations !== null && confirmations < MIN_CONFIRMATIONS) {
+      fail(
+        `module ${id} is only ${confirmations} confirmations deep.`,
+        `bundle ${bundleId} mined at ${bundleHeight}, chain head ${head}.`,
+        `Want at least ${MIN_CONFIRMATIONS}. Wait and re-run.`)
+    }
+    console.log(
+      `module durability      bundle ${bundleId.slice(0, 12)}… @ ${bundleHeight}` +
+      (confirmations !== null ? ` (${confirmations} confirmations)` : ''))
+  }
+
+  // 4 — the bytes exist AND are the ones we built. The decisive check.
+  const raw = await fetch(`https://arweave.net/raw/${id}`, { signal: AbortSignal.timeout(60_000) })
+    .catch(() => null)
+  if (!raw?.ok) {
+    fail(
+      `module ${id} is indexed but its BYTES could not be fetched (HTTP ${raw?.status ?? 'no response'}).`,
+      'Indexed is not retrievable. A node resolving this module has to make this exact request,',
+      'so if it fails here it will fail on the node — see the 2026-08-19 live cutover, where a',
+      'gateway rate limit (429) made three settled modules unfetchable and every spawn failed at',
+      'compute with dev_lua:load_modules/3.')
+  }
+  const published = Buffer.from(await raw.arrayBuffer())
+  const publishedSha = createHash('sha256').update(published).digest('hex')
+  const localSha = createHash('sha256').update(localBundle).digest('hex')
+  if (publishedSha !== localSha) {
+    fail(
+      `MODULE_ID ${id} is NOT the module this image builds.`,
+      `published sha256 ${publishedSha}`,
+      `local     sha256 ${localSha}`,
+      'The image and the pinned MODULE_ID come from different commits. Nothing else catches',
+      'this: "module verified ... matches source" only compares this image\'s dist/ to its own src/.')
+  }
+  console.log(`module bytes           ${published.length.toLocaleString()} B, sha256 matches this build`)
 }
 
 const deployer = new Wallet('0x' + KEY).address
@@ -314,7 +403,7 @@ const ao = createAoClient({
   console.log(`authority              ${authority}${process.env.AUTHORITY ? ' (explicit)' : ' (node)'}`)
   console.log(`deployer (Owner)       ${deployer}`)
   console.log(`module                 ${MODULE_ID}`)
-  await assertModuleIsDurable(MODULE_ID)
+  await assertModuleIsDurable(MODULE_ID, bundle)
 
   if (scheduler !== nodeAddress) {
     console.warn('  ! scheduler-location is NOT this node — the node will not adopt the process')
