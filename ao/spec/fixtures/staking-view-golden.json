@@ -4276,6 +4276,7 @@
           }
         }
       },
+      "Network": [],
       "Period": 3600,
       "Summary": {
         "Ratings": "1313425946422815120584223",
@@ -4541,7 +4542,7 @@
         "claimedHodlers": 400,
         "pendingRounds": 0,
         "pendingShareChanges": 0,
-        "rewardedHodlers": 587,
+        "rewardedHodlers": 585,
         "shares": 0
       },
       "initialized": true,
@@ -14213,6 +14214,7 @@
           }
         }
       },
+      "Network": [],
       "Period": 3600,
       "Summary": {
         "Ratings": "12188119173695763264290210",
@@ -14477,7 +14479,7 @@
         "claimedHodlers": 400,
         "pendingRounds": 0,
         "pendingShareChanges": 0,
-        "rewardedHodlers": 562,
+        "rewardedHodlers": 560,
         "shares": 0
       },
       "initialized": true,
@@ -14515,9 +14517,9 @@
       "0xf96cdfBdBbD173E174D180E9D4632676effA212D (spread)",
       "0xF9DdCaF742f561d5A2Cf3DBEa809465aF31F1E12 (spread)"
     ],
-    "module": "ceFyKa6GPIdQi2Ft7f8QD6X-kpHYb0by5jM92_gmvtQ",
+    "module": "KDU7tgBkJOdqsHa0xQvyYz-DWNST01SPKIKPwtVQJns",
     "roundTimestamp": 1783067640855,
     "seedDetailHodlers": 451,
-    "seedRewardedHodlers": 562
+    "seedRewardedHodlers": 560
   }
 }

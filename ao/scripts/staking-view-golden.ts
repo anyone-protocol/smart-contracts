@@ -25,6 +25,11 @@
 //
 //   MODULE_ID=<id> HB_URL=http://localhost:8734 bun run scripts/staking-view-golden.ts
 //   MODULE_ID=<id> ... bun run scripts/staking-view-golden.ts --check    # diff vs the golden
+//   MODULE_ID=<id> ... bun run scripts/staking-view-golden.ts --resample # rotate the sample too
+//
+// The sampled address set is INHERITED from an existing golden in both modes, so a re-baseline
+// stays comparable to what it replaces. --resample opts out, and makes the result incomparable
+// to every earlier capture.
 import fs from 'node:fs'
 import path from 'node:path'
 import { EthereumSigner } from '@dha-team/arbundles'
@@ -39,6 +44,9 @@ const KEY = (process.env.DEPLOYER_PRIVATE_KEY
   || '80611882d38e5502d93305c88b64da234fea23037334ecb9a647249076c5fa37').replace(/^0x/, '')
 const signer = new EthereumSigner(KEY)
 const CHECK = process.argv.includes('--check')
+// Rotate the sampled address set instead of inheriting the golden's. Deliberate act: it makes the
+// next diff incomparable to every earlier capture, so it must be asked for, never defaulted to.
+const RESAMPLE = process.argv.includes('--resample')
 const GOLDEN = path.join(AO, 'spec/fixtures/staking-view-golden.json')
 
 const seedEnvelope = JSON.parse(
@@ -223,18 +231,27 @@ function assertAgainstSeed (snap: Record<string, any>, addrs: [string, string][]
   })
   console.log(`pid ${pid}`)
 
-  // In --check mode REUSE the golden's address list. Recomputing it would let the sample drift
-  // with the seed shape and report harness noise as behavior change — which it did on the first
-  // run: the flattened seed has 2 fewer Rewarded hodlers, every index-based pick shifted, and
-  // 208 "diffs" were simply different addresses being compared.
+  // REUSE the golden's address list whenever a golden exists — in BOTH modes. Recomputing it
+  // lets the sample drift with the seed shape and reports harness noise as behavior change:
+  // the flattened seed has 2 fewer Rewarded hodlers, so every index-based pick shifts and the
+  // "diffs" are simply different addresses being compared (208 of them on the first run).
+  //
+  // This guard was originally --check only, which left the RE-BASELINE path drifting: capturing
+  // a new golden silently rotated 13 of 21 addresses, so the very next --check compared a
+  // different sample and the continuity the golden exists to provide was gone. Re-baselining is
+  // exactly when the sample must be held fixed. Pass --resample to rotate it deliberately.
   let addrs = sampleAddresses()
-  if (CHECK && fs.existsSync(GOLDEN)) {
+  if (!RESAMPLE && fs.existsSync(GOLDEN)) {
     const g = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'))
-    addrs = (g.meta?.addresses ?? []).map((a: string) => {
+    const fromGolden = (g.meta?.addresses ?? []).map((a: string) => {
       const m = a.match(/^(\S+) \((.*)\)$/)
       return [m ? m[1] : a, m ? m[2] : 'golden'] as [string, string]
     })
-    console.log(`  --check: reusing the golden's ${addrs.length} addresses`)
+    if (fromGolden.length) {
+      addrs = fromGolden
+      console.log(`  reusing the golden's ${addrs.length} addresses`
+        + `${CHECK ? '' : ' (re-baseline holds the sample fixed; --resample to rotate)'}`)
+    }
   }
   console.log(`sampled ${addrs.length} addresses across branches: `
     + [...new Set(addrs.map(([, b]) => b.replace(/#\d+$/, '')))].join(', '))
