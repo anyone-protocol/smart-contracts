@@ -81,7 +81,9 @@ const ENVS = {
   },
   live: {
     host: 'hb.anyone.tech',
-    gated: false,
+    // GATED since 2026-08-20, once deploy.ts had written all three native PIDs to Consul — the
+    // gate templates `gated-processes` from those keys and refuses anything not named there.
+    gated: true,
     edgeLocked: true,
     allowList: [
       '0xD2ef195d86FC9a7AA8889D163b143d5DA0d7bE65',
