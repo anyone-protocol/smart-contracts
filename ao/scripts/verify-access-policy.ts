@@ -551,6 +551,65 @@ for (const env of targets) {
     check(un.headers.get('process') === null && un.status >= 400,
       'unsigned spawn creates no process (faff fails open, scheduler does not)',
       `HTTP ${un.status}`)
+
+    // ---- `~bundler@1.0`: the one route where admitting a stranger COSTS MONEY -----------
+    //
+    // WS-6 runs our own bundling (Jim, 2026-08-20), which means `bundler_httpsig` points at
+    // our own node and the node's wallet SIGNS AND PAYS the L1 transaction:
+    // `dev_bundler_task` does `ar_tx:sign(TX#tx{anchor = Anchor, reward = Price})` with
+    // `hb_opts:get(priv_wallet, ...)`. So an accepted item is a real charge against that
+    // wallet — dev's holds 28.5 AR.
+    //
+    // Everywhere else on this node, admitting an unauthorized request costs a slot and some
+    // compute. Here it costs AR. And hb-dev is DELIBERATELY open to the public internet with
+    // no auth (a standing decision, not a gap), so the moment the bundler is enabled there,
+    // faff is the only thing between a funded wallet and anyone who can POST.
+    //
+    // The assertion is deliberately one-directional and safe in BOTH states: an ephemeral,
+    // never-allow-listed signer must NOT get an item accepted. If the device is disabled or
+    // unrouted it refuses for that reason and the check still passes — which is correct,
+    // because the property under test is "strangers cannot make us pay", not "the bundler is
+    // on". Acceptance is the only failure, and it is the expensive one.
+    if (usable) {
+      const item = createData(new Uint8Array(0) as never, signer, {
+        tags: [{ name: 'action', value: 'bundler-denial-probe' }],
+      })
+      await item.sign(signer)
+      const res = await fetch(`${base(host)}/~bundler@1.0/tx`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/ans104' },
+        body: item.getRaw() as unknown as BodyInit,
+        signal: AbortSignal.timeout(30_000),
+      })
+      // `dev_bundler:item/3` answers an ACCEPTED item with `{ id, timestamp }` and a 2xx.
+      // Treat any 2xx as acceptance regardless of body, so a future response-shape change
+      // cannot quietly turn this into a pass.
+      const accepted = res.status >= 200 && res.status < 300
+      check(!accepted,
+        'bundler REFUSES an item from a non-allow-listed signer (acceptance would spend our AR)',
+        `HTTP ${res.status}`)
+
+      // `verify_message` rejects `unsigned_item` before anything is queued or metered. This is
+      // the device's own guard rather than faff's, so it is asserted separately: a regression
+      // here would let unsigned traffic bill us even with the allow-list intact.
+      const unsignedBundle = await fetch(`${base(host)}/~bundler@1.0/tx`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ data: 'bundler-unsigned-probe' }),
+        signal: AbortSignal.timeout(30_000),
+      })
+      const unsignedAccepted = unsignedBundle.status >= 200 && unsignedBundle.status < 300
+      check(!unsignedAccepted,
+        'bundler REFUSES an unsigned item (verify_message requires signers)',
+        `HTTP ${unsignedBundle.status}`)
+    }
+
+    // A p4 carve-out for the bundler would exempt it from charging entirely, i.e. remove the
+    // only gate in front of a spending endpoint. Nothing should ever put it here, so assert
+    // the absence rather than trusting review to catch it.
+    check(!routes.some(r => typeof r === 'string' && /bundler/i.test(r)),
+      'no p4-non-chargable carve-out for ~bundler@1.0 (a carve-out would ungate spending)',
+      routes.filter(r => typeof r === 'string' && /bundler/i.test(r)).join(' ') || 'none')
   }
 }
 
