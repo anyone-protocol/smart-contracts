@@ -283,14 +283,28 @@ for (const env of targets) {
   const faff = await listOf(host, 'faff-allow-list')
   check(faff.length > 0, 'faff-allow-list is non-empty (empty = key was silently not-found)',
     `${faff.length} entries`)
-  const badForm = faff.filter(a => {
+  // WS-6 self-bundling puts the node's OWN 43-char Arweave address on this list. p4 evaluates the
+  // OUTER request when the node POSTs its own upload to `~bundler@1.0/tx`, and the node signs that
+  // as itself, so without the entry it 400s its own bundle. That is the ONLY non-EVM entry ever
+  // legitimate here, so it is carved out by identity rather than by loosening the format check —
+  // a stray 43-char string that is not this node still fails.
+  //
+  // ⚠️ dev_faff has no per-route scoping, so this entry admits the node on EVERY chargeable route.
+  // Acceptable for our own scheduler on loopback, but it is a real widening, which is why it is
+  // asserted explicitly rather than silently tolerated.
+  const selfEntries = faff.filter(a => a === addresses[env])
+  const evmEntries = faff.filter(a => a !== addresses[env])
+  check(selfEntries.length <= 1, 'node self-entry appears at most once', `${selfEntries.length}`)
+  const badForm = evmEntries.filter(a => {
     try { return getAddress(a) !== a } catch { return true }
   })
-  check(badForm.length === 0, 'every allow-list entry is EIP-55 checksummed',
-    badForm.length ? badForm.join(', ') : `${faff.length} ok`)
+  check(badForm.length === 0,
+    'every allow-list entry is EIP-55 checksummed (excluding the node self-entry)',
+    badForm.length ? badForm.join(', ') : `${evmEntries.length} ok`
+      + (selfEntries.length ? ' + node self-entry' : ''))
   check(new Set(faff).size === faff.length, 'no duplicate allow-list entries')
   const wantList = [...allowList].sort().join(',')
-  const gotList = [...faff].sort().join(',')
+  const gotList = [...evmEntries].sort().join(',')
   check(wantList === gotList, 'allow-list matches the expected set for this environment',
     wantList === gotList ? `${faff.length} addresses` : `got ${gotList}`)
 
