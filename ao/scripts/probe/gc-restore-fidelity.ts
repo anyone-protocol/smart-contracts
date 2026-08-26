@@ -1,8 +1,10 @@
 // Restore fidelity across a node restart — the validation gate for the luerl-GC image patch.
 //
-// hyperbeam-docker patches/v0.9-FINAL/0002-luerl-gc-before-snapshot.patch adds `luerl:gc/1` to
-// `dev_lua:snapshot/3`, which serialises the whole luerl VM and otherwise retains every table the
-// process has ever allocated (400 KB at slot 2 -> 20.6 MB at slot 150, written twice per slot).
+// hyperbeam-docker patches/v0.9-FINAL/0002-luerl-gc-after-compute.patch collects the luerl VM,
+// which `dev_lua:snapshot/3` serialises whole and which otherwise retains every table the process
+// has ever allocated (400 KB at slot 2 -> 20.6 MB at slot 150, written twice per slot). The patch
+// was reshaped from a collect inside snapshot/3 to a collect after compute; the property under
+// test is unchanged, and it is still restore, for the reason given below.
 //
 // `snapshot/3` does NOT write the collected state back into `priv` — it collects a COPY purely for
 // serialisation and the live VM continues on the uncollected state. So the patch cannot affect a
@@ -152,11 +154,27 @@ async function waitForNode (timeoutS = 240) {
   const warmDump = await get(`/${pid}~process@1.0/as/dump`)
   ok('warm full-state dump readable', warmDump.status === 200, `${warmDump.body.length} B  sha=${sha(warmDump.body)}`)
 
-  // Every write must be present warm, or the restart comparison is meaningless.
-  let warmMissing = 0
-  for (let i = 1; i <= WRITES; i++) {
-    if ((await get(`/${pid}~process@1.0/now/state/claimable/${fpOf(i)}`)).status !== 200) warmMissing++
+  // D32 moved the state root out of `base.state` into a runtime global, so
+  // `now/state/claimable/<fp>` — which this probe used until 2026-08-26 — resolves to nothing on
+  // any current contract. It failed WARM, before the restart was even reached, and read as "9
+  // writes LOST" when the writes had in fact all landed (`as/status` counted them). Reads go
+  // through the `as/` view surface now. The `fingerprints` view takes a comma-separated `ids`
+  // param and answers for all of them in ONE request, so this is also N fewer round trips.
+  //
+  // NB the param is `ids`, not `fingerprints`: a query param sharing the view's name shadows the
+  // on-device path resolution and returns the raw param string instead of invoking the view.
+  const claimableMissing = async (from: number, to: number): Promise<number> => {
+    const ids: string[] = []
+    for (let i = from; i <= to; i++) ids.push(fpOf(i))
+    const r = await get(`/${pid}~process@1.0/as/fingerprints?ids=${ids.join(',')}`)
+    if (r.status !== 200) return ids.length
+    let body: any
+    try { body = JSON.parse(r.body) } catch { return ids.length }
+    return ids.filter(fp => !body?.[fp]?.claimable).length
   }
+
+  // Every write must be present warm, or the restart comparison is meaningless.
+  const warmMissing = await claimableMissing(1, WRITES)
   ok('all writes visible warm', warmMissing === 0,
     warmMissing ? `${warmMissing} missing — last compute output: ${lastBody}` : `${WRITES}/${WRITES}`)
 
@@ -190,18 +208,14 @@ async function waitForNode (timeoutS = 240) {
   ok('cold dump readable', coldDump.status === 200, `${coldDump.body.length} B  sha=${coldSha}`)
   ok('full state BYTE-IDENTICAL across restart', preSha === coldSha, `pre=${preSha} cold=${coldSha}`)
 
-  let coldMissing = 0
-  for (let i = 1; i <= WRITES + 1; i++) {
-    if ((await get(`/${pid}~process@1.0/now/state/claimable/${fpOf(i)}`)).status !== 200) coldMissing++
-  }
+  const coldMissing = await claimableMissing(1, WRITES + 1)
   ok('all writes survive the restart', coldMissing === 0,
     coldMissing ? `${coldMissing} LOST` : `${WRITES + 1}/${WRITES + 1}`)
 
   console.log(`\n[5] the restored VM still computes`)
   const postStatus = await submit(pid, fpOf(WRITES + 2))
   ok('post-restore write accepted', postStatus === 200)
-  const postGet = await get(`/${pid}~process@1.0/now/state/claimable/${fpOf(WRITES + 2)}`)
-  ok('post-restore write persisted', postGet.status === 200)
+  ok('post-restore write persisted', await claimableMissing(WRITES + 2, WRITES + 2) === 0)
 
   const before = JSON.parse((await get(`/${pid}~process@1.0/as/status`)).body)
   ok('claimable count consistent with writes', typeof before?.counts?.claimable === 'number',
