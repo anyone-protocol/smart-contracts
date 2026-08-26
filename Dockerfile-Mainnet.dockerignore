@@ -43,6 +43,11 @@
 !ao/scripts/build-native-bundle.ts
 !ao/scripts/util/native-bundle.ts
 
+!ao/scripts/snapshot-state.ts
+!ao/scripts/publish-snapshot.ts
+!ao/scripts/verify-snapshot.ts
+!ao/scripts/recover-from-arweave.ts
+
 !ao/state-dumps/2026-07-09/live-operator-registry.state.json
 !ao/state-dumps/2026-07-09/live-operator-registry.roles.json
 !ao/state-dumps/2026-07-09/live-relay-rewards.state.json

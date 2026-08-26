@@ -84,6 +84,22 @@ COPY ao/scripts/build-staking-seed.ts  ./scripts/build-staking-seed.ts
 COPY ao/scripts/build-native-bundle.ts ./scripts/build-native-bundle.ts
 COPY ao/scripts/util/native-bundle.ts  ./scripts/util/native-bundle.ts
 
+# ── D22 snapshot / durability tooling ───────────────────────────────────────────────────────
+# snapshot-state.ts and publish-snapshot.ts are what the periodic snapshot job runs
+# (operations/ao/publish-snapshot-{stage,live}.hcl). A sidecar in the hyperbeam job was the first
+# design and was rejected: a sidecar shares the node's lifecycle, so a snapshot failure could
+# restart the scheduler. publish-snapshot.ts signs a REAL L1 transaction with a funded Arweave
+# wallet, so it belongs to the same "runs with a live signing key mounted" class as
+# publish-module.ts.
+#
+# verify-snapshot.ts and recover-from-arweave.ts are read-only and sign nothing. They are here
+# because recovery is the disaster path: needing a working workstation checkout to recover from
+# a node loss is exactly the dependency this deliverable removes.
+COPY ao/scripts/snapshot-state.ts       ./scripts/snapshot-state.ts
+COPY ao/scripts/publish-snapshot.ts     ./scripts/publish-snapshot.ts
+COPY ao/scripts/verify-snapshot.ts      ./scripts/verify-snapshot.ts
+COPY ao/scripts/recover-from-arweave.ts ./scripts/recover-from-arweave.ts
+
 # ── migration input ─────────────────────────────────────────────────────────────────────────
 # `deploy.ts --seed live|stage` rebuilds the seed from these rather than trusting a prebuilt
 # artifact, so both envs' state+roles are needed. The .message-tail.json dumps and manifest.json
