@@ -268,11 +268,34 @@ for (const env of targets) {
       'every gated contract is computable HERE and has a seeded allowlist',
       reachable.map(r => r.status).join(' '))
 
+    // Self-hosted bundling puts the node's OWN 43-char Arweave address here, for the same reason
+    // the faff allow-list carries it on dev: the node POSTs its own upload to `~bundler@1.0/tx`
+    // signed as itself, and the gate refuses any request with no target process unless the signer
+    // is a deploy wallet. Carved out by identity rather than by loosening the EIP-55 check, so a
+    // stray 43-char string that is not this node still fails.
+    //
+    // ⚠️ What this admits is SCHEDULING, not authority. The gate is a DoS and cost filter — a
+    // refusal there costs no slot, while an in-contract ACL denial costs ~445 ms and a permanent
+    // one. Contract writes are still decided by the contract's own ACL (native.lua Section ACL),
+    // which this entry does not touch. What it DOES grant is the ability to consume slots on
+    // gated processes and to spawn, so it belongs to wallets we control and nothing else.
     const deployWallets = await listOf(host, `${P4_PATH}/deploy-wallets`)
-    check(deployWallets.length > 0 && deployWallets.every(a => {
+    const dwSelf = deployWallets.filter(a => a === addresses[env])
+    const dwEvm = deployWallets.filter(a => a !== addresses[env])
+    check(dwSelf.length <= 1, 'deploy-wallets node self-entry appears at most once', `${dwSelf.length}`)
+    check(dwEvm.length > 0 && dwEvm.every(a => {
       try { return getAddress(String(a)) === a } catch { return false }
-    }), 'deploy-wallets is non-empty and EIP-55 (spawns are impossible without it)',
-      `${deployWallets.length} entries`)
+    }), 'deploy-wallets is non-empty and EIP-55, excluding the node self-entry (spawns are impossible without it)',
+      `${dwEvm.length} entries${dwSelf.length ? ' + node self-entry' : ''}`)
+
+    // Assert the PAIRING rather than each half. A node pointed at its own bundler without the
+    // self-entry silently refuses its own uploads; the self-entry without the loopback target is
+    // a widening that buys nothing. Either alone is a misconfiguration.
+    const bundlerTarget = (await info(host))?.['bundler-ans104']
+    const selfBundling = typeof bundlerTarget === 'string' && /127\.0\.0\.1|localhost/.test(bundlerTarget)
+    check(selfBundling === (dwSelf.length === 1),
+      'self-bundling configured coherently (loopback bundler <-> node self-entry in deploy-wallets)',
+      `bundler=${bundlerTarget ?? '(unset)'} selfEntry=${dwSelf.length}`)
   } else {
     check(p4?.['pricing-device'] === 'faff@1.0' && p4?.['ledger-device'] === 'faff@1.0',
       'final hook is p4 with faff pricing + ledger devices',
