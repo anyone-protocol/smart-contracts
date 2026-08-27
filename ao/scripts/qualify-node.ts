@@ -549,26 +549,47 @@ const PHASES: Phase[] = [
 
       // Device NAMES, not the container's link hashes: the hashes are content addresses of the
       // rendered messages and move with unrelated detail, while the names are the surface.
+      //
+      // BEST-EFFORT, and it has already stopped working once. On v0.9-FINAL the device list is an
+      // enumerable opt; on edge (checked at 14e9f68a, 2026-08-26) `preloaded-devices` does not
+      // exist at all — upstream moved preloaded devices into a prebuilt LMDB store, which shows up
+      // as the new `preloaded-store` opt (hb_store_lmdb, _build/preloaded-store, read-only). The
+      // names are simply not exposed over HTTP on that build. Nor can they be probed one by one
+      // through a locked edge, since /~<device>/info is not on the nginx whitelist.
+      //
+      // So this reports unavailability with the real reason instead of throwing. The opt surface
+      // above is the fingerprint that works everywhere; this is a second signal when it is offered.
+      let names: string[] = []
+      let deviceWhy = ''
       const container = await optJson(c.url, 'preloaded-devices')
       const idx = Object.keys(container ?? {})
         .map(k => k.split('+')[0])
         .filter(k => /^\d+$/.test(k))
         .map(Number)
         .sort((a, b) => a - b)
-      const names: string[] = []
-      // Sequential on purpose: this is 61 requests, and against a remote node behind an edge a
-      // burst is both rude and a good way to meet the rate limiter we configured ourselves.
-      for (const i of idx) {
-        const m = await optJson(c.url, `preloaded-devices/${i}`)
-        if (m?.name) names.push(String(m.name))
+      if (!container) {
+        deviceWhy = buildKeys.includes('preloaded-store')
+          ? 'this build has no `preloaded-devices` opt; devices live in the `preloaded-store` LMDB store and are not enumerable over HTTP'
+          : 'the `preloaded-devices` opt did not resolve'
+      } else if (!idx.length) {
+        deviceWhy = '`preloaded-devices` resolved but exposes no indexed entries'
+      } else {
+        // Sequential on purpose: this is ~61 requests, and against a remote node behind an edge a
+        // burst is both rude and a good way to meet the rate limiter we configured ourselves.
+        for (const i of idx) {
+          const m = await optJson(c.url, `preloaded-devices/${i}`)
+          if (m?.name) names.push(String(m.name))
+        }
+        names.sort()
+        if (!names.length) deviceWhy = 'indexed entries resolved but carried no `name` (an edge may be refusing the per-index reads)'
       }
-      names.sort()
-      if (!names.length) throw new Error('could not enumerate preloaded devices — the edge may be refusing /~meta@1.0/info/preloaded-devices/<n>')
 
       const sha = (xs: string[]) => crypto.createHash('sha256').update(xs.join('\n')).digest('hex').slice(0, 16)
       metric('fingerprint.optSurface', sha(buildKeys))
       metric('fingerprint.optCount', buildKeys.length)
-      metric('fingerprint.deviceSurface', sha(names))
+      // Never hash an empty list into a real-looking sha: '(not enumerable)' cannot be mistaken
+      // for agreement with a baseline that recorded actual devices.
+      metric('fingerprint.deviceSurface', names.length ? sha(names) : '(not enumerable)')
       metric('fingerprint.deviceCount', names.length)
       metric('fingerprint.configOnly', configOnly.length)
       surfaces.opts = buildKeys
@@ -581,13 +602,31 @@ const PHASES: Phase[] = [
       const diffs: string[] = []
       for (const [what, now, before] of [['opt', buildKeys, prev.opts], ['device', names, prev.devices]] as const) {
         if (!before) continue
+        // Do NOT diff devices we could not enumerate. Otherwise a build that simply stopped
+        // exposing the list reports every device in the baseline as GONE — 61 of them on the
+        // first edge run — which reads as a catastrophic removal instead of what it is.
+        if (what === 'device' && deviceWhy) continue
         const added = now.filter(k => !before.includes(k))
         const gone = before.filter(k => !now.includes(k))
         if (added.length) diffs.push(`${what}s ADDED since the baseline: ${added.join(', ')}`)
         if (gone.length) diffs.push(`${what}s GONE since the baseline: ${gone.join(', ')}`)
       }
-      if (diffs.length) throw new Error(diffs.join(' | ') +
-        ' — if these are configuration keys rather than upstream ones, add them to CONFIG_OWNED in this phase')
+      // WHETHER A CHANGED SURFACE IS A FAILURE DEPENDS ON THE QUESTION BEING ASKED.
+      //
+      //   --image  you are qualifying a CANDIDATE. A different surface is the expected state of
+      //            affairs, exactly as it is for toolchain.*, so it is reported in full and the
+      //            phase passes. --record-baseline then blesses it.
+      //   --url    you are asking whether a DEPLOYED node is the build you already blessed. A
+      //            different surface is the answer 'no', so it fails.
+      //
+      // Both print the same diff, by name. Only the verdict differs.
+      const surfaceChanged = diffs.length > 0
+      if (surfaceChanged && MODE === 'url') {
+        throw new Error(diffs.join(' | ') +
+          ' — if these are configuration keys rather than upstream ones, add them to CONFIG_OWNED in this phase')
+      }
+      if (surfaceChanged) for (const d of diffs) console.log(`    ${d}`)
+      if (deviceWhy) console.log(`    devices NOT enumerable: ${deviceWhy}`)
 
       // THE PIECE HTTP CANNOT GIVE YOU, and the cheap way to get it anyway.
       //
@@ -620,12 +659,15 @@ const PHASES: Phase[] = [
           `jobspec's two literals agree BEFORE concluding anything about the running node.`)
       }
 
-      const verdict = MODE === 'url'
-        ? (declared
-            ? '  — surfaces AND the declared image pin match the blessed baseline'
-            : '  — same VERSION FAMILY as the baseline; the exact image is NOT proven (no image-digest declared in config.json)')
-        : ''
-      return `${buildKeys.length} build opts (${sha(buildKeys)})  ·  ${names.length} devices (${sha(names)})` + verdict
+      const devicePart = names.length ? `${names.length} devices (${sha(names)})` : 'devices not enumerable'
+      const verdict = surfaceChanged
+        ? '  — build surface DIFFERS from the baseline (see above); expected when qualifying a new version'
+        : MODE === 'url'
+          ? (declared
+              ? '  — surfaces AND the declared image pin match the blessed baseline'
+              : '  — same VERSION FAMILY as the baseline; the exact image is NOT proven (no image-digest declared in config.json)')
+          : ''
+      return `${buildKeys.length} build opts (${sha(buildKeys)})  ·  ${devicePart}` + verdict
     },
   },
 
@@ -1030,11 +1072,18 @@ function compare (baseline: Baseline | null): Cmp[] {
     if (key in measured) continue
     const owner = ownerOf(key)
     const ph = results.find(r => r.id === owner)
-    const skipped = ph?.state === 'SKIP' || !ph
+    // Three reasons a baseline metric can be missing, and they mean different things:
+    //   the phase was skipped   -> already reported as a skip; nothing further to say
+    //   the phase FAILED        -> a consequence of that failure, not a second finding
+    //   the phase PASSED anyway -> the extraction broke, and the run must not read as a
+    //                              comparison it did not actually make
+    const st = ph?.state
     out.push({
       key, base: baseline!.metrics[key], now: undefined, kind: METRICS[key]?.kind ?? 'record',
-      verdict: skipped ? 'ABSENT' : 'REGRESSED',
-      why: skipped ? `phase ${owner} did not run` : `phase ${owner} passed but stopped emitting this metric`,
+      verdict: st === 'PASS' ? 'REGRESSED' : 'ABSENT',
+      why: !ph || st === 'SKIP' ? `phase ${owner} did not run`
+        : st === 'PASS' ? `phase ${owner} passed but stopped emitting this metric`
+          : `phase ${owner} failed before emitting it`,
     })
   }
 
@@ -1058,8 +1107,11 @@ function compare (baseline: Baseline | null): Cmp[] {
     }
 
     // gate
+    // mustMatchBaseline gates only when validating a DEPLOYMENT. When qualifying an image the
+    // surface is expected to move, so it is reported like an identity metric instead.
     if (m.mustMatchBaseline && base !== undefined && String(base) !== String(v)) {
-      verdict = 'REGRESSED'; why = 'differs from the blessed baseline'
+      if (MODE === 'url') { verdict = 'REGRESSED'; why = 'differs from the blessed baseline' }
+      else { verdict = 'changed'; why = 'differs from baseline (expected when qualifying a new version)' }
     }
     else if (m.mustBe !== undefined && v !== m.mustBe) { verdict = 'REGRESSED'; why = `must be ${m.mustBe}` }
     else if (m.ceiling !== undefined && typeof v === 'number' && v > m.ceiling) { verdict = 'REGRESSED'; why = `exceeds hard ceiling ${m.ceiling}` }
