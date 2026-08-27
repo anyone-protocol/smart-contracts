@@ -15,9 +15,25 @@
 ---   `gated-processes`     list of process ids this gate protects
 ---   `operator-registry`   the operator-registry id (operators live only there)
 ---   `deploy-wallets`      our own wallets, admitted for ANY path
+---   `bundler-wallets`     wallets admitted for `~bundler@1.0` AND NOTHING ELSE (optional)
 --- Anything not named in `gated-processes` is refused, so the node is locked down by
 --- construction rather than by remembering to add to a denylist: no free reads or writes for
 --- processes we do not run, and no spawning by third parties.
+---
+--- `bundler-wallets` exists for SELF-HOSTED BUNDLING, and is deliberately not `deploy-wallets`.
+--- When a node uploads its own data it POSTs to its own `~bundler@1.0/tx` over loopback, signed
+--- as itself. That request has no target process, so `targetOf` returns nil and the gate refuses
+--- it — which is why stage and live cannot self-bundle without this, while dev can (dev's pricing
+--- device is plain `faff@1.0`, whose allow-list has no per-route scoping at all).
+---
+--- The obvious fix is to put the node's address in `deploy-wallets`, and it is the wrong one:
+--- that list passes ANY path, so it would hand the node key write access to every gated contract
+--- and the ability to spawn — neither of which bundling needs. This list is scoped to one device.
+--- A holder of the node key already controls the scheduler, so the marginal risk is small, but
+--- "small" is not a reason to grant more than the job requires.
+---
+--- ⚠️ NEVER add `^/~bundler@1.0` to `p4-non-chargable-routes` instead. That removes the only gate
+--- in front of a spending endpoint and lets anyone on the internet spend our AR.
 ---
 --- `deploy-wallets` exists for exactly one reason: SPAWN. A spawn is a bare `POST /push` with no
 --- target process, so there is no contract to consult and no Owner to check — the process does
@@ -102,6 +118,20 @@ function gate.targetOf(path, ids)
   return nil
 end
 
+--- Is this request aimed at the bundler device?
+---
+--- Prefix-compared with `string.sub` exactly like `targetOf`, and for the same reason: no pattern
+--- engine (header trap 2), and a substring match would let `~bundler@1.0` appearing in a query
+--- parameter or a nested segment select this branch. Matches the DEVICE, not one path under it,
+--- because the whole device is the spending surface being authorised.
+function gate.isBundlerPath(path)
+  if type(path) ~= 'string' then return false end
+  local p = path
+  if string.sub(p, 1, 1) == '/' then p = string.sub(p, 2) end
+  if p == '~bundler@1.0' then return true end
+  return string.sub(p, 1, 13) == '~bundler@1.0/'
+end
+
 --- Is this allowlist value an admission?
 --- Refcounts are integer strings. A deleted entry is the EMPTY STRING (dev_trie has no delete),
 --- and a blocked address is `B<count>` — the count is preserved so unblocking restores it
@@ -172,8 +202,18 @@ function estimate(base, req, opts)
   for i = 1, n do if not deploy[signers[i]] then allDeploy = false end end
   if allDeploy then return 'ok', ADMIT end
 
+  -- Self-hosted bundling. Checked BEFORE `targetOf`, because a bundler POST has no target
+  -- process and would otherwise fall straight into the refusal below. Scoped to this one device,
+  -- and every signer must be on the list — a bundler request co-signed by a stranger is refused.
+  local path = request and (request.path or request['request-path'])
+  if gate.isBundlerPath(path) then
+    local bundlers = gate.configuredSet(base, 'bundler-wallets')
+    for i = 1, n do if not bundlers[signers[i]] then return 'ok', REFUSE end end
+    return 'ok', ADMIT
+  end
+
   local ids = gate.configuredIds(base)
-  local pid = gate.targetOf(request and (request.path or request['request-path']), ids)
+  local pid = gate.targetOf(path, ids)
   if not pid then return 'ok', REFUSE end
 
   local opreg = base and base['operator-registry']

@@ -6,7 +6,8 @@
 --- end-to-end run tells you the gate said no; only these tell you it said no for the right
 --- reason.
 ---
---- Covered here: committer extraction, target selection, and the allowlist value grammar. The
+--- Covered here: committer extraction, target selection, the allowlist value grammar, and the
+--- bundler carve-out. The
 --- resolve-backed parts (`isOwner`, `listed`) need a node and are Tier-3's job — see
 --- scripts/probe/allowlist-tier3.ts and scripts/probe/p4-gate-e2e.ts.
 
@@ -139,4 +140,82 @@ describe('write-gate', function()
       assert.is_false(gate.admits('true'))
     end)
   end)
+
+  describe('bundler carve-out', function()
+    local NODE = 'pjg-wjvIRYF6EWaJHliNFMAIiD2HnZpg34FZdilLj2M'
+    local OTHER = 'EbD49sHTtVM3POcTmJBHBvuVzVJjwY6_rW2y0WvWPK0'
+
+    describe('isBundlerPath', function()
+      it('matches the device, with or without a leading slash', function()
+        assert.is_true(gate.isBundlerPath('/~bundler@1.0/tx'))
+        assert.is_true(gate.isBundlerPath('~bundler@1.0/tx'))
+        assert.is_true(gate.isBundlerPath('/~bundler@1.0'))
+      end)
+
+      it('does NOT match the device appearing later in the path', function()
+        -- A substring match here would let any request select the carve-out by naming the device
+        -- in a query parameter or a nested segment, which is the whole point of prefix-comparing.
+        assert.is_false(gate.isBundlerPath('/' .. PID_A .. '~process@1.0/push?x=~bundler@1.0/tx'))
+        assert.is_false(gate.isBundlerPath('/foo/~bundler@1.0/tx'))
+      end)
+
+      it('does not match a different device with the same prefix', function()
+        assert.is_false(gate.isBundlerPath('/~bundler@1.0x/tx'))
+        assert.is_false(gate.isBundlerPath('/~bundlerX@1.0/tx'))
+      end)
+
+      it('is false for a non-string path', function()
+        assert.is_false(gate.isBundlerPath(nil))
+        assert.is_false(gate.isBundlerPath(42))
+      end)
+    end)
+
+    local function estimateFor(base, path, committers)
+      local commitments = {}
+      for i, c in ipairs(committers) do
+        commitments['c' .. i] = { ['commitment-device'] = 'ans104@1.0', committer = c }
+      end
+      return select(2, estimate(base, { request = { path = path, commitments = commitments } }, {}))
+    end
+
+    it('admits a listed bundler wallet on the bundler path', function()
+      local base = { ['bundler-wallets'] = { NODE }, ['gated-processes'] = { PID_A } }
+      assert.equal(0, estimateFor(base, '/~bundler@1.0/tx', { NODE }))
+    end)
+
+    it('REFUSES a bundler wallet anywhere else', function()
+      -- The entire reason this is not `deploy-wallets`: the node key must not gain contract
+      -- write access as a side effect of being allowed to upload its own data.
+      local base = { ['bundler-wallets'] = { NODE }, ['gated-processes'] = { PID_A } }
+      assert.equal('infinity', estimateFor(base, '/' .. PID_A .. '~process@1.0/push', { NODE }))
+      assert.equal('infinity', estimateFor(base, '/push', { NODE }))
+    end)
+
+    it('REFUSES a stranger on the bundler path', function()
+      local base = { ['bundler-wallets'] = { NODE }, ['gated-processes'] = { PID_A } }
+      assert.equal('infinity', estimateFor(base, '/~bundler@1.0/tx', { OTHER }))
+    end)
+
+    it('REFUSES when a stranger co-signs alongside a listed wallet', function()
+      local base = { ['bundler-wallets'] = { NODE }, ['gated-processes'] = { PID_A } }
+      assert.equal('infinity', estimateFor(base, '/~bundler@1.0/tx', { NODE, OTHER }))
+    end)
+
+    it('REFUSES the bundler path when the key is absent entirely', function()
+      -- Unset must not fail open: stage and live carry no `bundler-wallets` today.
+      assert.equal('infinity', estimateFor({ ['gated-processes'] = { PID_A } }, '/~bundler@1.0/tx', { NODE }))
+    end)
+
+    it('still refuses an UNSIGNED bundler request', function()
+      local base = { ['bundler-wallets'] = { NODE } }
+      assert.equal('infinity', estimateFor(base, '/~bundler@1.0/tx', {}))
+    end)
+
+    it('leaves deploy-wallets passing everywhere, unchanged', function()
+      local base = { ['deploy-wallets'] = { ALICE }, ['gated-processes'] = { PID_A } }
+      assert.equal(0, estimateFor(base, '/~bundler@1.0/tx', { ALICE }))
+      assert.equal(0, estimateFor(base, '/push', { ALICE }))
+    end)
+  end)
+
 end)
