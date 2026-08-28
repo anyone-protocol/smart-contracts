@@ -94,7 +94,8 @@ const writeConfig = (gatedPids: string[], opreg = '', gateModuleId = '', deployW
     // generic `^/<43-char>~process@1.0/now` template would hand every process on the node free
     // public reads, including ones we have nothing to do with. Everything not listed here goes
     // through the gate, which refuses anything unsigned or not aimed at a gated PID.
-    // Six entries, matching the jobspec: three PID read carve-outs + the three node devices.
+    // Seven entries, matching the jobspec: three PID read carve-outs, the root, and the three
+    // node devices.
     // The alternation must name EVERY read verb a consumer uses, because the gate itself
     // refuses anything unsigned (`n == 0 -> REFUSE`) with no read/write discrimination — so a
     // read verb missing here is not "slower", it is a 400. `as` is the D32 view path and was
@@ -102,6 +103,10 @@ const writeConfig = (gatedPids: string[], opreg = '', gateModuleId = '', deployW
     // are the other two the client issues.
     'p4-non-chargable-routes': [
       ...gatedPids.map(p => ({ template: `^/${p}~process@1.0/(now|compute|slot|as)` })),
+      // `^/$` is the root, which must reach Hyperbuddy rather than be eaten by the gate. It was
+      // added to the jobspecs with the node-host root fix and never mirrored here, so VERIFY=1
+      // reported three failures that were this probe's config, not the node's.
+      { template: '^/$' },
       { template: '^/~meta@1.0' },
       { template: '^/~hyperbuddy@1.0' },
       { template: '^/~query@1.0' },
