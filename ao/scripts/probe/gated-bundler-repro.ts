@@ -127,6 +127,10 @@ const writeConfig = (opts: {
       { template: '^/~meta@1.0' },
       { template: '^/~hyperbuddy@1.0' },
       { template: '^/~query@1.0' },
+      // Mirrors stage and live: the bundler route is exempt from pricing, and the EDGE is what
+      // keeps it off the internet. Legitimate only because those edges refuse `~bundler@1.0`;
+      // dev, whose edge is open, keeps p4 in front of it instead.
+      { template: '^/~bundler@1.0/(tx|item)$' },
     ],
     'rate-limit-requests': 100000,
     'rate-limit-max': 100000,

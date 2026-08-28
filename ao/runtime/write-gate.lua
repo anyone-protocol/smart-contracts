@@ -85,88 +85,6 @@ function gate.configuredIds(base)
   return out
 end
 
---- The node's OWN uploads arrive with an UNSIGNED ENVELOPE.
----
---- `dev_arweave:post_tx/4`'s `ans104@1.0` clause posts
----   hb_http:post(<bundler-ans104>, #{ path, `bundler-subject` = `body`, body = <the item> })
---- and `hb_http:post` never commits what it sends — there is no `hb_message:commit` anywhere on
---- the outbound request path. The signature rides on the nested item, which is precisely what
---- `bundler-subject` tells `dev_bundler:verify_message` to check INSTEAD of the envelope. Measured
---- shape of `req.request` for one of these:
----
----   Message < Path: /~bundler@1.0/tx > {
----     commitments      (absent — the envelope is unsigned)
----     bundler-subject => `body`
----     body            => the SIGNED item, with its own commitments and a `target` or `process`
----   }
----
---- So a scheduler upload reaches p4 unsigned. `dev_faff` admits it (`lists:all` over an empty
---- signer list is vacuously true) and this gate's `n == 0` rule refuses it. That asymmetry is why
---- self-bundling worked on dev and silently stopped publishing on stage and live: the scheduler
---- DISCARDS the upload result (`dev_scheduler_server.erl:266-269`), so a refusal is dropped and
---- never retried and the slot's assignment never reaches Arweave. Eight stage slots were lost
---- that way on 2026-08-27 before it was reverted.
----
---- ⚠️ This is the SECOND of two independent causes, and it was invisible until the first was
---- fixed. Before hyperbeam-docker patch 0005, `dev_lua` could not encode a cache link, so the
---- request never reached this function at all and every gate variant failed identically. Both
---- fixes are required; neither alone is enough.
----
---- ⚠️ This does NOT weaken the gate, and specifically it is not the forbidden shortcut of putting
---- `^/~bundler@1.0` in `p4-non-chargable-routes`. The subject is judged by exactly the same rule
---- as a write: our own wallets, or an address the target contract already admits. An unsigned
---- subject still refuses, and a stranger's signed item names no gated target and refuses too.
----
---- Asserted by scripts/probe/gated-bundler-repro.ts, which runs locally and costs no slots.
---- 🚨 Is this the bundler route? The subject rule below MUST NOT apply anywhere else.
----
---- A `committer` is a FIELD, not a signature check. Whether it can be trusted depends on who
---- verified the message before p4 ran, and that is codec-dependent
---- (`hb_http:req_to_tabm_singleton`): `ans104@1.0` is verified unconditionally by
---- `ar_bundles:verify_item`, `tx@1.0` by `ar_tx:verify`, any other codec by `hb_message:verify`
---- — but `httpsig@1.0` is verified ONLY when `force_signed_requests` is set, and it is not set on
---- any of our nodes (checked on stage and live: absent, so upstream's `false`).
----
---- The bundler envelope is unsigned httpsig, so its nested subject's `committer` is UNVERIFIED
---- data at this point. Without this path check, anyone could put `bundler-subject` on an unsigned
---- httpsig POST to `/<pid>~process@1.0/push`, declare a `committer` of one of our deploy wallets
---- in the body, and be admitted — consuming the slot the gate exists to protect.
----
---- Confined to `~bundler@1.0`, a forged subject buys nothing: the request reaches `dev_bundler`,
---- whose own `verify_message` checks the subject's signature properly and rejects it, and no slot
---- is created and no AR is spent on that path. The gate is still the cost filter; the bundler is
---- the authority for what it bundles, exactly as each contract's ACL is for what it accepts.
----
---- Prefix-compared with `string.sub`, no pattern engine — same reasoning as `targetOf`.
-function gate.isBundlerPath(path)
-  if type(path) ~= 'string' then return false end
-  local want = '/~bundler@1.0/'
-  if string.sub(path, 1, #want) == want then return true end
-  -- Some callers present the path without its leading slash.
-  return string.sub(path, 1, #want - 1) == string.sub(want, 2)
-end
-
-function gate.subjectOf(m)
-  if type(m) ~= 'table' then return nil end
-  local key = m['bundler-subject']
-  if type(key) ~= 'string' or key == '' then return nil end
-  local subject = m[key]
-  if type(subject) ~= 'table' then return nil end
-  return subject
-end
-
---- Which gated contract is this SUBJECT aimed at? An assignment names it in `process`, a message
---- in `target`. There is nothing to prefix-match as there is for a path: the value either IS one
---- of our ids or it is not.
-function gate.subjectTargetOf(subject, ids)
-  if type(subject) ~= 'table' then return nil end
-  local p = subject.process
-  if type(p) == 'string' and ids[p] then return p end
-  local t = subject.target
-  if type(t) == 'string' and ids[t] then return t end
-  return nil
-end
-
 --- Which gated contract is this request writing to?
 ---
 --- Matched as a PREFIX (`/<id>~process@1.0`), not a substring: an id appearing anywhere else in
@@ -244,15 +162,6 @@ function estimate(base, req, opts)
   local request = type(req) == 'table' and req.request or nil
   local signers, n = gate.committersOf(request)
 
-  -- An unsigned ENVELOPE is not the same thing as an unsigned request. The bundler route carries
-  -- its signature on the subject the envelope names, so look there before refusing — otherwise the
-  -- node's own uploads are refused and their assignments are lost silently.
-  local subject = nil
-  if n == 0 and gate.isBundlerPath(request and (request.path or request['request-path'])) then
-    subject = gate.subjectOf(request)
-    if subject ~= nil then signers, n = gate.committersOf(subject) end
-  end
-
   -- Deny-by-default on unsigned. Deliberately stricter than dev_faff, whose `lists:all` over an
   -- empty signer list is vacuously true — stock faff ADMITS unsigned requests.
   if n == 0 then return 'ok', REFUSE end
@@ -263,15 +172,8 @@ function estimate(base, req, opts)
   for i = 1, n do if not deploy[signers[i]] then allDeploy = false end end
   if allDeploy then return 'ok', ADMIT end
 
-  -- A bundler POST's path is `/~bundler@1.0/tx` and names no contract, so the target has to come
-  -- from the subject. Everything else is still matched on the path.
   local ids = gate.configuredIds(base)
-  local pid
-  if subject ~= nil then
-    pid = gate.subjectTargetOf(subject, ids)
-  else
-    pid = gate.targetOf(request and (request.path or request['request-path']), ids)
-  end
+  local pid = gate.targetOf(request and (request.path or request['request-path']), ids)
   if not pid then return 'ok', REFUSE end
 
   local opreg = base and base['operator-registry']

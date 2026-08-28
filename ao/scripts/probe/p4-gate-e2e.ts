@@ -110,6 +110,12 @@ const writeConfig = (gatedPids: string[], opreg = '', gateModuleId = '', deployW
       { template: '^/~meta@1.0' },
       { template: '^/~hyperbuddy@1.0' },
       { template: '^/~query@1.0' },
+      // NO bundler carve-out here, deliberately, even though stage and live have one. That
+      // carve-out is only safe because those edges refuse `~bundler@1.0` outright, and this
+      // probe's node has no edge at all — so p4 must stay in front of the bundler, exactly as it
+      // does on dev. Mirroring production here was tried and `verify-access-policy` correctly
+      // failed it twice over: the carve-out was unpaired, and a stranger's item was accepted.
+      // See scripts/probe/gated-bundler-repro.ts, which does carry it, for the reasoning.
     ],
     'rate-limit-requests': 100000, 'rate-limit-max': 100000, 'rate-limit-period': 60,
     // faff is still the LEDGER device; its list governs everything the gate does not.

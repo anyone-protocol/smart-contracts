@@ -288,14 +288,29 @@ for (const env of targets) {
     }), 'deploy-wallets is non-empty and EIP-55, excluding the node self-entry (spawns are impossible without it)',
       `${dwEvm.length} entries${dwSelf.length ? ' + node self-entry' : ''}`)
 
-    // Assert the PAIRING rather than each half. A node pointed at its own bundler without the
-    // self-entry silently refuses its own uploads; the self-entry without the loopback target is
-    // a widening that buys nothing. Either alone is a misconfiguration.
+    // Assert the PAIRING rather than each half: a loopback bundler needs the route carve-out to
+    // let the node's own upload through, and a carve-out without a loopback target is a widening
+    // that buys nothing. Either alone is a misconfiguration.
+    //
+    // ⚠️ The pairing used to be loopback <-> a node SELF-ENTRY in `deploy-wallets`, and that never
+    // worked: the node signs its uploads on the nested item, never on the envelope, so p4 sees no
+    // signer and no wallet list can match. Shipping it stalled publishing on stage and live and
+    // cost 8 slots. The self-entry is now redundant and should be ABSENT — it granted the node
+    // identity slot-consuming and spawn rights for nothing.
     const bundlerTarget = (await info(host))?.['bundler-ans104']
     const selfBundling = typeof bundlerTarget === 'string' && /127\.0\.0\.1|localhost/.test(bundlerTarget)
-    check(selfBundling === (dwSelf.length === 1),
-      'self-bundling configured coherently (loopback bundler <-> node self-entry in deploy-wallets)',
-      `bundler=${bundlerTarget ?? '(unset)'} selfEntry=${dwSelf.length}`)
+    // Read here rather than reusing the `bundlerRoutes` computed further down: that one lives
+    // after this block, and a forward reference would be `undefined` at run time rather than a
+    // compile error.
+    const carveOuts = (await listOf(host, 'p4-non-chargable-routes'))
+      .map(r => r?.template)
+      .filter(r => typeof r === 'string' && /bundler/i.test(r))
+    check(selfBundling === (carveOuts.length > 0),
+      'self-bundling configured coherently (loopback bundler <-> ~bundler@1.0 route carve-out)',
+      `bundler=${bundlerTarget ?? '(unset)'} carveOut=${carveOuts.length}`)
+    check(dwSelf.length === 0,
+      'deploy-wallets carries NO node self-entry (it never admitted the upload and grants slots + spawn)',
+      dwSelf.length ? String(dwSelf[0]) : 'none')
   } else {
     check(p4?.['pricing-device'] === 'faff@1.0' && p4?.['ledger-device'] === 'faff@1.0',
       'final hook is p4 with faff pricing + ledger devices',
@@ -333,7 +348,13 @@ for (const env of targets) {
 
   // --- native: p4 carve-outs ---------------------------------------------
   const routes = (await listOf(host, 'p4-non-chargable-routes')).map(r => r?.template)
-  check(routes.length === 7, 'p4-non-chargable-routes has exactly 7 entries', `got ${routes.length}`)
+  // 7 base entries, plus the bundler carve-out on an environment that self-bundles. The carve-out
+  // is legitimate ONLY where the edge refuses `~bundler@1.0` outright — see the paired assertion
+  // further down, which is the one that actually protects the wallet.
+  const bundlerRoutes = routes.filter(r => typeof r === 'string' && /bundler/i.test(r))
+  check(routes.length === 7 + bundlerRoutes.length,
+    `p4-non-chargable-routes has exactly ${7 + bundlerRoutes.length} entries (7 base + ${bundlerRoutes.length} bundler)`,
+    `got ${routes.length}`)
   // `.every()` is true for an empty list, so each assertion below is paired with a
   // length guard — otherwise a container that failed to parse reads as a clean pass.
   check(routes.length > 0 && routes.every(t => typeof t === 'string' && t.startsWith('^/')),
@@ -622,8 +643,14 @@ for (const env of targets) {
       // Treat any 2xx as acceptance regardless of body, so a future response-shape change
       // cannot quietly turn this into a pass.
       const accepted = res.status >= 200 && res.status < 300
+      // ⚠️ WHAT THIS ACTUALLY ASSERTS depends on the node. Through a real edge that refuses
+      // `~bundler@1.0` the request never reaches p4, so a pass here is evidence about the EDGE and
+      // says nothing about the pricing device. On a node with no edge it is evidence about p4. It
+      // is a genuine check either way — the property is "a stranger cannot make us spend AR" — but
+      // do not read a pass as proof that p4 gates the bundler. It usually does not; on stage and
+      // live the carve-out means it deliberately does not.
       check(!accepted,
-        'bundler REFUSES an item from a non-allow-listed signer (acceptance would spend our AR)',
+        'a stranger CANNOT get an item bundled (edge or p4, whichever is the control here)',
         `HTTP ${res.status}`)
 
       // `verify_message` rejects `unsigned_item` before anything is queued or metered. This is
@@ -641,12 +668,31 @@ for (const env of targets) {
         `HTTP ${unsignedBundle.status}`)
     }
 
-    // A p4 carve-out for the bundler would exempt it from charging entirely, i.e. remove the
-    // only gate in front of a spending endpoint. Nothing should ever put it here, so assert
-    // the absence rather than trusting review to catch it.
-    check(!routes.some(r => typeof r === 'string' && /bundler/i.test(r)),
-      'no p4-non-chargable carve-out for ~bundler@1.0 (a carve-out would ungate spending)',
-      routes.filter(r => typeof r === 'string' && /bundler/i.test(r)).join(' ') || 'none')
+    // THE bundler invariant, and it is CONDITIONAL — an earlier version of this check asserted
+    // the carve-out was never present, full stop, which is right for an open edge and wrong for a
+    // closed one.
+    //
+    // `~bundler@1.0` accepts items this node pays an L1 reward to bundle, so exactly one control
+    // must stand in front of it. p4 cannot be that control on a node that self-bundles: the node
+    // signs its uploads on the nested item, never on the envelope (`hb_http:post` does not commit
+    // what it sends), so the gate sees an unsigned request and would have to admit the route for
+    // self-bundling to work at all. p4 is also the wrong layer for the actual risk, which is
+    // VOLUME rather than identity — a large body is parsed and its nested item deserialized
+    // before any pricing device runs.
+    //
+    // So the rule is a PAIR, and this asserts the pair rather than either half:
+    //   carve-out present  ->  the edge MUST refuse ~bundler@1.0   (stage, live)
+    //   carve-out absent   ->  p4 is the control, as on the open dev edge
+    // Getting this wrong in the permissive direction puts a funded wallet behind an open
+    // endpoint, which is why it is asserted behaviourally against the real edge, not from config.
+    if (bundlerRoutes.length > 0) {
+      const edge = await get(host, '/~bundler@1.0/tx')
+      check(edge.status === 403 || edge.status === 404,
+        'bundler carve-out is paired with an edge that REFUSES ~bundler@1.0',
+        `carve-out ${bundlerRoutes.join(' ')} + edge HTTP ${edge.status}`)
+    } else {
+      check(true, 'no p4 carve-out for ~bundler@1.0 — p4 is the control on this node', 'none')
+    }
   }
 }
 
