@@ -118,6 +118,34 @@ end
 --- subject still refuses, and a stranger's signed item names no gated target and refuses too.
 ---
 --- Asserted by scripts/probe/gated-bundler-repro.ts, which runs locally and costs no slots.
+--- 🚨 Is this the bundler route? The subject rule below MUST NOT apply anywhere else.
+---
+--- A `committer` is a FIELD, not a signature check. Whether it can be trusted depends on who
+--- verified the message before p4 ran, and that is codec-dependent
+--- (`hb_http:req_to_tabm_singleton`): `ans104@1.0` is verified unconditionally by
+--- `ar_bundles:verify_item`, `tx@1.0` by `ar_tx:verify`, any other codec by `hb_message:verify`
+--- — but `httpsig@1.0` is verified ONLY when `force_signed_requests` is set, and it is not set on
+--- any of our nodes (checked on stage and live: absent, so upstream's `false`).
+---
+--- The bundler envelope is unsigned httpsig, so its nested subject's `committer` is UNVERIFIED
+--- data at this point. Without this path check, anyone could put `bundler-subject` on an unsigned
+--- httpsig POST to `/<pid>~process@1.0/push`, declare a `committer` of one of our deploy wallets
+--- in the body, and be admitted — consuming the slot the gate exists to protect.
+---
+--- Confined to `~bundler@1.0`, a forged subject buys nothing: the request reaches `dev_bundler`,
+--- whose own `verify_message` checks the subject's signature properly and rejects it, and no slot
+--- is created and no AR is spent on that path. The gate is still the cost filter; the bundler is
+--- the authority for what it bundles, exactly as each contract's ACL is for what it accepts.
+---
+--- Prefix-compared with `string.sub`, no pattern engine — same reasoning as `targetOf`.
+function gate.isBundlerPath(path)
+  if type(path) ~= 'string' then return false end
+  local want = '/~bundler@1.0/'
+  if string.sub(path, 1, #want) == want then return true end
+  -- Some callers present the path without its leading slash.
+  return string.sub(path, 1, #want - 1) == string.sub(want, 2)
+end
+
 function gate.subjectOf(m)
   if type(m) ~= 'table' then return nil end
   local key = m['bundler-subject']
@@ -220,7 +248,7 @@ function estimate(base, req, opts)
   -- its signature on the subject the envelope names, so look there before refusing — otherwise the
   -- node's own uploads are refused and their assignments are lost silently.
   local subject = nil
-  if n == 0 then
+  if n == 0 and gate.isBundlerPath(request and (request.path or request['request-path'])) then
     subject = gate.subjectOf(request)
     if subject ~= nil then signers, n = gate.committersOf(subject) end
   end

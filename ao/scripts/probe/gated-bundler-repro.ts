@@ -235,6 +235,11 @@ const unsignedGet = async (p: string) => {
     const un = await unsignedGet('/~router@1.0/routes')
     console.log(`       unsigned request -> HTTP ${un.status} ${un.refused ? 'REFUSED' : 'admitted'}  ${un.body.slice(0, 60)}`)
 
+    // The subject rule must not be usable off the bundler route. That is NOT tested here: a
+    // hand-rolled forgery never decodes and is refused identically by the vulnerable build, so it
+    // passes for the wrong reason. It needs a captured real envelope replayed at a push path —
+    // scripts/probe/gate-subject-replay.ts does exactly that, and fails on the unconfined gate.
+
     // LEG 2 — a real write. The scheduler uploads message + assignment to the loopback bundler
     // INLINE (`scheduling_mode` defaults to `sync`), so by the time this resolves the upload has
     // already been attempted and its result thrown away.
@@ -275,6 +280,7 @@ const unsignedGet = async (p: string) => {
   check(results.gate.queued > 0,
     'under the GATE the node\'s own upload reaches the bundler too',
     `queueing_item x${results.gate.queued}`)
+
 
   if (results.faff.queued > 0 && results.gate.queued === 0) {
     console.log(`\n  DIAGNOSIS — the node's upload is refused before the bundler sees it.`)
