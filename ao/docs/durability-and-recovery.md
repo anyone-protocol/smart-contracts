@@ -77,7 +77,7 @@ the dependency D22 exists to remove.
 | script | what it does |
 |---|---|
 | `scripts/snapshot-state.ts <env>` | capture a consistent, anchored snapshot per contract |
-| `scripts/publish-snapshot.ts <dir>` | publish snapshots as direct L1 transactions (dry run by default) |
+| `scripts/publish-snapshot.ts <dir>` | publish snapshots through the node's own `~bundler@1.0` (dry run by default) |
 | `scripts/verify-snapshot.ts <dir>` | verify payload, anchor, chain continuity and message retrievability |
 | `scripts/recover-from-arweave.ts <pid>` | reconstruct state + ordered history from Arweave alone |
 
@@ -121,29 +121,34 @@ and the snapshot never touches the write path.
 `periodic { cron = "@daily", prohibit_overlap = true }`. Overlap prohibition plus the
 (process, slot) dedupe below means a double-post is unreachable even if a run wedges.
 
-Snapshots go to Arweave as **direct L1 transactions**, not through a bundler - including not
-through our own `~bundler@1.0`. Three reasons, in order of weight:
+Snapshots go to Arweave through **the node's own `~bundler@1.0`**, the same path every
+scheduled message and assignment already takes since D24. The point is to operate, fund and
+monitor one upload mechanism rather than two.
 
-1. **Our `~bundler@1.0` is broken.** It signs, prices and mines the bundle transaction, then
-   every chunk POST returns `400 data_root_not_found`: `building_proofs` computes a `data_size`
-   that does not match the bundle it just posted a header for, so the merkle root describes a
-   payload that does not exist. Structural in the `SignedTX -> structured@1.0 -> tx@1.0` round
-   trip between `post_tx` and `build_proofs`, not payload-specific - snapshots would fail the
-   same way while still being paid for.
-2. **A bundled item is only queryable by tag if a gateway chooses to unbundle it.** A direct L1
-   transaction is indexed natively with its tags. Recovery finds snapshots by
-   `tag process=<pid>, type=state-snapshot`, so bundling would make durability depend on gateway
-   policy for no benefit.
-3. **The saving is 0.348%.** Measured 2026-08-25: three separate transactions cost 0.0205867 AR,
-   one bundle of the same bytes 0.0205150 AR. Arweave prices per byte; bundling amortises many
-   small items, and three ~1 MiB blobs are the opposite shape.
+This was decided against direct L1, which the tooling originally used, and the argument that had
+to be answered was real: recovery finds snapshots by GraphQL **tag query**
+(`tag process=<pid>, type=state-snapshot`), and a bundled data item is indexed only if a gateway
+chooses to unbundle it, whereas an L1 transaction is indexed natively. Verified against live on
+2026-08-28 and the concern does not hold in practice - items inside our own node-signed bundles
+are tag-discoverable on arweave.net, and `transaction(id:)` reports a block height for them,
+which is what the publisher's settlement wait depends on.
 
-If `~bundler@1.0` is fixed, revisit (2) before (3) - the unbundling dependency is the real
-objection, not the fee.
+Two consequences are worth stating plainly rather than discovering later:
 
-Measured 2026-08-25:
+- **The node pays.** `PUBLISH_JWK` signs the data item and holds no AR. The wallet to keep
+  funded is the node's, which already pays for every assignment it publishes.
+- **Acceptance is not settlement.** The bundler batches on an idle flush, then mines, then the
+  gateway indexes - minutes, not seconds. A run that ends with items accepted but not yet
+  indexed is normal and exits 0. Confirming they actually landed is D25's job, and it has to
+  cover snapshots and not only assignments, because snapshot durability now shares a failure
+  domain with the node's upload queue.
 
-| contract | state | gzipped | L1 cost |
+The fee was never the deciding factor either way: bundling the same bytes saves 0.348%
+(measured 2026-08-25, 0.0205867 AR as three transactions against 0.0205150 AR as one bundle).
+
+Measured 2026-08-25 - now an estimate of what the node pays, not a direct charge:
+
+| contract | state | gzipped | cost |
 |---|---|---|---|
 | operator-registry | 0.99 MiB | 0.36 MiB | 0.0059 AR |
 | relay-rewards | 4.02 MiB | 0.96 MiB | 0.0117 AR |
@@ -161,8 +166,10 @@ If a published snapshot exists for the same (process, slot) but its `state-sha25
 that is not a duplicate - one slot produced two different states, which is a correctness problem.
 The publisher reports it and exits non-zero rather than skipping silently. `--force` overrides.
 
-`PUBLISH_JWK` is an **Arweave JWK** that signs and pays. It is not the EVM key used by
-`publish-module.ts`, which signs ANS-104 items for a bundler and holds no AR.
+`PUBLISH_JWK` is an **Arweave JWK** that signs the data item and pays nothing. `BUNDLER` says
+which node takes the upload and defaults to `http://$SNAPSHOT_HOST`, the in-cluster address the
+periodic job resolves from Consul. That default matters: `~bundler@1.0` is refused at the edge
+on stage and live, so the upload only works from inside the cluster.
 
 ### Verifying
 

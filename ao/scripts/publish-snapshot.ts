@@ -1,17 +1,26 @@
 /**
- * D22 - publish state snapshots to Arweave as DIRECT L1 transactions.
+ * D22 - publish state snapshots to Arweave through the node's own ~bundler@1.0.
  *
- * Why L1 and not a bundler
- * ------------------------
- * Bundling exists to amortise many small items into one transaction. A snapshot is a
- * single ~1 MiB blob, so bundling buys nothing and costs us three problems:
- *   - up.arweave.net is Forward Research infrastructure, and getting our durability
- *     path off it is the entire point of WS-6;
- *   - its 5 MiB ceiling is a POLICY limit we are already close to (live relay-rewards
- *     is 4.02 MiB uncompressed and grows with fingerprints);
- *   - our own ~bundler@1.0 is blocked on a proof/header size mismatch.
- * A direct L1 transaction has none of those. Measured 2026-08-25, a full round of all
- * three live contracts is ~1.54 MiB gzipped and costs 0.0205 AR.
+ * Why our own bundler and not direct L1
+ * -------------------------------------
+ * WS-6 exists to get our durability path off Forward Research infrastructure, and D24
+ * closed that: all three nodes sign and pay for their own bundles. Every scheduled message
+ * and assignment already reaches Arweave that way, so publishing snapshots through the same
+ * path leaves ONE upload mechanism to operate, fund and monitor instead of two.
+ *
+ * The objection this had to clear is that recovery finds snapshots by GraphQL TAG QUERY
+ * (recover-from-arweave.ts), and a bundled data item is indexed only if a gateway chooses to
+ * unbundle it. Verified against live 2026-08-28: items inside our own node-signed bundles ARE
+ * tag-discoverable on arweave.net, and `transaction(id:)` reports a block height for them,
+ * which is what the settlement wait below depends on.
+ *
+ * Consequences of the handoff, all real:
+ *   - the NODE pays, from its own wallet. This signer needs no AR at all.
+ *   - acceptance is not settlement. The bundler batches on an idle flush, then mines, then the
+ *     gateway indexes - minutes, not seconds. A run that ends PENDING is normal, not failure.
+ *   - snapshot durability now shares a failure domain with the node's own upload queue. That is
+ *     the trade taken for a single mechanism, and it is exactly why D25 must cover snapshots
+ *     too, not only assignments.
  *
  * Idempotency
  * -----------
@@ -27,7 +36,7 @@
  *
  * Safety
  * ------
- * Dry-run is the DEFAULT. Posting requires --confirm and spends real AR. Publishing an
+ * Dry-run is the DEFAULT. Posting requires --confirm and spends the NODE's AR. Publishing an
  * UNANCHORED snapshot is refused: a snapshot with no anchor assignment leaves the
  * published chain rootless, which is the exact defect D22 exists to close, so paying to
  * store one would buy a false sense of durability.
@@ -40,10 +49,16 @@
  *   PUBLISH_JWK=<json> bun run scripts/publish-snapshot.ts <dir> --confirm
  *
  * Env:
- *   PUBLISH_JWK   Arweave JWK (JSON, or a path to one). Signs AND PAYS. Required for --confirm.
- *   GATEWAY       gateway + peer for posting and verification (default https://arweave.net).
+ *   PUBLISH_JWK   Arweave JWK (JSON, or a path to one). SIGNS the data item and nothing else -
+ *                 it does not pay, so it needs no balance. Required for --confirm.
+ *   BUNDLER       base URL of the node whose ~bundler@1.0 takes the upload. Defaults to
+ *                 http://$SNAPSHOT_HOST, which is what the periodic job resolves from Consul.
+ *                 The route is p4-exempt and refused at the edge, so this must be an
+ *                 in-cluster address, never the public host.
+ *   GATEWAY       gateway for dedupe, size pricing and settlement checks.
  */
 import Arweave from 'arweave'
+import { createData, ArweaveSigner } from '@dha-team/arbundles'
 import { readFileSync, readdirSync } from 'node:fs'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -57,6 +72,8 @@ const FORCE = has('--force')
 const ALLOW_UNANCHORED = has('--allow-unanchored')
 const WAIT_S = Number(flag('--wait') ?? 900)
 const GATEWAY = (process.env.GATEWAY || 'https://arweave.net').replace(/\/$/, '')
+const BUNDLER = (process.env.BUNDLER
+  || (process.env.SNAPSHOT_HOST ? `http://${process.env.SNAPSHOT_HOST}` : '')).replace(/\/$/, '')
 
 if (!DIR) {
   console.error('usage: bun run scripts/publish-snapshot.ts <snapshotDir> [--confirm] [--wait 900]')
@@ -75,7 +92,7 @@ const ar = (winston: string) => (Number(winston) / 1e12).toFixed(8)
 
 function loadJwk (): any {
   const raw = process.env.PUBLISH_JWK
-  if (!raw) throw new Error('PUBLISH_JWK is not set - required to sign and pay for an L1 transaction')
+  if (!raw) throw new Error('PUBLISH_JWK is not set - required to sign the data item')
   const text = existsSync(raw) ? readFileSync(raw, 'utf8') : raw
   const jwk = JSON.parse(text)
   if (!jwk.n || !jwk.d) throw new Error('PUBLISH_JWK does not look like an Arweave JWK')
@@ -171,38 +188,53 @@ async function main () {
     console.log('\nnothing to publish - every snapshot is already on chain at its slot')
     return
   }
-  console.log(`\n  TOTAL ${ar(totalWinston.toString())} AR for ${priced.length} transaction(s)`)
+  console.log(`\n  TOTAL ${ar(totalWinston.toString())} AR for ${priced.length} item(s) - ESTIMATE of what the NODE pays`)
 
   if (!CONFIRM) {
     console.log('\nDRY RUN - nothing posted. Re-run with --confirm (and PUBLISH_JWK set) to publish.')
     return
   }
 
-  const jwk = loadJwk()
-  const addr = await arweave.wallets.jwkToAddress(jwk)
-  const balance = await arweave.wallets.getBalance(addr)
-  console.log(`\n  signer  ${addr}`)
-  console.log(`  balance ${ar(balance)} AR`)
-  if (BigInt(balance) < totalWinston) {
-    throw new Error(`insufficient balance: need ${ar(totalWinston.toString())} AR, have ${ar(balance)} AR`)
+  if (!BUNDLER) {
+    throw new Error('BUNDLER (or SNAPSHOT_HOST) is not set - required to know where to upload')
   }
+  const jwk = loadJwk()
+  const signer = new ArweaveSigner(jwk)
+  const addr = await arweave.wallets.jwkToAddress(jwk)
+  console.log(`\n  signer  ${addr} (signs the item; the node pays for the bundle)`)
+  console.log(`  bundler ${BUNDLER}`)
 
   const published: { contract: string, slot: string, id: string }[] = []
   for (const { item } of priced) {
-    const tx = await arweave.createTransaction({ data: item.data }, jwk)
-    for (const [k, v] of Object.entries(item.meta.tags)) tx.addTag(k, String(v))
-    await arweave.transactions.sign(tx, jwk)
+    // The snapshot's tags are already lowercase and unique, which is what lets dev_codec_ans104
+    // re-encode the stored item bit-exact for signature verification on later reads.
+    const di = createData(item.data, signer, {
+      tags: Object.entries(item.meta.tags).map(([name, value]) => ({ name, value: String(value) })),
+    })
+    await di.sign(signer)
 
-    const uploader = await arweave.transactions.getUploader(tx)
-    while (!uploader.isComplete) {
-      await uploader.uploadChunk()
-      process.stdout.write(`\r  ${item.meta.tags.contract} upload ${uploader.pctComplete}% (${uploader.uploadedChunks}/${uploader.totalChunks})   `)
+    // `Accept: application/json` is REQUIRED. Without it the node answers the POST with the
+    // Hyperbuddy HTML UI and HTTP 200, which reads as success and is not.
+    const res = await fetch(`${BUNDLER}/~bundler@1.0/tx`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/ans104',
+        'codec-device': 'ans104@1.0',
+        'Accept': 'application/json',
+      },
+      body: di.getRaw(),
+      signal: AbortSignal.timeout(300_000),
+    })
+    const body = (await res.text()).replace(/\s+/g, ' ')
+    if (!res.ok || !body.includes('"id"')) {
+      throw new Error(`bundler REFUSED ${item.meta.tags.contract} - HTTP ${res.status}: ${body.slice(0, 200)}`)
     }
-    console.log(`\n  ${item.meta.tags.contract} posted ${tx.id}`)
-    published.push({ contract: item.meta.tags.contract, slot: item.meta.tags.slot, id: tx.id })
+    console.log(`  ${item.meta.tags.contract} accepted ${di.id} (queued - NOT yet on chain)`)
+    published.push({ contract: item.meta.tags.contract, slot: item.meta.tags.slot, id: di.id })
   }
 
   console.log(`\nwaiting up to ${WAIT_S}s for GraphQL settlement (a 200 from the data endpoint is NOT settlement)`)
+  console.log('the bundler batches on an idle flush, then mines, then the gateway indexes - minutes')
   const deadline = Date.now() + WAIT_S * 1000
   const pending = new Set(published.map(p => p.id))
   while (pending.size && Date.now() < deadline) {
@@ -215,9 +247,14 @@ async function main () {
     console.log(`  ${p.contract.padEnd(18)} slot=${String(p.slot).padEnd(6)} ${p.id}  ${pending.has(p.id) ? 'PENDING' : 'settled'}`)
   }
   if (pending.size) {
-    console.log(`\n${pending.size} transaction(s) not yet indexed. Re-check with:`)
+    // Every item here was ACCEPTED by the bundler; the node owns landing it from this point.
+    // Exiting non-zero would mark a routine slow flush as a failed job and train the operator
+    // to ignore it. Settlement is D25's job, not this one's - it has to watch for the case
+    // where an accepted item never lands, which is the 2026-08-27 failure class.
+    console.log(`\n${pending.size} item(s) accepted but not yet indexed - NORMAL for a bundled upload.`)
+    console.log('Confirm later with:')
     for (const id of pending) console.log(`  bun run scripts/verify-snapshot.ts --published ${id}`)
-    process.exit(1)
+    return
   }
   console.log('\nVerify each with:  bun run scripts/verify-snapshot.ts --published <id>')
 }

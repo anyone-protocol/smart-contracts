@@ -11,29 +11,26 @@
 # both on p4's non-chargable routes, so this signer needs NO faff allow-list entry, and the
 # snapshot never touches the write path.
 #
-# --- Why direct L1 and not the node's ~bundler@1.0 ------------------------------------------
-# Three reasons, in order of weight:
+# --- Why the node's own ~bundler@1.0 and not direct L1 --------------------------------------
+# One upload mechanism, not two. D24 closed self-bundling on all three nodes, so every scheduled
+# message and assignment already reaches Arweave through ~bundler@1.0. Publishing snapshots the
+# same way leaves a single path to operate, fund and monitor.
 #
-#   1. Our own ~bundler@1.0 is BROKEN. It signs, prices and mines the bundle transaction, then
-#      every chunk POST returns 400 data_root_not_found: `building_proofs` computes a data_size
-#      that does not match the bundle it just posted a header for, so the merkle root describes
-#      a payload that does not exist. That is structural in the SignedTX -> structured@1.0 ->
-#      tx@1.0 round trip between post_tx and build_proofs, not payload-specific, so snapshots
-#      would fail exactly the same way - while still being PAID FOR.
-#   2. A bundled item is only queryable by tag if a gateway chooses to UNBUNDLE it. A direct L1
-#      transaction is indexed natively with its tags. Recovery finds snapshots by
-#      `tag process=<pid>, type=state-snapshot`, so bundling would make the durability
-#      mechanism depend on gateway policy for no benefit.
-#   3. The saving is 0.348%. Measured 2026-08-25: three separate transactions cost 0.0205867 AR,
-#      one bundle of the same bytes costs 0.0205150 AR. Arweave prices per byte; bundling exists
-#      to amortise MANY SMALL items, and three ~1 MiB blobs are the opposite shape.
+# The objection this had to clear: recovery finds snapshots by GraphQL TAG QUERY, and a bundled
+# data item is indexed only if a gateway chooses to UNBUNDLE it. Verified against live on
+# 2026-08-28 - items inside our own node-signed bundles ARE tag-discoverable on arweave.net, and
+# `transaction(id:)` reports a block height for them, which is what the settlement wait uses.
 #
-# If ~bundler@1.0 is ever fixed, revisit (2) before (3) - the unbundling dependency is the real
-# objection, not the fee.
+# What the handoff costs, and it is not nothing: snapshot durability now shares a failure domain
+# with the node's own upload queue, and acceptance by the bundler is NOT settlement on chain. A
+# run can legitimately end with items accepted but not yet indexed, and it exits 0 when it does.
+# That is exactly why D25's publishing-reliability monitoring has to cover snapshots too.
 #
 # --- Cost and safety ------------------------------------------------------------------------
-# WARNING: this SPENDS AR from PUBLISH_JWK - a real L1 transaction per contract. Keep it funded.
-# Measured 2026-08-25: 0.0206 AR for all three live contracts.
+# WARNING: this spends the NODE's AR, not PUBLISH_JWK's - the node signs and pays for the bundle
+# that carries the snapshot. PUBLISH_JWK signs the data item only and needs NO balance. The
+# thing to keep funded is the NODE wallet, which also pays for every assignment it publishes.
+# Estimated at 2026-08-25 prices: 0.0206 AR for all three live contracts.
 #
 # Publishing is IDEMPOTENT on (process, slot). A contract that has not advanced a slot since its
 # last published snapshot is SKIPPED, not re-posted - live operator-registry sits at slot 8 for
@@ -115,9 +112,14 @@ job "publish-snapshot-stage" {
     # SNAPSHOT_HOST and PUBLISH_JWK are here, not in the env block: an env block does not run
     # through consul-template, so neither a service lookup nor a Vault read works there.
     #
-    # PUBLISH_JWK is a DEDICATED Arweave JWK that signs and pays. Not the node's wallet - the
-    # node's identity key stays in its own Vault path and is never used to publish - and not the
-    # EVM key publish-module.ts uses, which signs ANS-104 items for a bundler and holds no AR.
+    # PUBLISH_JWK is a DEDICATED Arweave JWK that SIGNS the snapshot data item and nothing else.
+    # It holds no AR and needs none: the node pays for the bundle. It is deliberately not the
+    # node's own key - the node's identity stays in its own Vault path and never signs a payload
+    # - so a snapshot stays attributable to the publisher rather than to the scheduler.
+    #
+    # BUNDLER is not set here: publish-snapshot.ts defaults it to http://$SNAPSHOT_HOST, which is
+    # the in-cluster address resolved just below. That matters - `~bundler@1.0` is refused at the
+    # edge on this env, so the upload only works from inside the cluster.
     template {
       destination = "secrets/keys.env"
       env         = true
