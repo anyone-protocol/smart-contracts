@@ -77,8 +77,12 @@ job "publish-snapshot-stage" {
     config {
       network_mode = "host"
 
-      # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48d4cb5a2dd59498489441d3f15294ecd2f53658@sha256:893fdecab1a7dc78642598cf962bb4ba22407a181a5b5048195af4749af53d4a"
+      # Pinned to bbbcdbb, the commit that moved publishing onto the node's own ~bundler@1.0.
+      # The previous pin (48d4cb5a, 2026-08-20) PREDATED the snapshot tooling entirely and would
+      # have failed on a missing file - the scripts landed in c35dbc6 on 2026-08-26.
+      # Tag and digest must move together: the tag names the commit, the digest is what runs.
+      # Digest verified against the tag on ghcr 2026-08-29.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:bbbcdbbc9f630efa06aa78a144ece80fa4038dec@sha256:70f87446adcce501291e585ce03f493819f2af67080ab43e14bc740a67b75e8f"
 
       # Chained with && so a failed capture never reaches the publisher. NOT wrapped in
       # ( set -e; ... ): POSIX ignores -e for a list being tested, and a subshell inherits that
