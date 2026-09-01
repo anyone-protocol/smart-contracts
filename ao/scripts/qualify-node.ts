@@ -77,6 +77,8 @@
 //   --keep                 leave the container running for inspection
 //   --stream               tee every subprocess to the console (default: capture, tail on failure)
 //   --port <n>             host port for the container under test (default 8735)
+//   --from-image <ref>     the image CURRENTLY DEPLOYED. Enables the `trie-crossing` phase, which
+//                          is the only check that can see an upgrade break EXISTING processes.
 //
 // Env: E2E_PRIVATE_KEY, else DEPLOYER_PRIVATE_KEY from ao/.env, else a built-in dev key that the
 //      run warns about loudly (see the note by BUILTIN_DEV_KEY). CONTAINER_ENGINE.
@@ -94,6 +96,7 @@ const opt = (n: string, d = '') => { const i = argv.indexOf(n); return i >= 0 ? 
 const list = (n: string) => (opt(n) || '').split(',').map(s => s.trim()).filter(Boolean)
 
 const IMAGE = opt('--image')
+const FROM_IMAGE = opt('--from-image')
 const URL_ARG = opt('--url')
 const ENV_NAME = opt('--env')
 const BASELINE_PATH = path.resolve(AO, opt('--baseline', 'spec/fixtures/node-baseline.json'))
@@ -183,6 +186,10 @@ const METRICS: Record<string, Metric> = {
   'toolchain.luerl':     { label: 'luerl version', kind: 'identity' },
   'toolchain.erts':      { label: 'erts version', kind: 'identity' },
   'toolchain.tier2Pin':  { label: 'tier-2 runner luerl matches the image', kind: 'gate', mustBe: true },
+
+  // Provenance only: WHICH image we crossed from. The gate is the phase's pass/fail, not this —
+  // the value legitimately changes on every upgrade, so gating on it would fail every real run.
+  'trieCrossing.from':   { label: 'crossed from image', kind: 'record' },
 
   'tier2.passed':        { label: 'tier-2 luerl conformance assertions passed', kind: 'gate', worse: 'lower' },
   'tier2.failed':        { label: 'tier-2 luerl conformance failures', kind: 'gate', ceiling: 0 },
@@ -352,6 +359,8 @@ interface Phase {
   id: string
   label: string
   modes: Array<'image' | 'url'>
+  /** Return a reason to SKIP, or null to run. Reported as SKIP, never as a silent pass. */
+  skipReason?: () => string | null
   /** false for phases that read the image without running it — lets `--only toolchain` skip the boot */
   needsNode?: boolean
   /** true if the phase SPAWNS PROCESSES OR WRITES on the node it is pointed at */
@@ -863,6 +872,48 @@ const PHASES: Phase[] = [
     },
   },
 
+  // ---------------------------------------------------------------- trie survives an upgrade
+  //
+  // 🚨 THE ONLY PHASE THAT TESTS AN UPGRADE RATHER THAN AN IMAGE. Every other phase boots the
+  // candidate clean, so all of them pass an image that cannot continue the processes we are
+  // already running. That gap cost us operator-registry on stage AND live on 2026-08-28:
+  // v0.9-FINAL -> 14e9f68a moved devices out of compiled beams into the LMDB preloaded-store, and
+  // the first message afterwards that WROTE `~trie@1.0` failed with
+  // `Erlang error while running Lua: undef`, wedging the process permanently. Reproduced on
+  // UNPATCHED images, so it is upstream, not our patches.
+  //
+  // What makes it easy to miss, and why the check has to be shaped exactly like this:
+  //   - a READ of the trie succeeds across the boundary;
+  //   - a WRITE that grants nothing (`prev == addr`) also succeeds;
+  //   - only a write that actually grants fails. So the probe must build trie state on the OLD
+  //     image, cross, and then GRANT.
+  //   - `as/` keeps serving the last computed state with HTTP 200 throughout, so only `now/`
+  //     reveals it.
+  //
+  // Verified to discriminate: exit 1 on the known-bad v0.9-FINAL -> 14e9f68a crossing, exit 0 on
+  // a same-image control.
+  {
+    id: 'trie-crossing',
+    label: 'existing processes survive the upgrade (trie write across images)',
+    modes: ['image'],
+    needsNode: false,
+    writes: false,
+    skipReason: () => FROM_IMAGE
+      ? null
+      : 'no --from-image: pass the CURRENTLY DEPLOYED image to test that this one can continue its processes',
+    run: async () => {
+      const r = await run('bun', ['run', 'scripts/probe/opreg-wedge-repro.ts',
+        '--history', '3', '--expect-healthy', '--from-image', FROM_IMAGE!],
+        { env: { IMAGE: IMAGE!, CONTAINER_ENGINE: ENGINE }, timeoutS: 1800, log: 'trie-crossing' })
+      metric('trieCrossing.from', FROM_IMAGE!.slice(-16))
+      if (r.code !== 0) {
+        throw new Error('a process whose trie was written by the deployed image CANNOT be ' +
+          `continued by this one — upgrading would wedge it permanently. ${logged('trie-crossing', r.out)}`)
+      }
+      return 'granting write survives the crossing'
+    },
+  },
+
   // ---------------------------------------------------------------- contract verticals
   {
     id: 'verticals',
@@ -1228,6 +1279,8 @@ function compare (baseline: Baseline | null): Cmp[] {
         continue
       }
       if (p.needsNode !== false && !ctx.url) { record(p.id, p.label, 'SKIP', booted ? 'no node URL' : 'the container failed to boot'); continue }
+      const why = p.skipReason?.()
+      if (why) { record(p.id, p.label, 'SKIP', why, 0, 'selection'); continue }
       console.log(`\n[${p.id}]`)
       const t0 = performance.now()
       try {
