@@ -445,6 +445,16 @@ const ao = createAoClient({
       { name: 'app-name', value: 'anyone-protocol' },
       { name: 'name', value: `${contract}-${Date.now()}` },
     ],
+    // 🚨 DEFER the forced first compute. `spawnProcess` normally drives slot 0 by reading
+    // `now/at-slot`, and on a gated node that read is the SAME one the publish-then-verify
+    // ordering below exists to work around: unsigned, and free only for pids already in
+    // `p4-non-chargable-routes`. Leaving it on means the spawn fails before the Consul key is
+    // ever written — "spawned … but it never computed after 30 attempts (400: Node will not
+    // service this request)" — which is exactly what happened on stage 2026-08-31.
+    //
+    // Nothing is lost by deferring: `materialize()` below calls forceFirstCompute itself, and it
+    // runs after the route exists. Slot 0 is still driven before any view is read.
+    verify: false,
   })
   console.log(`process id             ${processId}  (slot ${slot})`)
 
