@@ -25,8 +25,17 @@ job "operator-registry-stage" {
 
     config {
       network_mode = "host"
-      # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
+      # Pinned to 2814394, which carries the PUBLISH-THEN-VERIFY deploy order. The previous
+      # order wrote the Consul key only after verifying, which the write gate made impossible to
+      # satisfy: verification is UNSIGNED reads, those are free only for pids already in
+      # `p4-non-chargable-routes`, and that list templates from the very key being held back. A
+      # freshly spawned pid therefore always 400s "Node will not service this request" (measured
+      # on stage 2026-08-31). It now publishes, waits for the node to re-render and restart onto
+      # the new pid, verifies, and REVERTS the key on any failure — so a bad id never outlives
+      # the run. Do not re-pin below this commit without restoring that ordering.
+      # Previous pin, for an emergency rollback ONLY — it carries the deadlocking order,
+      # so a deploy from it cannot verify a fresh pid on a gated node: 0e1566b @sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:281439428b96f259c8bf71455629aedcdd6ab97d@sha256:7287ea8041fa517fc4781ceda167dd7ac19097949c15a095d0cc99d35a23cfb3"
 
       entrypoint = ["bun"]
       command = "run"

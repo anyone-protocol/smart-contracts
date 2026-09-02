@@ -25,13 +25,17 @@ job "operator-registry-live" {
 
     config {
       network_mode = "host"
-      # Pinned to 48d4cb5 (2026-08-20). Carries the HARDENED `assertModuleIsDurable`: a module id
-      # must be indexed, its containing bundle mined, >=50 confirmations deep, and its bytes must
-      # sha256-MATCH the bundle this image builds. Safe to repin because 8e02154..48d4cb5 changed
-      # ZERO Lua — only TypeScript tooling, docs and jobspecs — so this image builds byte-identical
-      # bundles to the one that published the modules below, and the new check still passes.
-      # Rollback: 8e02154 @sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48d4cb5a2dd59498489441d3f15294ecd2f53658@sha256:893fdecab1a7dc78642598cf962bb4ba22407a181a5b5048195af4749af53d4a"
+      # Pinned to 2814394, which carries the PUBLISH-THEN-VERIFY deploy order. The previous
+      # order wrote the Consul key only after verifying, which the write gate made impossible to
+      # satisfy: verification is UNSIGNED reads, those are free only for pids already in
+      # `p4-non-chargable-routes`, and that list templates from the very key being held back. A
+      # freshly spawned pid therefore always 400s "Node will not service this request" (measured
+      # on stage 2026-08-31). It now publishes, waits for the node to re-render and restart onto
+      # the new pid, verifies, and REVERTS the key on any failure — so a bad id never outlives
+      # the run. Do not re-pin below this commit without restoring that ordering.
+      # Previous pin, for an emergency rollback ONLY — it carries the deadlocking order,
+      # so a deploy from it cannot verify a fresh pid on a gated node: 48d4cb5 @sha256:893fdecab1a7dc78642598cf962bb4ba22407a181a5b5048195af4749af53d4a
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:281439428b96f259c8bf71455629aedcdd6ab97d@sha256:7287ea8041fa517fc4781ceda167dd7ac19097949c15a095d0cc99d35a23cfb3"
 
       entrypoint = ["bun"]
       command = "run"
