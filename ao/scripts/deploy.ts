@@ -40,6 +40,9 @@
 //
 //   <contract>   operator-registry | relay-rewards | staking-rewards
 //   --seed       live|stage → migrate-on-spawn from that env's 2026-07-09 dump;
+//                current    → RESPAWN from an envelope already built by build-respawn-seed.ts,
+//                             i.e. the state the process holds NOW. Use this to replace a live
+//                             process; `--seed live` would roll it back to the July dump.
 //                none → empty declared state (a fresh process, not a migration)
 //   --publish    publish durably via BUNDLER (needs PUBLISH_KEY); prints the MODULE_ID
 //   --publish-cmd  print the node-host eval for a NODE-LOCAL id (fast, NOT cold-start safe)
@@ -87,8 +90,8 @@ if (!contract || !(contract in CONTRACTS)) {
   process.exit(2)
 }
 const seed = opt('seed')
-if (!seed || !['live', 'stage', 'none'].includes(seed)) {
-  console.error('--seed is required and must be one of: live, stage, none')
+if (!seed || !['live', 'stage', 'none', 'current'].includes(seed)) {
+  console.error('--seed is required and must be one of: live, stage, none, current')
   console.error('  (there is no default: "which state does this process start from" is not a question to guess at)')
   process.exit(2)
 }
@@ -158,7 +161,24 @@ if (!fs.existsSync(bundlePath)) {
 }
 
 let seedEnvelope: string | undefined
-if (seed !== 'none') {
+if (seed === 'current') {
+  // A RESPAWN. The envelope must already exist and must have been captured from the running
+  // node — regenerating it here from the 2026-07-09 dump is precisely the mistake this guards
+  // against (live held 3,288 claimable on 2026-08-31 against the dump's 2,940).
+  if (!fs.existsSync(envelopePath)) {
+    console.error(`--seed current needs ${path.relative(AO, envelopePath)}, built by:`)
+    console.error('  bun run scripts/build-respawn-seed.ts <env> --verify --image <ref>')
+    process.exit(1)
+  }
+  seedEnvelope = fs.readFileSync(envelopePath, 'utf8')
+  const parsed = JSON.parse(seedEnvelope)
+  const roles = Object.keys(parsed?.acl?.roles ?? {})
+  if (roles.length === 0) {
+    console.error('REFUSING: envelope carries no ACL roles — the controllers could not write to it.')
+    process.exit(1)
+  }
+  console.log(`seed envelope          ${(seedEnvelope.length / 1024).toFixed(1)}KB (RESPAWN, roles: ${roles.join(', ')})`)
+} else if (seed !== 'none') {
   // Reuse the seed builders verbatim rather than reimplementing the transform — they
   // are what the Tier-3 validations were run against, and they assert their own
   // totality (a dropped address fails the build rather than shrinking the migration).
