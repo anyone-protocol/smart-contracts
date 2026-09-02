@@ -448,6 +448,95 @@ const ao = createAoClient({
   })
   console.log(`process id             ${processId}  (slot ${slot})`)
 
+  // ─── PUBLISH-THEN-VERIFY, and why the order had to invert ─────────────────────────────────
+  // This used to write the Consul key only after every check below, so an unreadable id could
+  // never reach `gated-processes`. The write gate made that ordering IMPOSSIBLE to satisfy:
+  // every check below is an UNSIGNED read, those are free only for pids listed in
+  // `p4-non-chargable-routes`, and that list is templated from the very key we were holding
+  // back. A freshly spawned pid therefore always 400s "Node will not service this request"
+  // (measured on stage 2026-08-31, and it is why the contracts could be deployed at all before
+  // the gate landed but not after).
+  //
+  // So: write the key, let the node re-render and restart onto it (the hyperbeam config.json
+  // template has no change_mode, so it takes Nomad's default of `restart`), wait for the route
+  // to actually appear, then verify. The safety the old ordering provided is preserved by
+  // REVERTING the key on any verification failure, so a bad id never outlives the run.
+  const consulKey = process.env.CONTRACT_CONSUL_KEY
+  const { CONSUL_IP, CONSUL_PORT, CONSUL_TOKEN } = process.env
+  let consul: any = null
+  let previousPid: string | null = null
+
+  if (consulKey) {
+    if (!CONSUL_IP || !CONSUL_PORT) {
+      console.error(`\nCONTRACT_CONSUL_KEY is set (${consulKey}) but CONSUL_IP/CONSUL_PORT are not.`)
+      console.error('Refusing to continue: the PID would go unrecorded and the deploy would still')
+      console.error(`look successful. Record it manually: consul kv put ${consulKey} ${processId}`)
+      process.exit(1)
+    }
+    const { default: Consul } = await import('consul')
+    consul = new Consul({ host: CONSUL_IP, port: CONSUL_PORT })
+  }
+  // Omit the token rather than passing undefined: the client forwards it straight into the
+  // x-consul-token header, and `undefined` is rejected as an invalid header value.
+  const tok = CONSUL_TOKEN ? { token: CONSUL_TOKEN } : {}
+  const consulGet = async (): Promise<string | null> => {
+    try {
+      const r: any = await consul.kv.get({ key: consulKey!, ...tok })
+      return r?.Value ?? null
+    } catch { return null }
+  }
+  const consulSet = async (value: string) =>
+    !!(await consul.kv.set({ key: consulKey!, value, ...tok }))
+
+  /** Wait for the node to re-render its route list and answer for this pid again. The node
+   *  RESTARTS on the key change, so connection errors here are expected and not failures. */
+  const waitForRoute = async (pid: string, seconds = 300): Promise<boolean> => {
+    const deadline = Date.now() + seconds * 1000
+    while (Date.now() < deadline) {
+      try {
+        const r = await fetch(`${HB_URL}/${pid}~process@1.0/slot/current`,
+          { signal: AbortSignal.timeout(10_000) })
+        if (r.ok) return true
+      } catch { /* node restarting */ }
+      await new Promise(r => setTimeout(r, 5000))
+    }
+    return false
+  }
+
+  /** Verification failed after the key was published — put it back and fail the run. */
+  const abort = async (why: string): Promise<never> => {
+    console.error(`\nFAILED: ${why}`)
+    if (consulKey && previousPid) {
+      console.error(`reverting ${consulKey} -> ${previousPid} …`)
+      const ok = await consulSet(previousPid).catch(() => false)
+      console.error(ok
+        ? `  reverted. The node will restart back onto ${previousPid}.`
+        : `  REVERT FAILED — set it by hand: consul kv put ${consulKey} ${previousPid}`)
+    } else if (consulKey) {
+      console.error(`no previous value to revert to; ${consulKey} now names an UNVERIFIED pid.`)
+      console.error(`Clear or repoint it by hand before anything reads it.`)
+    }
+    process.exit(1)
+  }
+
+  if (consulKey) {
+    previousPid = await consulGet()
+    console.log(`\nconsul ${consulKey}`)
+    console.log(`  previous             ${previousPid ?? '(unset)'}`)
+    if (!await consulSet(processId)) {
+      console.error(`\nFAILED to write ${consulKey}. Nothing was changed; the spawned pid is`)
+      console.error(`orphaned and can be ignored: ${processId}`)
+      process.exit(1)
+    }
+    console.log(`  set                  ${processId}`)
+    console.log('\nwaiting for the node to re-render its routes and restart …')
+    if (!await waitForRoute(processId)) {
+      await abort('the node never served the new pid — routes did not re-render, or it did not come back up')
+    }
+    console.log('  node is serving the new pid')
+  }
+
+
   // Verify it MATERIALIZED, rather than trusting a 200. `spawnProcess` already forced the
   // lazy first compute (that is a spawn-level guarantee now, not a caller's job), so this is
   // the SEED-LANDED confirmation: `status.initialized` separates a computed-but-empty process
@@ -457,8 +546,7 @@ const ao = createAoClient({
   let status: any
   try { status = await ao.materialize(processId, { attempts: 40, delayMs: 1500 }) }
   catch (e) {
-    console.error(`FAILED: the process did not materialize — ${(e as Error).message}`)
-    process.exit(1)
+    await abort(`the process did not materialize — ${(e as Error).message}`)
   }
   console.log(`  status: ${JSON.stringify(status.counts ?? status)}`)
   console.log(`  owner:  ${status.owner ?? '(not reported)'}`)
@@ -512,14 +600,13 @@ const ao = createAoClient({
       console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}: ${got}/${want}`)
     }
     if (ran === 0) {
-      console.error('\nFAILED: no count could be verified against the seed. A deploy that')
       console.error('cannot confirm what it migrated is not a deploy — check the status view')
       console.error('field names against COUNT_MAP.')
-      process.exit(1)
+      await abort('no count could be verified against the seed')
     }
     if (bad) {
-      console.error('\nFAILED: seeded state does not match the builder output. Do NOT publish this PID.')
-      process.exit(1)
+      console.error('\nseeded state does not match the builder output.')
+      await abort('seeded state does not match the builder output')
     }
   }
 
@@ -602,48 +689,22 @@ const ao = createAoClient({
   }
 
   if (gateBad) {
-    console.error('\nFAILED: the write gate cannot read this process. Publishing this PID into')
-    console.error('gated-processes would refuse every operator write, because the gate fails')
-    console.error('CLOSED. Do NOT write this id to Consul.')
-    process.exit(1)
+    console.error('\nthe write gate cannot read this process — it fails CLOSED, so every')
+    console.error('operator write would be refused.')
+    await abort('the write gate cannot read this process')
   }
 
   const env = seed === 'none' ? '<env>' : seed
   console.log('\n=== DEPLOYED ===')
   console.log(`  ${processId}`)
 
-  // Record the PID in Consul when the job supplies a key. Deliberately AFTER every check above:
-  // the jobspecs template `gated-processes` from this key, so an id the gate cannot read must
-  // never reach it. The exits above are what guarantee that.
-  //
-  // No dummy default. If a key is named, the write is required — a deploy that reports success
-  // while silently writing nowhere is worse than one that fails.
-  const consulKey = process.env.CONTRACT_CONSUL_KEY
+  // The key was published before verification (see the note by the spawn) and every check above
+  // has now passed, so this only reports the state rather than changing it.
   if (consulKey) {
-    const { CONSUL_IP, CONSUL_PORT, CONSUL_TOKEN } = process.env
-    if (!CONSUL_IP || !CONSUL_PORT) {
-      console.error(`\nCONTRACT_CONSUL_KEY is set (${consulKey}) but CONSUL_IP/CONSUL_PORT are not.`)
-      console.error('Refusing to finish: the PID would go unrecorded and the deploy would still')
-      console.error(`look successful. Record it manually: consul kv put ${consulKey} ${processId}`)
-      process.exit(1)
-    }
-    const { default: Consul } = await import('consul')
-    const consul = new Consul({ host: CONSUL_IP, port: CONSUL_PORT })
-    // Omit the token rather than passing undefined: the client forwards it straight into the
-    // x-consul-token header, and `undefined` is rejected as an invalid header value. Omitting is
-    // also better than the legacy 'no-token' placeholder, which sends a real header that an
-    // ACL-enabled Consul then has to reject on its own terms.
-    const ok = await consul.kv.set({
-      key: consulKey,
-      value: processId,
-      ...(CONSUL_TOKEN ? { token: CONSUL_TOKEN } : {}),
-    })
-    if (!ok) {
-      console.error(`\nFAILED to write ${consulKey} to Consul. The process is deployed and`)
-      console.error(`verified, so this is safe to retry: consul kv put ${consulKey} ${processId}`)
-      process.exit(1)
-    }
     console.log(`\n  consul: ${consulKey} = ${processId}`)
+    if (previousPid && previousPid !== processId) {
+      console.log(`  replaced: ${previousPid}`)
+    }
   } else {
     console.log('\nRecord the PID (this is what the jobspecs template from):')
     console.log(`  consul kv put smart-contracts/${env}/${contract}-address ${processId}`)
