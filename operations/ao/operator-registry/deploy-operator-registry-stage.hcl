@@ -25,11 +25,21 @@ job "operator-registry-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
+      # Pinned to 2814394, which carries the PUBLISH-THEN-VERIFY deploy order. The previous
+      # order wrote the Consul key only after verifying, which the write gate made impossible to
+      # satisfy: verification is UNSIGNED reads, those are free only for pids already in
+      # `p4-non-chargable-routes`, and that list templates from the very key being held back. A
+      # freshly spawned pid therefore always 400s "Node will not service this request" (measured
+      # on stage 2026-08-31). It now publishes, waits for the node to re-render and restart onto
+      # the new pid, verifies, and REVERTS the key on any failure — so a bad id never outlives
+      # the run. Do not re-pin below this commit without restoring that ordering.
+      # Previous pin, for an emergency rollback ONLY — it carries the deadlocking order,
+      # so a deploy from it cannot verify a fresh pid on a gated node: 0e1566b @sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:281439428b96f259c8bf71455629aedcdd6ab97d@sha256:7287ea8041fa517fc4781ceda167dd7ac19097949c15a095d0cc99d35a23cfb3"
 
-      entrypoint = ["npm"]
+      entrypoint = ["bun"]
       command = "run"
-      args = ["deploy"]
+      args = ["scripts/deploy.ts", "operator-registry", "--seed", "stage"]
 
       logging {
         type = "loki"
@@ -44,29 +54,26 @@ job "operator-registry-stage" {
 
     consul {}
 
+    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
+    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
+    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
+    # rides the spawn message, selected by `--seed` above.
     env {
-      PHASE = "stage"
+      # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
+      # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
+      # rendered in the template block below instead.
+
+      # TODO: the durable module id, from publishing this contract's module.
+      # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
+      # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
+      MODULE_ID = "2vWsI194X4gmK66fhWQdRsBnQJIoG8nFBqnSazW_cgA"
+
+      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
+      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
+      # template gated-processes from.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/operator-registry-address"
-      CONTRACT_NAME = "operator-registry"
-      CU_URL="https://cu-stage.anyone.tech"
-
-      ## NB: Spawn a new process & migrate state from an existing one
-      ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
-      ##     existing process ID to migrate from
-      IS_MIGRATION_DEPLOYMENT = "true"
-
-      ## NB: Call Init with data from file at INIT_DATA_PATH
-      # CALL_INIT_HANDLER="true"
-    }
-
-    template {
-      data = <<-EOF
-      MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/stage/operator-registry-address" }}
-      EOF
-      destination = "local/config.env"
-      env = true
     }
 
     template {
@@ -79,6 +86,9 @@ job "operator-registry-stage" {
       {{- end }}
       {{- range service "loki" }}
       LOKI_URL="http://{{ .Address }}:{{ .Port }}/loki/api/v1/push"
+      {{- end }}
+      {{- range service "hyperbeam-stage-node" }}
+      HB_URL="http://{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
     }

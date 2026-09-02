@@ -1,0 +1,135 @@
+# The AO MAINNET contracts image — the native operator-registry, relay-rewards and
+# staking-rewards contracts, the HyperBEAM runtime they execute in, and the tooling that
+# publishes and deploys them.
+#
+# Distinct from legacy/Dockerfile-AO, which builds the aos/genesis-wasm era contracts. The two
+# share a package.json and nothing else; none of that tree is copied here.
+#
+# ─── Why this image exists ──────────────────────────────────────────────────────────────────
+# So that publishing and deploying can run FROM THE CLUSTER instead of a workstation. A module
+# id is the SIGNED ans104 item id, so it is a function of the signing wallet as much as of the
+# bytes — which is exactly why that wallet should be Vault's, mounted into a Nomad job, and not
+# a copy someone pasted into a local .env.
+#
+# It also closes the loop on hard-coded module ids: the id is content-addressed, so with the
+# bytes in git and the id literal in the jobspec, the gate a node is running can be verified
+# against a specific commit.
+#
+# ─── EVERY FILE IS NAMED. Do not add a directory COPY. ──────────────────────────────────────
+# This container runs with a live signing key mounted, so anything in it is something that
+# could end up signed, and anything in the build context is something that could end up in it.
+# A directory COPY plus a `rm -rf` of the bits you remembered is a denylist: it ships whatever
+# nobody thought of — a stray .env, a test wallet, a scratch dump.
+#
+# So the file list below is exhaustive and derived from what the two entrypoints actually read.
+# Adding a contract or a script means adding a line here. That is the point: the diff shows up
+# in review instead of arriving silently inside a directory.
+#
+# Dockerfile-Mainnet.dockerignore is the second half of the same control — it denies the whole
+# context and re-admits only these paths, so even a careless `COPY . .` added later cannot leak.
+# It is scoped to THIS Dockerfile (BuildKit prefers <dockerfile>.dockerignore over a root one),
+# so the legacy image's context is untouched and nothing here has to accommodate it. If the two
+# lists drift, the build FAILS on a missing COPY source rather than quietly including too much.
+#
+# ─── Usage ──────────────────────────────────────────────────────────────────────────────────
+# There is no CMD: every use is a one-shot job that names its own entrypoint.
+#
+#   bun run scripts/publish-module.ts runtime/write-gate.lua     # needs BUNDLER + PUBLISH_KEY
+#   bun run scripts/deploy.ts operator-registry --seed live      # needs HB_URL + DEPLOYER_PRIVATE_KEY
+#
+# Build context is the REPO ROOT (docker build . --file Dockerfile-Mainnet), matching the
+# legacy image.
+
+FROM docker.io/oven/bun:1.3-alpine
+
+WORKDIR /app
+
+# Dependencies first: a contract or script edit should not re-resolve the lockfile.
+# bun 1.3 is required — `bun.lock` is the text lockfile format, which bun 1.1 cannot parse.
+COPY ao/package.json ao/bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY ao/tsconfig.json ./
+
+# ── runtime ─────────────────────────────────────────────────────────────────────────────────
+# native.lua is the contract runtime; write-gate.lua is the p4 pricing device. Both are read by
+# scripts/util/native-bundle.ts, which inlines them into the published module.
+# runtime/runtime.lua is the LEGACYNET shim and is deliberately not here.
+COPY ao/runtime/native.lua      ./runtime/native.lua
+COPY ao/runtime/write-gate.lua  ./runtime/write-gate.lua
+COPY ao/runtime/vendor/json.lua ./runtime/vendor/json.lua
+
+# ── contract libraries ──────────────────────────────────────────────────────────────────────
+# Exactly the four the bundler inlines. common/acl.lua is NOT among them — the ACL lives in
+# native.lua for the mainnet contracts.
+COPY ao/src/contracts/common/bigint.lua ./src/contracts/common/bigint.lua
+COPY ao/src/contracts/common/eip55.lua  ./src/contracts/common/eip55.lua
+COPY ao/src/contracts/common/errors.lua ./src/contracts/common/errors.lua
+COPY ao/src/contracts/common/utils.lua  ./src/contracts/common/utils.lua
+
+# ── the contracts ───────────────────────────────────────────────────────────────────────────
+COPY ao/src/contracts/native/operator-registry.lua ./src/contracts/native/operator-registry.lua
+COPY ao/src/contracts/native/relay-rewards.lua     ./src/contracts/native/relay-rewards.lua
+COPY ao/src/contracts/native/staking-rewards.lua   ./src/contracts/native/staking-rewards.lua
+
+# ── tooling ─────────────────────────────────────────────────────────────────────────────────
+# The two entrypoints, the three seed builders deploy.ts shells out to, and the one shared
+# module they all import. scripts/util/ holds node-facing helpers that reach for a local .env
+# and a live node; only native-bundle.ts is pure.
+COPY ao/scripts/deploy.ts              ./scripts/deploy.ts
+COPY ao/scripts/publish-module.ts      ./scripts/publish-module.ts
+COPY ao/scripts/build-seed.ts          ./scripts/build-seed.ts
+COPY ao/scripts/build-relay-seed.ts    ./scripts/build-relay-seed.ts
+COPY ao/scripts/build-staking-seed.ts  ./scripts/build-staking-seed.ts
+COPY ao/scripts/build-native-bundle.ts ./scripts/build-native-bundle.ts
+COPY ao/scripts/util/native-bundle.ts  ./scripts/util/native-bundle.ts
+
+# ── D22 snapshot / durability tooling ───────────────────────────────────────────────────────
+# snapshot-state.ts and publish-snapshot.ts are what the periodic snapshot job runs
+# (operations/ao/publish-snapshot-{stage,live}.hcl). A sidecar in the hyperbeam job was the first
+# design and was rejected: a sidecar shares the node's lifecycle, so a snapshot failure could
+# restart the scheduler. publish-snapshot.ts signs a REAL L1 transaction with a funded Arweave
+# wallet, so it belongs to the same "runs with a live signing key mounted" class as
+# publish-module.ts.
+#
+# verify-snapshot.ts and recover-from-arweave.ts are read-only and sign nothing. They are here
+# because recovery is the disaster path: needing a working workstation checkout to recover from
+# a node loss is exactly the dependency this deliverable removes.
+COPY ao/scripts/snapshot-state.ts       ./scripts/snapshot-state.ts
+COPY ao/scripts/publish-snapshot.ts     ./scripts/publish-snapshot.ts
+COPY ao/scripts/verify-snapshot.ts      ./scripts/verify-snapshot.ts
+COPY ao/scripts/recover-from-arweave.ts ./scripts/recover-from-arweave.ts
+
+# ── migration input ─────────────────────────────────────────────────────────────────────────
+# `deploy.ts --seed live|stage` rebuilds the seed from these rather than trusting a prebuilt
+# artifact, so both envs' state+roles are needed. The .message-tail.json dumps and manifest.json
+# are diagnostics that no deploy path reads.
+COPY ao/state-dumps/2026-07-09/live-operator-registry.state.json   ./state-dumps/2026-07-09/live-operator-registry.state.json
+COPY ao/state-dumps/2026-07-09/live-operator-registry.roles.json   ./state-dumps/2026-07-09/live-operator-registry.roles.json
+COPY ao/state-dumps/2026-07-09/live-relay-rewards.state.json       ./state-dumps/2026-07-09/live-relay-rewards.state.json
+COPY ao/state-dumps/2026-07-09/live-relay-rewards.roles.json       ./state-dumps/2026-07-09/live-relay-rewards.roles.json
+COPY ao/state-dumps/2026-07-09/live-staking-rewards.state.json     ./state-dumps/2026-07-09/live-staking-rewards.state.json
+COPY ao/state-dumps/2026-07-09/live-staking-rewards.roles.json     ./state-dumps/2026-07-09/live-staking-rewards.roles.json
+COPY ao/state-dumps/2026-07-09/stage-operator-registry.state.json  ./state-dumps/2026-07-09/stage-operator-registry.state.json
+COPY ao/state-dumps/2026-07-09/stage-operator-registry.roles.json  ./state-dumps/2026-07-09/stage-operator-registry.roles.json
+COPY ao/state-dumps/2026-07-09/stage-relay-rewards.state.json      ./state-dumps/2026-07-09/stage-relay-rewards.state.json
+COPY ao/state-dumps/2026-07-09/stage-relay-rewards.roles.json      ./state-dumps/2026-07-09/stage-relay-rewards.roles.json
+COPY ao/state-dumps/2026-07-09/stage-staking-rewards.state.json    ./state-dumps/2026-07-09/stage-staking-rewards.state.json
+COPY ao/state-dumps/2026-07-09/stage-staking-rewards.roles.json    ./state-dumps/2026-07-09/stage-staking-rewards.roles.json
+
+# `deploy.ts` rebuilds the module bundle and the migration seed into dist/ on every run, so that
+# one directory has to be writable. Everything else stays root-owned and read-only to the
+# runtime user ON PURPOSE: this container runs with a live signing key mounted, and a source
+# tree it cannot rewrite is a source tree that cannot be rewritten between the moment the bytes
+# are read and the moment they are signed.
+# Build the contract module bundles INTO the image. The bytes are identical across dev/stage/
+# live and across reseeds — the seed rides the spawn message, not the module — so one published
+# id serves every environment, and pinning them to the image digest means the bytes that get
+# signed are the bytes that were reviewed.
+RUN bun run scripts/build-native-bundle.ts operator-registry \
+ && bun run scripts/build-native-bundle.ts relay-rewards \
+ && bun run scripts/build-native-bundle.ts staking-rewards
+
+RUN mkdir -p dist && chown bun:bun dist
+
+USER bun

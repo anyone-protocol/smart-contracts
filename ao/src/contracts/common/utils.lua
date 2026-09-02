@@ -19,6 +19,48 @@ local function initUtils()
   end
 
   return {
+    -- Exact string→integer (digit-fold). luerl's tonumber FLOATS integer strings, so
+    -- parsing integer tags/config with tonumber then assertInteger fails on-device.
+    -- Returns an integer or nil (non-integer input). Accepts an already-integer number.
+    parseInt = function (v)
+      if type(v) == 'number' then
+        if math.type and math.type(v) == 'float' then
+          return v == math.floor(v) and math.floor(v) or nil
+        end
+        return v
+      end
+      if type(v) ~= 'string' then return nil end
+      local a, neg = v, false
+      if a:sub(1, 1) == '-' then neg, a = true, a:sub(2) end
+      if #a == 0 then return nil end
+      local n = 0
+      for k = 1, #a do
+        local b = a:byte(k)
+        if b < 48 or b > 57 then return nil end
+        n = n * 10 + (b - 48)
+      end
+      if neg then n = -n end
+      return n
+    end,
+
+    -- Device-safe replacement for `string.gmatch(s, '[^sep]+')`: luerl 1.3.0's gmatch
+    -- throws `bad argument` on the device VM (A13), so contracts that split comma lists
+    -- must not use it. Returns non-empty tokens split on the literal separator `sep`.
+    split = function (str, sep)
+      local out, start, n = {}, 1, #str
+      while start <= n do
+        local i = string.find(str, sep, start, true)   -- plain find (no patterns)
+        local tok
+        if not i then
+          tok = string.sub(str, start); start = n + 1
+        else
+          tok = string.sub(str, start, i - 1); start = i + #sep
+        end
+        if #tok > 0 then out[#out + 1] = tok end
+      end
+      return out
+    end,
+
     normalizeEvmAddress = function (address)
       if (starts_with(address, '0x')) then
         return '0x'..string.upper(string.sub(address, 3))

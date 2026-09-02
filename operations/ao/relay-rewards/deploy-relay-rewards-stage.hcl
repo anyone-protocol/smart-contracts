@@ -25,10 +25,11 @@ job "relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
-      entrypoint = ["npm"]
+      # TODO: pin the commit that built this image before running.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
+      entrypoint = ["bun"]
       command = "run"
-      args = ["deploy"]
+      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage"]
       logging {
         type = "loki"
         config {
@@ -42,29 +43,26 @@ job "relay-rewards-stage" {
 
     consul {}
 
+    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
+    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
+    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
+    # rides the spawn message, selected by `--seed` above.
     env {
-      PHASE = "stage"
+      # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
+      # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
+      # rendered in the template block below instead.
+
+      # TODO: the durable module id, from publishing this contract's module.
+      # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
+      # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
+      MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
+
+      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
+      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
+      # template gated-processes from.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/relay-rewards-address"
-      CONTRACT_NAME = "relay-rewards"
-      CU_URL="https://cu-stage.anyone.tech"
-
-      ## NB: Spawn a new process & migrate state from an existing one
-      ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
-      ##     existing process ID to migrate from
-      IS_MIGRATION_DEPLOYMENT = "true"
-
-      ## NB: Call Init with data from file at INIT_DATA_PATH
-      # CALL_INIT_HANDLER="true"
-    }
-
-    template {
-      data = <<-EOF
-      MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/stage/relay-rewards-address" }}
-      EOF
-      destination = "local/config.env"
-      env = true
     }
 
     template {
@@ -74,6 +72,9 @@ job "relay-rewards-stage" {
       {{- with secret "kv/stage-protocol/relay-rewards-stage" }}
       DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+      {{- end }}
+      {{- range service "hyperbeam-stage-node" }}
+      HB_URL="http://{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
     }
