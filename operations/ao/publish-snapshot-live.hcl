@@ -72,6 +72,12 @@ job "publish-snapshot-live" {
 
     env {
       GATEWAY = "https://arweave.net"
+
+      # A PATH, not the key itself. publish-snapshot.ts's loadJwk() accepts either
+      # (`existsSync(raw) ? readFileSync(raw) : raw`), and a file is how every other Arweave JWK
+      # in this org is delivered - see HB_OPERATOR_KEY_BASE64 -> secrets/wallet.json in
+      # hyperbeam-{dev,stage,live}.hcl. It also keeps the key out of the process environment.
+      PUBLISH_JWK = "${NOMAD_SECRETS_DIR}/publish-jwk.json"
     }
 
     config {
@@ -116,6 +122,10 @@ job "publish-snapshot-live" {
     # SNAPSHOT_HOST and PUBLISH_JWK are here, not in the env block: an env block does not run
     # through consul-template, so neither a service lookup nor a Vault read works there.
     #
+    # ⚠️ The JWK is STORED BASE64 in Vault as PUBLISH_JWK_BASE64 and decoded into a FILE below,
+    # never into an env var: a JWK is JSON full of double quotes, so a raw env render ends the
+    # value at the first inner quote. Same shape as the node's own key.
+    #
     # PUBLISH_JWK is a DEDICATED Arweave JWK that SIGNS the snapshot data item and nothing else.
     # It holds no AR and needs none: the node pays for the bundle. It is deliberately not the
     # node's own key - the node's identity stays in its own Vault path and never signs a payload
@@ -128,13 +138,19 @@ job "publish-snapshot-live" {
       destination = "secrets/keys.env"
       env         = true
       data = <<-EOH
-      {{- with secret "kv/live-protocol/publish-snapshot-live" }}
-      PUBLISH_JWK="{{ .Data.data.PUBLISH_JWK }}"
-      {{- end }}
       {{- range service "hyperbeam-live-node" }}
       SNAPSHOT_HOST="{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
+    }
+
+    template {
+      data = <<-EOF
+      {{- with secret "kv/live-protocol/publish-snapshot-live" }}
+      {{- base64Decode .Data.data.PUBLISH_JWK_BASE64 }}
+      {{- end }}
+      EOF
+      destination = "secrets/publish-jwk.json"
     }
   }
 }
