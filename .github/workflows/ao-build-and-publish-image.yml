@@ -46,13 +46,37 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build image
-        run: docker build . --file Dockerfile-Mainnet --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
-
+      # Login comes BEFORE the build now, because the build pushes.
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
-      - name: Push image
+      # ─── Why buildx --push instead of build-then-push ────────────────────────────────────────
+      # `docker build` exports every layer into the local image store, and `docker push` then
+      # compresses and uploads them again: two full passes over a ~724 MB image. The export pass
+      # alone measured 181-196s on every run in Aug-Sep 2026, and on 2026-09-02 the runner
+      # SIGTERMed the build inside that window three times in a row (exit 143, no other output).
+      # That was not the commit, the base image, the region or the runner version — all four were
+      # identical to builds that passed, and the same commit builds clean locally.
+      #
+      # buildx streams layers straight to ghcr as they are produced, so the phase that was dying
+      # no longer exists. The Dockerfile and therefore the image contents are unchanged.
+      # BuildKit still honours Dockerfile-Mainnet.dockerignore, which is the second half of the
+      # image's file allowlist, so that control is preserved.
+      #
+      # ⚠️ The three output flags are LOAD-BEARING, because the deploy jobspecs pin
+      # <tag>@sha256:... and are verified against the registry's docker-content-digest. The
+      # manifest this pushes therefore has to keep exactly the shape `docker push` produced
+      # before this change:
+      #   --provenance=false --sbom=false  attestations are on by default for the
+      #       docker-container driver, and they turn the tag into a manifest INDEX. The digest a
+      #       jobspec pinned would then be an index digest, not the image digest a plain pull
+      #       reports.
+      #   oci-mediatypes=false             buildx defaults to OCI media types; every image
+      #       published so far is application/vnd.docker.distribution.manifest.v2+json.
+      # Verified against a throwaway local registry on 2026-09-02: with all three, the pushed
+      # manifest is vnd.docker.distribution.manifest.v2+json with 45 layers and no .manifests,
+      # matching the last good ghcr image (281439428b96f2...) exactly.
+      - name: Build and push image
         run: |
           IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
 
@@ -60,5 +84,13 @@ jobs:
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
           echo IMAGE_ID=$IMAGE_ID
 
-          docker tag $IMAGE_NAME $IMAGE_ID:${GITHUB_SHA}
-          docker push $IMAGE_ID:${GITHUB_SHA}
+          # The runner's default builder uses the docker driver, which cannot --push.
+          docker buildx create --use --name ci --driver docker-container
+
+          docker buildx build . \
+            --file Dockerfile-Mainnet \
+            --label "runnumber=${GITHUB_RUN_ID}" \
+            --tag $IMAGE_ID:${GITHUB_SHA} \
+            --provenance=false \
+            --sbom=false \
+            --output type=registry,oci-mediatypes=false
