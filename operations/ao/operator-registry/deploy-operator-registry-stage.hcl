@@ -25,17 +25,28 @@ job "operator-registry-stage" {
 
     config {
       network_mode = "host"
-      # Pinned to 2814394, which carries the PUBLISH-THEN-VERIFY deploy order. The previous
-      # order wrote the Consul key only after verifying, which the write gate made impossible to
-      # satisfy: verification is UNSIGNED reads, those are free only for pids already in
-      # `p4-non-chargable-routes`, and that list templates from the very key being held back. A
-      # freshly spawned pid therefore always 400s "Node will not service this request" (measured
-      # on stage 2026-08-31). It now publishes, waits for the node to re-render and restart onto
-      # the new pid, verifies, and REVERTS the key on any failure — so a bad id never outlives
-      # the run. Do not re-pin below this commit without restoring that ordering.
-      # Previous pin, for an emergency rollback ONLY — it carries the deadlocking order,
-      # so a deploy from it cannot verify a fresh pid on a gated node: 0e1566b @sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:281439428b96f259c8bf71455629aedcdd6ab97d@sha256:7287ea8041fa517fc4781ceda167dd7ac19097949c15a095d0cc99d35a23cfb3"
+      # Pinned to 32b9f23, which fixes BOTH layers of the same deploy-order deadlock. The
+      # write gate makes verification impossible for a pid that is not yet published: the reads
+      # are UNSIGNED, unsigned reads are free only for pids already in `p4-non-chargable-routes`,
+      # and that list templates from the very Consul key being held back. A freshly spawned pid
+      # therefore always 400s "Node will not service this request".
+      #   layer 1 (2814394) — the CALLER verified before publishing. It now publishes, waits for
+      #     the node to re-render and restart onto the new pid, verifies, and REVERTS the key on
+      #     any failure, so a bad id never outlives the run. Measured on stage 2026-08-31.
+      #   layer 2 (32b9f23) — `spawnProcess` ALSO forced a first compute of its own, via the same
+      #     unsigned `now/at-slot` read, so the spawn died before the key was ever written. That
+      #     read is now deferred (`verify: false`); `materialize()` drives slot 0 afterwards,
+      #     once the route exists. Measured on stage 2026-09-01.
+      # Do not re-pin below this commit without restoring BOTH.
+      # ⚠️ THERE IS NO SAFE ROLLBACK TARGET. Every earlier image carries at least one of the two
+      # layers above, so a deploy from one cannot complete a spawn on a gated node:
+      #   2814394 @sha256:7287ea8041fa517fc4781ceda167dd7ac19097949c15a095d0cc99d35a23cfb3
+      #     fixes layer 1 only — the spawn still dies on its own forced first compute.
+      #   0e1566b @sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0
+      #     carries BOTH deadlocks.
+      # If this pin fails, fix forward. Rolling back only reproduces a failure we have already
+      # measured twice.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:32b9f2382e1f84c0f0ee65b4ff54c4dd4cef9264@sha256:7b2fa8568643f25575658a88998589ee75d1b046378219fc4ad7964409b8e508"
 
       entrypoint = ["bun"]
       command = "run"
