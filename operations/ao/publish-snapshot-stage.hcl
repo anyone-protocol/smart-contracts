@@ -61,7 +61,7 @@ job "publish-snapshot-stage" {
   # Once a day. prohibit_overlap stops a slow or hung run from racing its successor, which with
   # the (process, slot) dedupe means a double-post is not reachable even if a run wedges.
   periodic {
-    cron             = "@daily"
+    crons            = ["@daily"]
     prohibit_overlap = true
   }
 
