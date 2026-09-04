@@ -76,7 +76,13 @@ const argOf = (flag: string) => {
 const OUT = argOf('--out') || join('snapshots', env)
 const ONLY = argOf('--contract')
 const HOST = HOST_OVERRIDE || ENVS[env].host
-const scheme = (h: string) => (h.startsWith('localhost') || h.startsWith('127.') ? 'http' : 'https')
+// An IP literal is always in-cluster and always plain HTTP; only a DNS name reaches the TLS edge.
+// Matching on `127.` alone sent `https://` at the Consul-resolved node address and failed the
+// handshake - `publish-snapshot.ts` gets this right by hardcoding `http://$SNAPSHOT_HOST`.
+const scheme = (h: string) => {
+  const host = h.split(':')[0]
+  return host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ? 'http' : 'https'
+}
 const BASE = `${scheme(HOST)}://${HOST}`
 
 /**

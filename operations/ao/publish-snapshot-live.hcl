@@ -135,15 +135,17 @@ job "publish-snapshot-live" {
     # node's own key - the node's identity stays in its own Vault path and never signs a payload
     # - so a snapshot stays attributable to the publisher rather than to the scheduler.
     #
-    # BUNDLER is not set here: publish-snapshot.ts defaults it to http://$SNAPSHOT_HOST, which is
-    # the in-cluster address resolved just below. That matters - `~bundler@1.0` is refused at the
-    # edge on this env, so the upload only works from inside the cluster.
+    # BUNDLER is set explicitly and SNAPSHOT_HOST deliberately is NOT. `~bundler@1.0` is refused
+    # at the edge, so the upload must go in-cluster - but snapshot-state.ts in the PINNED image
+    # forces https:// on any non-127 host, so setting SNAPSHOT_HOST makes its reads fail the TLS
+    # handshake against the node's plain-HTTP port. Unset, it reads the public edge (free, p4
+    # non-chargable). Re-add it once an image carrying the scheme fix is built.
     template {
       destination = "secrets/keys.env"
       env         = true
       data = <<-EOH
       {{- range service "hyperbeam-live-node" }}
-      SNAPSHOT_HOST="{{ .Address }}:{{ .Port }}"
+      BUNDLER="http://{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
     }
