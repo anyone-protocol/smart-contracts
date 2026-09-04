@@ -51,7 +51,7 @@
 job "publish-snapshot-stage" {
   datacenters = [ "ator-fin" ]
   type = "batch"
-  namespace = "stage-services"
+  namespace = "stage-protocol"
 
   constraint {
     attribute = "${meta.pool}"
@@ -146,7 +146,7 @@ job "publish-snapshot-stage" {
 
     template {
       data = <<-EOF
-      {{- with secret "kv/stage-services/publish-snapshot-stage" }}
+      {{- with secret "kv/stage-protocol/publish-snapshot-stage" }}
       {{- base64Decode .Data.data.PUBLISH_JWK_BASE64 }}
       {{- end }}
       EOF
