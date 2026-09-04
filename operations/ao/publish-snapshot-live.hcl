@@ -119,6 +119,10 @@ job "publish-snapshot-live" {
       role = "any1-nomad-workloads-owner"
     }
 
+    # Required for the `range service` lookup below. Without it the template renders EMPTY and the
+    # job fails at upload with "BUNDLER (or SNAPSHOT_HOST) is not set".
+    consul {}
+
     # SNAPSHOT_HOST and PUBLISH_JWK are here, not in the env block: an env block does not run
     # through consul-template, so neither a service lookup nor a Vault read works there.
     #
