@@ -83,12 +83,12 @@ job "publish-snapshot-live" {
     config {
       network_mode = "host"
 
-      # Pinned to bbbcdbb, the commit that moved publishing onto the node's own ~bundler@1.0.
-      # The previous pin (48d4cb5a, 2026-08-20) PREDATED the snapshot tooling entirely and would
-      # have failed on a missing file - the scripts landed in c35dbc6 on 2026-08-26.
+      # Pinned to 695e7ba. Carries the fix for the run-killing refusal: one unanchored snapshot
+      # used to abort the whole run, so live published on only 3 of 13 runs and stage 9 of 15.
+      # Now unanchored items are skipped and everything anchored publishes.
       # Tag and digest must move together: the tag names the commit, the digest is what runs.
-      # Digest verified against the tag on ghcr 2026-08-29.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:bbbcdbbc9f630efa06aa78a144ece80fa4038dec@sha256:70f87446adcce501291e585ce03f493819f2af67080ab43e14bc740a67b75e8f"
+      # Digest verified against the tag on ghcr 2026-09-16.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:695e7baf520f13d48fee47f0c2b839d3f760818c@sha256:86a60d8c216e2fd9d334ddfb504660e312d6c32db5b206dd7a0d0e8c48698a3e"
 
       # Chained with && so a failed capture never reaches the publisher. NOT wrapped in
       # ( set -e; ... ): POSIX ignores -e for a list being tested, and a subshell inherits that
