@@ -70,6 +70,48 @@ const DIR = argv.find(a => !a.startsWith('--') && a !== flag('--wait'))
 const CONFIRM = has('--confirm')
 const FORCE = has('--force')
 const ALLOW_UNANCHORED = has('--allow-unanchored')
+/** How long to wait for a head slot's assignment to be indexed before giving up on THAT item. */
+const ANCHOR_WAIT_MS = (() => {
+  const i = process.argv.indexOf('--anchor-wait')
+  return (i > -1 ? parseInt(process.argv[i + 1], 10) : 900) * 1000
+})()
+
+/**
+ * Poll for the assignment at (pid, slot). Same query `snapshot-state.ts` uses at capture time -
+ * we are simply asking again, later, because indexing is not instant.
+ */
+async function waitForAnchor (pid: string, slot: string, budgetMs: number) {
+  const deadline = Date.now() + budgetMs
+  const query = `{ transactions(tags:[
+    {name:"process",values:["${pid}"]},
+    {name:"type",values:["Assignment"]},
+    {name:"slot",values:["${slot}"]}
+  ], first:5) { edges { node { id tags{name value} } } } }`
+  let waited = false
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${GATEWAY}/graphql`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query }),
+        signal: AbortSignal.timeout(45_000),
+      })
+      const j: any = await res.json()
+      const edge = j?.data?.transactions?.edges?.[0]
+      if (edge) {
+        const tags: Record<string, string> = {}
+        for (const t of edge.node.tags) tags[t.name] = t.value
+        return { assignment: edge.node.id as string, baseHashpath: tags['base-hashpath'] ?? null }
+      }
+    } catch { /* keep trying until the budget runs out */ }
+    if (!waited) {
+      console.log(`    waiting up to ${Math.round(budgetMs / 60000)} min for slot ${slot}'s assignment to be indexed …`)
+      waited = true
+    }
+    await new Promise(r => setTimeout(r, 30_000))
+  }
+  return null
+}
 const WAIT_S = Number(flag('--wait') ?? 900)
 const GATEWAY = (process.env.GATEWAY || 'https://arweave.net').replace(/\/$/, '')
 const BUNDLER = (process.env.BUNDLER
@@ -142,17 +184,40 @@ async function main () {
 
   const items = metas.map(m => {
     const meta = JSON.parse(readFileSync(join(DIR!, m), 'utf8'))
-    return { meta, data: readFileSync(join(DIR!, meta.data)) as Buffer, file: m }
+    return { meta, data: readFileSync(join(DIR!, meta.data)) as Buffer, file: m, skip: false }
   })
 
-  const unanchored = items.filter(i => !i.meta.anchored)
-  if (unanchored.length && !ALLOW_UNANCHORED) {
-    console.error(`REFUSING to publish ${unanchored.length} UNANCHORED snapshot(s):`)
-    for (const u of unanchored) console.error(`  ${u.file} - ${u.meta.anchorReason}`)
-    console.error('\nAn unanchored snapshot leaves the published chain rootless, which is the defect')
-    console.error('D22 closes. Wait for the slot\'s assignment to be indexed, or pass --allow-unanchored')
-    console.error('if you deliberately want an unanchored archival copy.')
-    process.exit(1)
+  // 🚨 ONE UNANCHORED SNAPSHOT MUST NOT SINK THE WHOLE RUN.
+  // This used to `process.exit(1)` if ANY item was unanchored, which threw away every anchored
+  // snapshot alongside it. Measured 2026-09-16: live published on only 3 of 13 runs and stage on
+  // 9 of 15, and every environment's snapshots share identical timestamps - the all-or-nothing
+  // signature of that exit. A real run: opreg and relay both anchored, staking not yet indexed,
+  // all three discarded.
+  //
+  // The race is inherent. A snapshot is captured at HEAD, and the head slot's assignment needs a
+  // bundler idle flush, then mining, then gateway indexing - minutes. Hourly contracts are always
+  // near head at capture time, so on any given night one of them is likely to lose.
+  //
+  // So: wait a bounded while for the anchor to appear (the job is @daily with prohibit_overlap, so
+  // waiting costs nothing), then SKIP whatever is still unanchored and publish the rest. The next
+  // run picks up the stragglers - which is what the original design intended and did not do.
+  let skippedUnanchored = 0
+  for (const item of items) {
+    if (item.meta.anchored || ALLOW_UNANCHORED) continue
+    const { process: pid, slot } = item.meta.tags
+    const found = ANCHOR_WAIT_MS > 0 ? await waitForAnchor(pid, slot, ANCHOR_WAIT_MS) : null
+    if (found) {
+      item.meta.anchored = true
+      item.meta.tags['anchor-assignment'] = found.assignment
+      if (found.baseHashpath) item.meta.tags['anchor-base-hashpath'] = found.baseHashpath
+      console.log(`  ${String(item.meta.tags.contract).padEnd(18)} slot=${String(slot).padEnd(6)} anchor appeared after waiting: ${found.assignment}`)
+    } else {
+      skippedUnanchored++
+      item.skip = true
+      console.warn(
+        `  ${String(item.meta.tags.contract).padEnd(18)} slot=${String(slot).padEnd(6)} SKIP - still UNANCHORED ` +
+        `(${item.meta.anchorReason}). The next run will pick it up.`)
+    }
   }
 
   console.log(`gateway=${GATEWAY}  snapshots=${items.length}  mode=${CONFIRM ? 'PUBLISH' : 'DRY RUN'}\n`)
@@ -161,6 +226,7 @@ async function main () {
   let conflicts = 0
   const priced: { item: typeof items[0], price: string }[] = []
   for (const item of items) {
+    if (item.skip) continue
     const t = item.meta.tags
     const dup = FORCE ? null : await alreadyPublished(t.process, t.slot, t['state-sha256'])
     if (dup && !dup.conflict) {
@@ -185,6 +251,12 @@ async function main () {
     process.exit(1)
   }
   if (!priced.length) {
+    if (skippedUnanchored) {
+      // Nothing got through. Exit non-zero so the run shows as failed in Nomad rather than
+      // looking like a clean no-op; `checkpoint-age` is the detector if this persists.
+      console.error(`\nNOTHING PUBLISHED - all ${skippedUnanchored} snapshot(s) are still unanchored.`)
+      process.exit(1)
+    }
     console.log('\nnothing to publish - every snapshot is already on chain at its slot')
     return
   }
