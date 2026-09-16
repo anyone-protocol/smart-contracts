@@ -25,11 +25,16 @@ job "relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
+      # ⚠️ REPIN REQUIRED, not optional. The previous pin predated BOTH deploy-order fixes
+      # (2814394 publish-PID-before-verify, 248aa91 defer the forced first compute), so a deploy
+      # from it deadlocks on a gated node - the opreg wedge of 2026-09-02.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
       entrypoint = ["bun"]
       command = "run"
-      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage"]
+      # --previous-round 0 makes the FIRST round pay nothing: the pot is
+      # TokensPerSecond * (roundTimestamp - PreviousRound.Timestamp), and the dump carries
+      # legacynet's 2026-07-03 date, which is what paid a 48-day round at the cutover.
+      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage", "--previous-round", "0"]
       logging {
         type = "loki"
         config {
@@ -52,7 +57,7 @@ job "relay-rewards-stage" {
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
       # rendered in the template block below instead.
 
-      # TODO: the durable module id, from publishing this contract's module.
+      # The durable module id, published from this contract's module and reused by live.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
       MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
