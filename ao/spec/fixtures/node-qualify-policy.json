@@ -1,0 +1,82 @@
+{
+  "node-host": "qualify.invalid",
+  "scheduler-default-commitment-spec": "ans104@1.0",
+  "on": {
+    "request": [
+      {
+        "device": "rate-limit@1.0"
+      },
+      {
+        "device": "auth-hook@1.0",
+        "path": "request",
+        "when": {
+          "keys": [
+            "authorization",
+            "!"
+          ]
+        },
+        "secret-provider": {
+          "device": "http-auth@1.0",
+          "access-control": {
+            "device": "http-auth@1.0"
+          }
+        }
+      },
+      {
+        "device": "name@1.0"
+      },
+      {
+        "device": "manifest@1.0"
+      },
+      {
+        "device": "blacklist@1.0"
+      },
+      {
+        "device": "p4@1.0",
+        "pricing-device": "lua@5.3a",
+        "ledger-device": "faff@1.0",
+        "module": "qualify-placeholder-write-gate-module-00000",
+        "gated-processes": [
+          "qualify-placeholder-operator-registry-00000",
+          "qualify-placeholder-relay-rewards-000000000",
+          "qualify-placeholder-staking-rewards-0000000"
+        ],
+        "operator-registry": "qualify-placeholder-operator-registry-00000",
+        "deploy-wallets": [
+          "0x0000000000000000000000000000000000000001",
+          "0x0000000000000000000000000000000000000002"
+        ]
+      }
+    ]
+  },
+  "faff-allow-list": [
+    "0x0000000000000000000000000000000000000001",
+    "0x0000000000000000000000000000000000000002"
+  ],
+  "p4-non-chargable-routes": [
+    {
+      "template": "^/qualify-placeholder-operator-registry-00000~process@1.0/(now|compute|slot|as)"
+    },
+    {
+      "template": "^/qualify-placeholder-relay-rewards-000000000~process@1.0/(now|compute|slot|as)"
+    },
+    {
+      "template": "^/qualify-placeholder-staking-rewards-0000000~process@1.0/(now|compute|slot|as)"
+    },
+    {
+      "template": "^/$"
+    },
+    {
+      "template": "^/~meta@1.0"
+    },
+    {
+      "template": "^/~hyperbuddy@1.0"
+    },
+    {
+      "template": "^/~query@1.0"
+    }
+  ],
+  "rate-limit-requests": 100000,
+  "rate-limit-max": 100000,
+  "rate-limit-period": 60
+}

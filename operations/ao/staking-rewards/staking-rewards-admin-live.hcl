@@ -4,8 +4,8 @@ job "staking-rewards-admin-live" {
   type = "batch"
 
   constraint {
-      attribute = "${meta.pool}"
-      value = "live-protocol"
+    attribute = "${meta.pool}"
+    value = "live-protocol"
   }
 
   reschedule { attempts = 0 }
@@ -13,10 +13,12 @@ job "staking-rewards-admin-live" {
   task "staking-rewards-live" {
 
     env {
-      SCRIPT = "scripts/acl/update-roles.ts"
-      # Stringified JSON
-      # UPDATE_ROLES_DATA=""
+      # SCRIPT = "scripts/acl/update-roles.ts"
+      # UPDATE_ROLES_DATA="{\"Grant\":{\"0x14F7b53a09758aa257D8597cF992bDB61915f319\":[\"Claim-Rewards\"],\"0xB45B7F679b7470b094dDf99ebCbee1bc8552fa1A\":[\"Complete-Round\",\"Add-Scores\"]}}"
       
+      SCRIPT="scripts/staking-rewards/toggle-share-feature.ts"
+      FEATURE_SHARES_ENABLED="true"
+
       PHASE = "live"
       CU_URL="https://cu.anyone.tech"
     }
@@ -39,7 +41,7 @@ job "staking-rewards-admin-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao:94dbaf9c050604df219a33a67a53a24875755c0a"
       entrypoint = ["npx"]
       command = "tsx"
       args = ["${SCRIPT}"]

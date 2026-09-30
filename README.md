@@ -11,4 +11,4 @@ The [/evm](./evm/README.md) directory is mostly used for test and development pu
 The [/ao](./ao/README.md) directory contains all [AO](https://ao.arweave.net) contracts used in the Protocol.
 
 ## SmartWeave (Deprecated/Legacy/Unused)
-The [/smartweave](./smartweave/README.md) directory contains all [SmartWeave](https://academy.warp.cc/tutorials/elementary/smartweave) contracts used in the Protocol.
+The [/legacy/smartweave](./legacy/smartweave/README.md) directory contains all [SmartWeave](https://academy.warp.cc/tutorials/elementary/smartweave) contracts used in the Protocol.

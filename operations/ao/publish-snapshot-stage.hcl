@@ -1,0 +1,162 @@
+# D22 - capture and publish a state snapshot of all three native contracts to Arweave.
+#
+# PERIODIC batch job, once a day. Deliberately a SEPARATE job rather than a sidecar in the
+# hyperbeam group: a sidecar would share the node's lifecycle, so every change to this tooling
+# or its image would redeploy hyperbeam and RESTART THE NODE. Snapshot tooling should never be
+# a reason to restart a node holding live protocol state.
+#
+# It needs nothing from the node but two reads. It resolves the node through the in-cluster
+# `hyperbeam-stage-node` Consul service, which exists for exactly this - deploy and verify jobs
+# address the node there rather than through the public edge. `slot/current` and `as/dump` are
+# both on p4's non-chargable routes, so this signer needs NO faff allow-list entry, and the
+# snapshot never touches the write path.
+#
+# --- Why the node's own ~bundler@1.0 and not direct L1 --------------------------------------
+# One upload mechanism, not two. D24 closed self-bundling on all three nodes, so every scheduled
+# message and assignment already reaches Arweave through ~bundler@1.0. Publishing snapshots the
+# same way leaves a single path to operate, fund and monitor.
+#
+# The objection this had to clear: recovery finds snapshots by GraphQL TAG QUERY, and a bundled
+# data item is indexed only if a gateway chooses to UNBUNDLE it. Verified against live on
+# 2026-08-28 - items inside our own node-signed bundles ARE tag-discoverable on arweave.net, and
+# `transaction(id:)` reports a block height for them, which is what the settlement wait uses.
+#
+# What the handoff costs, and it is not nothing: snapshot durability now shares a failure domain
+# with the node's own upload queue, and acceptance by the bundler is NOT settlement on chain. A
+# run can legitimately end with items accepted but not yet indexed, and it exits 0 when it does.
+# That is exactly why D25's publishing-reliability monitoring has to cover snapshots too.
+#
+# --- Cost and safety ------------------------------------------------------------------------
+# WARNING: this spends the NODE's AR, not PUBLISH_JWK's - the node signs and pays for the bundle
+# that carries the snapshot. PUBLISH_JWK signs the data item only and needs NO balance. The
+# thing to keep funded is the NODE wallet, which also pays for every assignment it publishes.
+# Estimated at 2026-08-25 prices: 0.0206 AR for all three live contracts.
+#
+# Publishing is IDEMPOTENT on (process, slot). A contract that has not advanced a slot since its
+# last published snapshot is SKIPPED, not re-posted - live operator-registry sits at slot 8 for
+# long stretches and a daily cadence would otherwise pay for a byte-identical copy every day.
+# `prohibit_overlap` below means a slow run can never race the next one.
+#
+# WARNING: refuses to publish an UNANCHORED snapshot. A snapshot with no anchor assignment
+# leaves the published chain rootless, which is the exact defect D22 closes. If it refuses, the
+# slot's assignment is usually just not indexed yet - the next run will pick it up.
+#
+# WARNING: every slot written before the D21 fix (scheduler-default-commitment-spec, deployed
+# 2026-08-25) has NO assignment on Arweave. Snapshots anchor history from their own slot
+# FORWARD. They do not recover what was never published.
+#
+# Verify afterwards, per id printed by the job:
+#   bun run scripts/verify-snapshot.ts --published <tx-id>
+
+job "publish-snapshot-stage" {
+  datacenters = [ "ator-fin" ]
+  type = "batch"
+  namespace = "stage-protocol"
+
+  constraint {
+    attribute = "${meta.pool}"
+    value = "stage"
+  }
+
+  # Once a day. prohibit_overlap stops a slow or hung run from racing its successor, which with
+  # the (process, slot) dedupe means a double-post is not reachable even if a run wedges.
+  periodic {
+    crons            = ["@daily"]
+    prohibit_overlap = true
+  }
+
+  reschedule { attempts = 0 }
+
+  task "publish-snapshot-stage" {
+    driver = "docker"
+
+    env {
+      GATEWAY = "https://arweave.net"
+
+      # A PATH, not the key itself. publish-snapshot.ts's loadJwk() accepts either
+      # (`existsSync(raw) ? readFileSync(raw) : raw`), and a file is how every other Arweave JWK
+      # in this org is delivered - see HB_OPERATOR_KEY_BASE64 -> secrets/wallet.json in
+      # hyperbeam-{dev,stage,live}.hcl. It also keeps the key out of the process environment.
+      PUBLISH_JWK = "${NOMAD_SECRETS_DIR}/publish-jwk.json"
+    }
+
+    config {
+      network_mode = "host"
+
+      # Pinned to 695e7ba. Carries the fix for the run-killing refusal: one unanchored snapshot
+      # used to abort the whole run, so live published on only 3 of 13 runs and stage 9 of 15.
+      # Now unanchored items are skipped and everything anchored publishes.
+      # Tag and digest must move together: the tag names the commit, the digest is what runs.
+      # Digest verified against the tag on ghcr 2026-09-16.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:695e7baf520f13d48fee47f0c2b839d3f760818c@sha256:86a60d8c216e2fd9d334ddfb504660e312d6c32db5b206dd7a0d0e8c48698a3e"
+
+      # Chained with && so a failed capture never reaches the publisher. NOT wrapped in
+      # ( set -e; ... ): POSIX ignores -e for a list being tested, and a subshell inherits that
+      # - verified in sh and bash that it runs the second command anyway AND reports success.
+      entrypoint = ["sh", "-c"]
+      command = "bun run scripts/snapshot-state.ts stage --out /tmp/snap && bun run scripts/publish-snapshot.ts /tmp/snap --confirm --wait 900"
+
+      logging {
+        type = "loki"
+        config {
+          loki-url = "http://10.1.3.1:3100/loki/api/v1/push"
+          loki-external-labels = "container_name={{.Name}},job_name=${NOMAD_JOB_NAME}"
+        }
+      }
+    }
+
+    restart {
+      attempts = 0
+      mode     = "fail"
+    }
+
+    resources {
+      cpu    = 1024
+      memory = 2048
+    }
+
+    vault {
+      role = "any1-nomad-workloads-owner"
+    }
+
+    # Required for the `range service` lookup below. Without it the template renders EMPTY and the
+    # job fails at upload with "BUNDLER (or SNAPSHOT_HOST) is not set".
+    consul {}
+
+    # SNAPSHOT_HOST and PUBLISH_JWK are here, not in the env block: an env block does not run
+    # through consul-template, so neither a service lookup nor a Vault read works there.
+    #
+    # ⚠️ The JWK is STORED BASE64 in Vault as PUBLISH_JWK_BASE64 and decoded into a FILE below,
+    # never into an env var: a JWK is JSON full of double quotes, so a raw env render ends the
+    # value at the first inner quote. Same shape as the node's own key.
+    #
+    # PUBLISH_JWK is a DEDICATED Arweave JWK that SIGNS the snapshot data item and nothing else.
+    # It holds no AR and needs none: the node pays for the bundle. It is deliberately not the
+    # node's own key - the node's identity stays in its own Vault path and never signs a payload
+    # - so a snapshot stays attributable to the publisher rather than to the scheduler.
+    #
+    # BUNDLER is set explicitly and SNAPSHOT_HOST deliberately is NOT. `~bundler@1.0` is refused
+    # at the edge, so the upload must go in-cluster - but snapshot-state.ts in the PINNED image
+    # forces https:// on any non-127 host, so setting SNAPSHOT_HOST makes its reads fail the TLS
+    # handshake against the node's plain-HTTP port. Unset, it reads the public edge (free, p4
+    # non-chargable). Re-add it once an image carrying the scheme fix is built.
+    template {
+      destination = "secrets/keys.env"
+      env         = true
+      data = <<-EOH
+      {{- range service "hyperbeam-stage-node" }}
+      BUNDLER="http://{{ .Address }}:{{ .Port }}"
+      {{- end }}
+      EOH
+    }
+
+    template {
+      data = <<-EOF
+      {{- with secret "kv/stage-protocol/publish-snapshot-stage" }}
+      {{- base64Decode .Data.data.PUBLISH_JWK_BASE64 }}
+      {{- end }}
+      EOF
+      destination = "secrets/publish-jwk.json"
+    }
+  }
+}

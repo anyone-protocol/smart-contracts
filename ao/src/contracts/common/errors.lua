@@ -16,6 +16,7 @@ return {
   AddressIsBlocked = 'Address is blocked',
   AddressRequired = 'Address is required',
   InvalidAddress = 'Invalid Address',
+  InvalidAddressChecksum = 'Invalid Address checksum (EIP-55)',
   AddressIsNotBlocked = 'Address is not blocked',
   InvalidFingerprint = 'Invalid Fingerprint',
   RegistrationCreditAlreadyAdded = 'Registration Credit already added',

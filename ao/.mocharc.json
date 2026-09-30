@@ -1,5 +1,6 @@
 {
   "extensions": ["ts"],
+  "spec": "test/spec/**/*.spec.ts",
   "node-option": [
     "import=tsx",
     "experimental-specifier-resolution=node",

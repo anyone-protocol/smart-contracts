@@ -1,0 +1,171 @@
+name: AO Contracts — Tests
+
+# CI has historically been manual in this repo; the two existing workflows only build and
+# publish images. This one runs the contract suites. The tiers are deliberately separate
+# jobs so a failure names the layer it happened in — Tier-1 is contract/runtime logic,
+# Tier-2 is the same code through the real device VM (luerl), and they fail for different
+# reasons. See docs/hyperbeam-migration/D8-port-safety-checklist.md.
+
+# `push` is main-only on purpose. Listing a working branch here as well means every commit on
+# it fires BOTH `push` and `pull_request` once a PR is open, and runs the whole workflow twice.
+# Branch coverage comes from the PR instead — which is where the result is actually needed.
+on:
+  push:
+    branches: [main]
+    paths: ['ao/**', '.github/workflows/ao-test.yml']
+  pull_request:
+    paths: ['ao/**', '.github/workflows/ao-test.yml']
+  workflow_dispatch:
+
+# Supersede an in-flight run when new commits land on the same PR or branch — pushing three
+# times in a minute should not leave three full runs racing. This is NOT what stops the workflow
+# running twice per commit; the main-only `push` trigger above does that.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Least privilege, stated explicitly rather than inherited. These jobs only read the
+# checkout — unlike the image-publish workflows, which need `packages: write`. Setting it
+# here means a change to the org or repo default cannot silently widen this workflow's
+# token. A `pull_request` from a fork already gets a read-only token with no access to
+# secrets (which is exactly why this uses `pull_request` and never `pull_request_target`);
+# this makes that explicit for same-repo runs too.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: ao
+
+# Fork pull requests execute the contributor's code: two container builds plus a
+# `bun install` that runs whatever lifecycle scripts their package.json declares. With a
+# read-only token and no secrets that is not a credential risk, but it is free compute on
+# our runners — and it would become remote code execution the day any of this moves to a
+# self-hosted runner. Outside contributions are not expected in this repo, so every job
+# below carries the same guard: run unless this is a PR from a different repository.
+# Branch pushes and workflow_dispatch are unaffected — the condition is only false for
+# fork PRs. (The guard is repeated per job rather than hoisted into `env:` because the
+# `env` context is not available to a job-level `if:`.)
+#
+# Belt and braces with Settings > Actions > "Require approval for all outside
+# collaborators": that setting is invisible from the repo and easy to lose to an org
+# policy change, whereas this guard shows up in the diff.
+
+jobs:
+  tier1:
+    name: Tier-1 — busted on Lua 5.3
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lua 5.3 specifically, not LuaJIT: LuaJIT is 5.1 and would diverge from luerl's 5.3
+      # semantics (integers, //, math.type) — which is the whole point of this tier.
+      - name: Build the Tier-1 toolchain image
+        run: docker build -t anyone-lua-spec:5.3 spec/
+
+      - name: Run specs
+        run: |
+          docker run --rm -v "$PWD":/work -w /work anyone-lua-spec:5.3 spec/
+
+  tier2:
+    name: Tier-2 — luerl 1.3.0 (device VM)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # luerl 1.3.0 is pinned on purpose — it is what HyperBEAM v0.9-FINAL vendors in its
+      # rebar.lock. Bumping it here would stop this tier from testing what the node runs.
+      - name: Build the luerl runner image
+        run: docker build -t anyone-luerl:1.3.0 spec/luerl/
+
+      - name: Run scenarios
+        env:
+          CONTAINER_ENGINE: docker
+          TIMEOUT: '600'
+        run: ./spec/run-tier2.sh
+
+  e2e:
+    name: E2E — full suite on a local HyperBEAM node
+    # Same fork guard as the tiers above, rather than the blanket `!= 'pull_request'` this used
+    # to carry. That exclusion is not survivable now `push` is main-only: PRs would be the only
+    # event a working branch fires, so e2e would never run until merge. The original concern was
+    # that `bun install` re-introduces a contributor-controlled lifecycle-script surface — but
+    # that is a FORK problem, and the fork guard addresses it precisely.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The suite's oracle stage shells out to this image (build-relay-probe.ts and
+      # build-staking-oracle.ts run the frozen round under luerl to produce the parity
+      # expectations). Tier-2 builds it too, but jobs get separate runners with separate
+      # docker daemons, so it has to be built here as well — it is local-only and cannot
+      # be pulled. Without it the oracles fail and both parity verticals then ENOENT.
+      - name: Build the luerl runner image
+        run: docker build -t anyone-luerl:1.3.0 spec/luerl/
+
+      # v0.9-FINAL is what the cluster runs. The image is public (anonymous ghcr token works),
+      # so no registry secret is needed. --network host so the suite can reach 8734 directly;
+      # the ephemeral wallet is fine because nothing here is published to Arweave.
+      - name: Start a HyperBEAM node
+        run: |
+          docker run -d --name hb-e2e --network host \
+            -e HB_ALLOW_EPHEMERAL_WALLET=true \
+            -e HB_WALLET_PATH=/app/wallet.json \
+            ghcr.io/memetic-block/hyperbeam-docker:v0.9-FINAL
+
+      - name: Wait for the node
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf --max-time 5 http://localhost:8734/~meta@1.0/info/address >/dev/null; then
+              echo "node up after ${i}s: $(curl -s http://localhost:8734/~meta@1.0/info/address)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "node never became ready"; docker logs hb-e2e | tail -40; exit 1
+
+      # --publish-container: module registration is a `bin/hb eval` INSIDE the node container
+      # (there is no HTTP path for it — see util/hb-client.ts moduleIdFor). Against dev/stage
+      # that step needs cluster access, which is why the stage run is re-homed to D14.
+      - name: Run the E2E suite
+        env:
+          HB_URL: http://localhost:8734
+          CONTAINER_ENGINE: docker
+        run: bun run scripts/run-e2e.ts --publish-container hb-e2e
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: ao/dist/e2e-logs/
+          if-no-files-found: ignore
+
+      - name: Node logs on failure
+        if: failure()
+        run: docker logs hb-e2e | tail -100
+
+      - name: Stop the node
+        if: always()
+        run: docker rm -f hb-e2e || true
+
+# The legacy mocha suite (`bun run test`, test/spec/**) is deliberately NOT run here.
+# It drives the obsolete aos-WASM harness against the legacynet contracts, which now carry
+# luerl workarounds their specs were never updated for. It is retained in the repo purely
+# as a COVERAGE REFERENCE — when adding behaviour to a native contract, read those specs to
+# see what the legacy suite asserted — but it is not executed by CI and is not a gate.
+# A coverage comparison against it was done in D10 (legacy 262 assertions vs native 285;
+# the gaps it surfaced are closed), so it has already served that purpose once.

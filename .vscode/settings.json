@@ -6,8 +6,8 @@
     "ao/node_modules",
     "evm",
     "operations",
-    "smartweave",
-    "ao-core",
+    "legacy/smartweave",
+    "legacy/ao-core",
     "ao/scripts"
   ]
 }

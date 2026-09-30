@@ -1,0 +1,7 @@
+{application, luerl_runner, [
+  {description, "Tier-2 luerl scenario runner (HyperBEAM-pinned luerl 1.3.0)"},
+  {vsn, "0.1.0"},
+  {applications, [kernel, stdlib, luerl]},
+  {modules, []},
+  {registered, []}
+]}.

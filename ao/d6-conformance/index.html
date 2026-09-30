@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>D6 — EVM Signature Conformance</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 820px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 18px; }
+    p.sub { opacity: 0.7; }
+    button, select { font: inherit; padding: 8px 12px; cursor: pointer; }
+    label { opacity: 0.7; margin-right: 4px; }
+    #out { margin-top: 20px; white-space: pre-wrap; }
+    .line { padding: 2px 0; }
+    .ok { color: #16a34a; }
+    .bad { color: #dc2626; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>D6 — EVM Signature Conformance</h1>
+  <p class="sub">
+    Connect an injected wallet (Rabby, MetaMask, …). This signs an ans104 data
+    item exactly as the Anyone dashboard does, and checks that the HyperBEAM node
+    recovers the committer to your wallet's EIP-55 address, accepts the signature,
+    and rejects a tampered one.
+  </p>
+  <p>
+    <label for="wallet">Wallet:</label>
+    <select id="wallet" disabled></select>
+    <button id="run">Run conformance check</button>
+  </p>
+  <div id="out"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

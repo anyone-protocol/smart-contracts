@@ -1,0 +1,5 @@
+priv_key_location: /app/_build/default/rel/hb/wallet.json
+port: 8734
+scheduler-default-commitment-spec: ans104@1.0
+relay-allow-commit-request: true
+bundler-ans104: http://127.0.0.1:1

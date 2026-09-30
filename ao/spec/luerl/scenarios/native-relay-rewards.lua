@@ -1,0 +1,161 @@
+-- Tier-2 golden differential for the NATIVE relay-rewards (D26 shape) at FULL token scale
+-- under luerl (arbitrary precision). Must reproduce the EXACT bint golden numbers captured in
+-- spec/fixtures/capture-relay-golden.lua — proving the wrapper reshape (Handlers→native,
+-- RelayRewards.X→ctx.state.X) did not move the frozen reward math. Plus the native invariants:
+-- Details NOT persisted, Details ride the Complete-Round OUTPUT, cumulative maps keyed EIP-55.
+local json = require('json')
+local function S() return native.stateRoot() end
+local eip55 = require('.common.eip55')
+local pass, fail, failures = 0, 0, {}
+local function check(name, cond, got)
+  if cond then pass = pass + 1
+  else fail = fail + 1; failures[#failures + 1] = name .. ' got=' .. tostring(got) end
+end
+
+local OWNER = '0x' .. string.rep('C', 40)
+local FP, ADDR = string.rep('A', 40), '0x' .. string.rep('a', 40)
+local T1, T2 = 1000000, 1060000
+local function commit(c) return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = c } } end
+local function assign(a, d, ts)
+  local tags = { { name = 'Action', value = a } }
+  if ts then tags[#tags + 1] = { name = 'Round-Timestamp', value = tostring(ts) } end
+  return { body = { action = a, commitments = commit(OWNER), tags = tags, data = d } }
+end
+local function scores(net) return json.encode({ Scores = { [FP] = { Address = ADDR, Network = net,
+  IsHardware = false, UptimeStreak = 5, FamilySize = 1, ExitBonus = false, LocationSize = 1 } } }) end
+
+-- ONE base across the sequence: native persists in the `RelayRewards` GLOBAL slot-to-slot
+-- (D31/D32), not on the message. S() dereferences it.
+local base = { process = { id = 'PID', commitments = commit(OWNER) } }
+local function run(a, d, ts) compute(base, assign(a, d, ts)); return base end
+
+run('Add-Scores', scores(1000), T1); run('Complete-Round', nil, T1)   -- round 1: Period 0 → rewards 0
+run('Add-Scores', scores(1000), T2)
+local last = run('Complete-Round', nil, T2)                            -- round 2: Period 60 → golden
+
+local pr = S().PreviousRound                       -- persisted SUMMARY (no Details)
+local snap = json.decode(last.results.output.data)        -- settle-slot OUTPUT (has Details)
+
+-- === golden values (from the bint version — must be byte-identical) ===
+check('Period == 60', pr.Period == 60, pr.Period)
+check('Rating.Network == 1009', snap.Details[FP].Rating.Network == 1009, snap.Details[FP].Rating.Network)
+check('Summary.Rewards.Network', pr.Summary.Rewards.Network == '972222189120000000', pr.Summary.Rewards.Network)
+check('Summary.Rewards.Total',   pr.Summary.Rewards.Total   == '1215277736400000000', pr.Summary.Rewards.Total)
+check('Reward.Total',            snap.Details[FP].Reward.Total == '1215277736400000000', snap.Details[FP].Reward.Total)
+check('Reward.Network',          snap.Details[FP].Reward.Network == '972222189120000000', snap.Details[FP].Reward.Network)
+check('Reward.OperatorTotal',    snap.Details[FP].Reward.OperatorTotal == '1215277736400000000', snap.Details[FP].Reward.OperatorTotal)
+
+-- === native-shape invariants ===
+check('Details NOT persisted', pr.Details == nil, tostring(pr.Details))
+check('output carries Details', snap.Details ~= nil and snap.Details[FP] ~= nil, tostring(snap.Details))
+-- cumulative TotalFingerprintReward (round1=0 + round2=golden)
+check('TotalFingerprintReward[FP]', S().TotalFingerprintReward[FP] == '1215277736400000000', S().TotalFingerprintReward[FP])
+-- cumulative TotalAddressReward keyed by canonical EIP-55 of ADDR
+local key = eip55.checksum(ADDR)
+check('TotalAddressReward[eip55(addr)]', S().TotalAddressReward[key] == '1215277736400000000', S().TotalAddressReward[key])
+check('address key is EIP-55 (not legacy ALLCAPS)', key ~= string.upper(ADDR), key)
+
+-- === Details persisted as a PRE-ENCODED JSON STRING ===
+-- Belongs here as well as Tier-1 because the float multipliers must survive luerl's encoder:
+-- storing the string means they are encoded ONCE, by the same call that builds the output, so
+-- the two read paths cannot drift. Tier-1 runs a different encoder host.
+local dj = pr.DetailsJson
+check('DetailsJson values are strings', type(dj) == 'table' and type(dj[FP]) == 'string',
+  type(dj) == 'table' and type(dj[FP]) or type(dj))
+check('Details NOT persisted as a table', pr.Details == nil, tostring(pr.Details))
+local djDecoded = type(dj) == 'table' and type(dj[FP]) == 'string' and json.decode(dj[FP]) or {}
+check('DetailsJson[fp] matches the output Details[fp]',
+  json.encode(djDecoded) == json.encode(snap.Details[FP]), json.encode(djDecoded))
+check('float multipliers survive verbatim',
+  djDecoded.Variables and djDecoded.Variables.FamilyMultiplier == snap.Details[FP].Variables.FamilyMultiplier,
+  tostring(djDecoded.Variables and djDecoded.Variables.FamilyMultiplier))
+-- The view must hand back the body VERBATIM. A re-encode would produce a quoted string literal,
+-- so the body would start with '"' instead of '{'.
+native.installViews()
+local djRes = _G['last_round_details'](base, { fingerprint = FP })
+check('view body is the stored string', djRes.body == dj[FP], string.sub(tostring(djRes.body), 1, 40))
+check('view body is an object, not a quoted string', string.sub(djRes.body, 1, 1) == '{',
+  string.sub(djRes.body, 1, 40))
+check('view content-type', djRes['content-type'] == 'application/json', djRes['content-type'])
+check('unknown fingerprint answers empty',
+  _G['last_round_details'](base, { fingerprint = string.rep('F', 40) }).body == '[]',
+  _G['last_round_details'](base, { fingerprint = string.rep('F', 40) }).body)
+
+-- No round has recorded a slot yet at this point, and redirecting to slot 0 would serve the
+-- spawn's output, so this must refuse rather than answer wrongly.
+check('last_snapshot refuses to redirect before a slot is recorded',
+  _G['last_snapshot'](base, { redirect = 'true' }).status == 404,
+  tostring(_G['last_snapshot'](base, { redirect = 'true' }).status))
+
+-- === settle-slot pointer (D29 §2) — MUST be an integer end to end ===
+-- The node delivers `slot` on the assignment as a STRING, and under luerl `tonumber('7')` is
+-- where this can go wrong: a float would serialize as `7.0`, and a consumer building
+-- `compute&slot=7.0` from the view gets a 404 rather than the Details payload. Tier-1 cannot
+-- see this — it runs Lua 5.3, not the device VM — so the type check belongs here.
+local T3 = 1120000
+run('Add-Scores', scores(1000), T3)
+local slotReq = assign('Complete-Round', nil, T3)
+slotReq.slot = '7'                                  -- assignment level, as the scheduler sends it
+compute(base, slotReq)
+local pr3 = S().PreviousRound
+local snap3 = json.decode(base.results.output.data)
+check('PreviousRound.Slot == 7', pr3.Slot == 7, pr3.Slot)
+check('Slot is an INTEGER, not 7.0', tostring(pr3.Slot) == '7', tostring(pr3.Slot))
+check('last_round view exposes Slot', native.view(base, 'last_round').Slot == 7,
+  native.view(base, 'last_round').Slot)
+check('Complete-Round output carries Slot', snap3.Slot == 7, snap3.Slot)
+-- Now that a slot IS recorded, last_snapshot can hop to it. The redirect builds the slot into a
+-- URL with tostring, so a float Slot would emit '7.0' and 404 the follow-up fetch. Tier-1 cannot
+-- see that (Lua 5.3 hands back integers); this VM can.
+local snapRes = _G['last_snapshot'](base, { redirect = 'true' })
+check('last_snapshot redirects with 302', snapRes.status == 302, tostring(snapRes.status))
+check('Location carries an INTEGER slot, not 7.0',
+  snapRes.location == '../compute&slot=7/results/output', tostring(snapRes.location))
+check('last_snapshot without redirect returns a composable Path',
+  native.view(base, 'last_snapshot').Path == 'compute&slot=7/results/output',
+  tostring(native.view(base, 'last_snapshot').Path))
+
+check('Slot survives JSON encode as 7', json.encode({ s = pr3.Slot }):find('"s":7', 1, true) ~= nil,
+  json.encode({ s = pr3.Slot }))
+
+-- === last_round_details BY ADDRESS (the dashboard's one-request read) ===
+-- Belongs in Tier-2 specifically: the view splits the fingerprint index with a PLAIN string.find
+-- because luerl has no character classes in gmatch — `[^,]+` throws HERE and nowhere in Tier-1,
+-- and it surfaces as an opaque HTTP 400 on a node. A single-relay round cannot catch that, so
+-- this round gives ONE address TWO relays and asserts the concatenation.
+local FP2 = string.rep('B', 40)
+local T4 = 1180000
+run('Add-Scores', json.encode({ Scores = {
+  [FP]  = { Address = ADDR, Network = 1000, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 },
+  [FP2] = { Address = ADDR, Network = 1000, IsHardware = false, UptimeStreak = 0, ExitBonus = false, FamilySize = 0, LocationSize = 0 },
+} }), T4)
+run('Complete-Round', nil, T4)
+local snap4 = json.decode(base.results.output.data)   -- THIS round's output, not round 2's
+
+local key2 = eip55.checksum(ADDR)
+local byAddr = native.view(base, 'last_round_details', { address = ADDR })
+check('address form returns a string', type(byAddr) == 'string', type(byAddr))
+local byAddrDecoded = type(byAddr) == 'string' and json.decode(byAddr) or {}
+check('address form carries BOTH relays', byAddrDecoded[FP] ~= nil and byAddrDecoded[FP2] ~= nil,
+  tostring(byAddr and string.sub(byAddr, 1, 60)))
+check('address index is keyed EIP-55', S().PreviousRound.AddressFingerprints[key2] ~= nil,
+  tostring(S().PreviousRound.AddressFingerprints[key2]))
+-- assembled by concatenation, so each line must equal the per-fingerprint read byte for byte
+check('address form matches the per-fingerprint form',
+  json.encode(byAddrDecoded[FP]) == json.encode(json.decode(native.view(base, 'last_round_details', { fingerprint = FP }))),
+  json.encode(byAddrDecoded[FP]))
+check('float multipliers survive the address form',
+  byAddrDecoded[FP] and byAddrDecoded[FP].Variables
+    and byAddrDecoded[FP].Variables.LocationMultiplier == snap4.Details[FP].Variables.LocationMultiplier,
+  tostring(byAddrDecoded[FP] and byAddrDecoded[FP].Variables and byAddrDecoded[FP].Variables.LocationMultiplier))
+check('lowercase address still resolves (eip55 canonicalizes)',
+  type(native.view(base, 'last_round_details', { address = string.lower(ADDR) })) == 'string',
+  type(native.view(base, 'last_round_details', { address = string.lower(ADDR) })))
+check('unknown address answers an empty OBJECT',
+  native.view(base, 'last_round_details', { address = '0x' .. string.rep('9', 40) }) == '{}',
+  tostring(native.view(base, 'last_round_details', { address = '0x' .. string.rep('9', 40) })))
+check('malformed address answers nil',
+  native.view(base, 'last_round_details', { address = 'nope' }) == nil,
+  tostring(native.view(base, 'last_round_details', { address = 'nope' })))
+
+return { pass = pass, fail = fail, failures = failures }

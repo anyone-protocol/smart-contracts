@@ -37,5 +37,13 @@ jobs:
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
           echo IMAGE_ID=$IMAGE_ID
 
-          docker tag $IMAGE_NAME $IMAGE_ID:${GITHUB_SHA}
-          docker push $IMAGE_ID:${GITHUB_SHA}
+          # The runner's default builder uses the docker driver, which cannot --push.
+          docker buildx create --use --name ci --driver docker-container
+
+          docker buildx build . \
+            --file Dockerfile-Mainnet \
+            --label "runnumber=${GITHUB_RUN_ID}" \
+            --tag $IMAGE_ID:${GITHUB_SHA} \
+            --provenance=false \
+            --sbom=false \
+            --output type=registry,oci-mediatypes=false

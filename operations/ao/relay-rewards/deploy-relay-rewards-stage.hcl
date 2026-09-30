@@ -25,10 +25,16 @@ job "relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao:c759cf551b9329405716c09d447833e0e15a9976"
-      entrypoint = ["npm"]
+      # ⚠️ REPIN REQUIRED, not optional. The previous pin predated BOTH deploy-order fixes
+      # (2814394 publish-PID-before-verify, 248aa91 defer the forced first compute), so a deploy
+      # from it deadlocks on a gated node - the opreg wedge of 2026-09-02.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
+      entrypoint = ["bun"]
       command = "run"
-      args = ["deploy"]
+      # --previous-round 0 makes the FIRST round pay nothing: the pot is
+      # TokensPerSecond * (roundTimestamp - PreviousRound.Timestamp), and the dump carries
+      # legacynet's 2026-07-03 date, which is what paid a 48-day round at the cutover.
+      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage", "--previous-round", "0"]
       logging {
         type = "loki"
         config {
@@ -42,29 +48,26 @@ job "relay-rewards-stage" {
 
     consul {}
 
+    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
+    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
+    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
+    # rides the spawn message, selected by `--seed` above.
     env {
-      PHASE = "stage"
+      # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
+      # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
+      # rendered in the template block below instead.
+
+      # The durable module id, published from this contract's module and reused by live.
+      # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
+      # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
+      MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
+
+      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
+      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
+      # template gated-processes from.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/relay-rewards-address"
-      CONTRACT_NAME = "relay-rewards"
-      CU_URL="https://cu-stage.anyone.tech"
-
-      ## NB: Spawn a new process & migrate state from an existing one
-      ##     Set MIGRATION_SOURCE_PROCESS_ID in template below to the
-      ##     existing process ID to migrate from
-      IS_MIGRATION_DEPLOYMENT = "true"
-
-      ## NB: Call Init with data from file at INIT_DATA_PATH
-      # CALL_INIT_HANDLER="true"
-    }
-
-    template {
-      data = <<-EOF
-      MIGRATION_SOURCE_PROCESS_ID={{ key "smart-contracts/stage/relay-rewards-address" }}
-      EOF
-      destination = "local/config.env"
-      env = true
     }
 
     template {
@@ -74,6 +77,9 @@ job "relay-rewards-stage" {
       {{- with secret "kv/stage-protocol/relay-rewards-stage" }}
       DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
       CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
+      {{- end }}
+      {{- range service "hyperbeam-stage-node" }}
+      HB_URL="http://{{ .Address }}:{{ .Port }}"
       {{- end }}
       EOH
     }
