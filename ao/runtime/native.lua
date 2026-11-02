@@ -155,16 +155,19 @@ function native.setACL(v) ACL = v end
 -- is already canonical here (node → EIP-55 for EVM; base64url/base58 are single-form). Chain-
 -- specific validation is a CONTRACT concern (e.g. `.common.eip55` for Ethereum fields). See D26.
 
+local function accountAddress(committer)
+  if type(committer) ~= 'string' then return committer end
+  return committer:match('^did:pkh:[^:]+:[^:]+:(.+)$') or committer
+end
+
 local function resolveCommitter(m)
   if type(m) ~= 'table' or type(m.commitments) ~= 'table' then return nil end
   local committer = nil
   for _, c in pairs(m.commitments) do
-    -- TODO(verify-live): confirm exact field names on the device (`type`,
-    -- `committer`, `commitment-device`) match D6 recovery; add hmac skip.
     if c.type == 'rsa-pss-sha512' then
-      committer = c.committer
+      committer = accountAddress(c.committer)
     elseif c['commitment-device'] == 'ans104@1.0' and c.committer ~= nil then
-      committer = c.committer
+      committer = accountAddress(c.committer)
     end
   end
   return committer

@@ -948,6 +948,26 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.is_nil(OperatorRegistry.claimable[FP_A])
     end)
 
+    it('resolves did:pkh committers to their account addresses', function()
+      local pkh = function(address) return 'did:pkh:eip155:1:' .. address end
+      native.reset()
+      local base = { process = { id = 'PID', commitments = commit(pkh(OWNER)) } }
+      submitCerts(base, pkh(OWNER), { { f = FP_A, a = ALICE } })
+      assert.are.equal(ALICE, OperatorRegistry.claimable[FP_A])
+      claim(base, pkh(ALICE), FP_A)
+      assert.are.equal(ALICE, OperatorRegistry.verified[FP_A])
+      submitCerts(base, pkh(BOB), { { f = FP_B, a = BOB } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      assert.is_nil(OperatorRegistry.claimable[FP_B])
+    end)
+
+    it('takes the account address from any did:pkh namespace and passes other committers through', function()
+      local sol = '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV'
+      assert.are.equal(sol, native.resolveCommitter({
+        commitments = commit('did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:' .. sol) }))
+      assert.are.equal(ALICE, native.resolveCommitter({ commitments = commit(ALICE) }))
+    end)
+
     it('rejects an unknown action', function()
       local base = newBase()
       compute(base, assign('No-Such-Action', OWNER, ''))
