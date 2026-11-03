@@ -266,7 +266,7 @@ const timings: { label: string, ms: number }[] = []
   }
 
   // ---- D. access control ------------------------------------------------------
-  console.log('\nD) access control and the write gate')
+  console.log('\nD) access control')
   const roles = await view('roles')
   expect(roles.ok, 'HIGH', 'acl', 'roles view answers')
   const holders = new Set<string>()
@@ -277,27 +277,6 @@ const timings: { label: string, ms: number }[] = []
   }
   expect(holders.size > 0, 'CRITICAL', 'acl', 'at least one role holder exists',
     `${holders.size} distinct address(es)`)
-
-  // The p4 write gate reads the contract's allowlist trie directly, WITHOUT executing contract
-  // code. Same read the node makes when deciding whether to schedule a message, so this is the
-  // real answer to "who can write here", not an approximation.
-  const allowed = async (addr: string) => {
-    const r = await raw(`compute/allowlistId/~trie@1.0/${addr}`)
-    return r.status === 200 && !/not_found/i.test(r.body)
-  }
-  const gateOn = (await raw('compute/allowlistId')).status === 200
-  if (!gateOn) {
-    add('HIGH', 'acl', 'no allowlist trie on this process — the write gate has nothing to read',
-      'third-party writes would not be gated here')
-  } else {
-    let lockedOut = 0
-    for (const h of holders) if (!(await allowed(h))) { lockedOut++; add('HIGH', 'acl', `role holder \`${h}\` is NOT on the write allowlist`, 'they would be rejected at the gate') }
-    if (!lockedOut) add('OK', 'acl', `all ${holders.size} role holder(s) are on the write allowlist`)
-    // Negative control: an address nobody has ever seen must not be admitted.
-    const stranger = '0x' + 'ab'.repeat(20)
-    expect(!(await allowed(stranger)), 'CRITICAL', 'acl',
-      'an unknown address is NOT on the write allowlist', stranger)
-  }
 
   // ---- E. deviations ----------------------------------------------------------
   console.log('\nE) known deviations from legacynet (deliberate)')

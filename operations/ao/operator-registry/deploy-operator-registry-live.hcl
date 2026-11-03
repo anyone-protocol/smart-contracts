@@ -87,9 +87,8 @@ job "operator-registry-live" {
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
       MODULE_ID = "2vWsI194X4gmK66fhWQdRsBnQJIoG8nFBqnSazW_cgA"
 
-      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
-      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
-      # template gated-processes from.
+      # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
+      # previous value if that fails.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/operator-registry-address"

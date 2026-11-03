@@ -783,14 +783,10 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.are.same({ roles = {} }, ACL)
     end)
 
-    it('only results and the allowlist id ride on base', function()
+    it('only the envelope and results ride on base', function()
       local base = newBase()
       addOperatorCert(base, ALICE, FP_A)
-      -- `allowlistId`/`allowlistTable` are deliberate: the p4 write gate reads
-      -- compute/allowlistId/~trie@1.0/<addr> without executing contract code, so it cannot
-      -- see a Lua global. Everything else here is HyperBEAM's own envelope.
-      local allowed = { process = true, results = true, allowlistId = true,
-                        allowlistTable = true, allowlistSeeded = true }
+      local allowed = { process = true, results = true }
       for k in pairs(base) do
         assert.is_true(allowed[k] == true, 'unexpected key on base: ' .. tostring(k))
       end

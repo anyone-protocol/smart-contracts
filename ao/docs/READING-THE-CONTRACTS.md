@@ -132,10 +132,9 @@ fetch only the line they need.
 
 **All reads described here are free and unauthenticated.** No wallet, no signature, no rate plan.
 
-**Writes are gated.** Requests to `push` and `schedule` are checked against an on chain allow list
-before they are scheduled, and a request from an address that is not permitted is refused before it
-consumes any resources. This protects the processes from having their state grown by third parties.
-Reads are deliberately outside that gate.
+**Writes are checked by the contracts.** Every write must be signed, and each contract refuses a
+write whose signer has no role or standing for that action, such as an operator acting on a
+fingerprint they do not hold.
 
 If you are writing rather than reading, you need a signed message from an address the process
 recognises, which for operators means being registered in `operator-registry`. Use the

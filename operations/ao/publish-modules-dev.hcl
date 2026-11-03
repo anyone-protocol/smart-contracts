@@ -16,18 +16,15 @@
 # pin that single id in all three environments.
 #
 # ─── What gets pinned where ─────────────────────────────────────────────────────────────────
-#   write-gate         -> `module` in the hyperbeam jobspecs (infra-arweave)
 #   <contract>-native  -> MODULE_ID in that contract's deploy job
 #
-# Neither is a Consul key. A module id is content-addressed and already a permanent version sha,
-# so pinning it in git makes what is running reviewable, and removes the failure where a missing
-# key renders empty into a device that fails closed.
+# It is not a Consul key. A module id is content-addressed and already a permanent version sha,
+# so pinning it in git makes what is running reviewable.
 #
 # ─── Why publish at all ─────────────────────────────────────────────────────────────────────
 # The node-local route (`bin/hb eval`) produces an id that exists in ONE alloc's cache. A process
-# spawned against it can never compute a slot elsewhere, and a gate module a node cannot resolve
-# refuses every write, because it fails closed. deploy.ts refuses an unindexed id for exactly
-# this reason.
+# spawned against it can never compute a slot elsewhere. deploy.ts refuses an unindexed id for
+# exactly this reason.
 #
 # ⚠️ A bundler 200 is a QUEUE RECEIPT, not persistence, and the gateway's data endpoint serves
 # unsettled items from an optimistic cache — `curl arweave.net/<id>` will 200 for an item that
@@ -78,7 +75,6 @@ job "publish-modules-dev" {
         "${SCRIPT}",
 
         # Comment out anything you are not publishing this run.
-        "runtime/write-gate.lua",
         "dist/operator-registry-native.lua",
         "dist/relay-rewards-native.lua",
         "dist/staking-rewards-native.lua",

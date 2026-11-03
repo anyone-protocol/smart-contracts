@@ -20,9 +20,8 @@ Related documents:
 
 | Document | Content |
 | --- | --- |
-| [../docs/runtime.md](../docs/runtime.md) | The native runtime: state, views, migration seed, allow-list |
+| [../docs/runtime.md](../docs/runtime.md) | The native runtime: state, views, migration seed |
 | [../docs/contracts.md](../docs/contracts.md) | The three native contracts |
-| [../docs/write-gate.md](../docs/write-gate.md) | The gate that decides who may write |
 | [../docs/READING-THE-CONTRACTS.md](../docs/READING-THE-CONTRACTS.md) | The read surface for consumers |
 | [../docs/durability-and-recovery.md](../docs/durability-and-recovery.md) | Snapshots, publishing and recovery |
 | [../docs/node-qualification.md](../docs/node-qualification.md) | Qualifying a HyperBEAM image |
@@ -308,7 +307,7 @@ Rules:
 | --- | --- | --- | --- |
 | `deploy.ts` | Builds, publishes, spawns and verifies a native contract. See [deploy.ts](#deployts) | `<contract> --seed <source> [options]` | See the section |
 | `publish-module.ts` | Publishes Lua modules to Arweave through a bundler and waits for settlement. See [publish-module.ts](#publish-modulets) | `<file.lua> [...] [options]` | `BUNDLER` (required), `PUBLISH_KEY` (required), `GATEWAY` (`https://arweave.net`) |
-| `publish-modules.sh` | Publishes the contract modules and the write gate into the cache of one node. See [publish-modules.sh](#publish-modulessh) | `[env] [--gate-only]` | Needs the `nomad` command and access to the cluster |
+| `publish-modules.sh` | Publishes the contract modules into the cache of one node. See [publish-modules.sh](#publish-modulessh) | `[env]` | Needs the `nomad` command and access to the cluster |
 | `publish-native-module.ts` | Writes the operator registry bundle and prints the commands that commit it into the cache of a local container named `hb-tier3` | `[outfile]` (`dist/operator-registry-native.lua`) | None |
 | `publish-view.ts` | Uploads `src/views/<VIEW_NAME>.lua` through Turbo | None | `VIEW_NAME` (required), `VIEW_VERSION` (`dev`), `DEPLOYER_PRIVATE_KEY` (required), `USE_CONSOLE_LOGGER` |
 
@@ -366,10 +365,7 @@ Steps of the spawn phase:
    during the wait are expected.
 6. Force the first compute and wait until `status.initialized` is true.
 7. Compare the counts of the `status` view with the expected seed.
-8. Check the reads that the write gate makes: the owner is readable from the spawn commitment,
-   `allowlistId` is a trie id, and the gate read path admits the deployer, every seeded role
-   holder and, for the operator registry, a sample of seeded operators.
-9. On any failure after step 5, restore the previous value of the Consul key and exit 1.
+8. On any failure after step 5, restore the previous value of the Consul key and exit 1.
 
 Rules:
 
@@ -392,17 +388,12 @@ Rules:
 - The node must be one of ours. Hosts under `forward.computer`, `ao-testnet.xyz` and
   `arweave.dev` are refused.
 - When `SCHEDULER` is not the address of the node, the node does not adopt the process.
-- On a node with the write gate, set `CONTRACT_CONSUL_KEY`. The verification reads are unsigned.
-  They are free only for process ids in `p4-non-chargable-routes`, and that list is rendered
-  from the Consul keys.
 - When verification fails and the key had no previous value, the key names a process that was
   not verified. Clear it by hand.
 - Without `CONTRACT_CONSUL_KEY` the script prints the `consul kv put` command. Record the
   process id by hand.
 - `--publish --dry-run` still posts the module to the bundler. It only skips the wait for
   settlement.
-- A process that has never computed answers 508 `Request creates infinite recursion` on every
-  `compute/` path. The gate checks therefore run after the first compute.
 
 Every deploy creates a new process id. See
 [Process ids](../docs/READING-THE-CONTRACTS.md#process-ids).
@@ -457,22 +448,18 @@ Rules:
 ### publish-modules.sh
 
 ```sh
-scripts/publish-modules.sh [dev|stage|live] [--gate-only]
+scripts/publish-modules.sh [dev|stage|live]
 ```
 
-Publishes `dist/operator-registry-native.lua`, `dist/relay-rewards-native.lua`,
-`dist/staking-rewards-native.lua` and `runtime/write-gate.lua` into the cache of the node of
-one environment, through `nomad alloc exec` and `bin/hb eval`. The default environment is
-`dev`. `--gate-only` publishes the write gate alone and does not need `dist/`.
+Publishes `dist/operator-registry-native.lua`, `dist/relay-rewards-native.lua` and
+`dist/staking-rewards-native.lua` into the cache of the node of one environment, through
+`nomad alloc exec` and `bin/hb eval`. The default environment is `dev`.
 
 Rules:
 
 - Publish on the node that will use the module. The id depends on the wallet of that node.
   Expect a different id per environment.
 - A module in the cache of the node resolves without a round trip to Arweave.
-- The write gate fails closed. A gate module that is missing from the cache refuses every write
-  to every gated contract.
-- Order: publish, then set the id in the configuration of the node, then deploy the node.
 - Publishing the same bytes on the same node again yields the same id.
 - Build `dist/` first with `build-native-bundle.ts` for each contract.
 
@@ -539,7 +526,7 @@ bun run scripts/qualify-node.ts --list
 | `trie-crossing` | image | No | `probe/opreg-wedge-repro.ts --expect-healthy` |
 | `verticals` | image, url | Yes | `run-e2e.ts --keep-artifacts` |
 | `golden` | image, url | Yes | `staking-view-golden.ts --check` |
-| `economics` | image, url | Yes | `probe/gc-cost-curve.ts` and `probe/trie-scale.ts` |
+| `economics` | image, url | Yes | `probe/gc-cost-curve.ts` |
 | `restore` | image | No | `probe/gc-restore-fidelity.ts` |
 | `policy` | url | No | `verify-access-policy.ts <env>`, then again with `PERTURB=1` |
 
@@ -680,7 +667,7 @@ CONTRACT=<contract> PID=<pid> HB_URL=<url> \
 | A | The process computes. The runtime reports the expected contract. The process is initialized. The module id |
 | B | The state equals the transform of the dump. The seed is rebuilt for `SEED_NET` first |
 | C | Every view that a consumer calls answers, is not empty, and answers within 2 seconds |
-| D | Role holders exist and are on the allow-list. An unknown address is not |
+| D | Role holders exist |
 | E | The deliberate deviations from the legacy contracts, listed for the reader |
 | F | With `--behavioral`: writes, role checks and revert on the twin |
 

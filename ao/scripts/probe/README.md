@@ -17,10 +17,7 @@ The other scripts are indexed in [../README.md](../README.md).
 - [Index](#index)
 - [Facts that hold for every probe](#facts-that-hold-for-every-probe)
 - [Read path](#read-path)
-- [Spawn and seed](#spawn-and-seed)
-- [Allow-list and trie](#allow-list-and-trie)
-- [Write gate](#write-gate)
-- [Cross-process reads](#cross-process-reads)
+- [Node allow-list](#node-allow-list)
 - [Bundling](#bundling)
 - [Image and upgrade](#image-and-upgrade)
 
@@ -66,25 +63,14 @@ Rules:
 | [`settle-slot-content-type.ts`](#settle-slot-content-typets) | Is the settled round of relay rewards served as JSON |
 | [`claim-tag-casing.ts`](#claim-tag-casingts) | Does a contract read tags that were sent with lowercase names |
 | [`run-timestamp-probe.ts`](#run-timestamp-probets) | Which time fields does the device hand to a contract, and in which units |
-| [`seed-on-spawn.ts`](#seed-on-spawnts) | Does the allow-list seed at spawn, or only with the first message |
-| [`allowlist-tier3.ts`](#allowlist-tier3ts) | Does the trie-backed allow-list store work on a node |
-| [`trie-scale.ts`](#trie-scalets) | Does a trie lookup stay cheap at the size of the operator set |
-| [`gate-reads.ts`](#gate-readsts) | What does a point read into a computed view cost |
-| [`p4-lua-pricing.ts`](#p4-lua-pricingts) | Can a Lua script serve as the pricing device of `p4@1.0` |
-| [`p4-gate-e2e.ts`](#p4-gate-e2ets) | Does the write gate decide correctly from contract state |
-| [`gate-subject-replay.ts`](#gate-subject-replayts) | Does the gate refuse a bundler upload envelope that is replayed at a push path |
 | [`stranger-write.ts`](#stranger-writets) | Can a wallet that is on no list write to a process |
-| [`xproc-syntax.ts`](#xproc-syntaxts) | Which forms of `ao.resolve` read the state of another process |
-| [`xproc-gate.ts`](#xproc-gatets) | Does a cross-process read wait behind the backlog of its target |
 | [`bundler-landing.ts`](#bundler-landingts) | Does the data of a bundle that the node made itself land on Arweave |
-| [`gated-bundler-repro.ts`](#gated-bundler-reprots) | Does the upload of the node reach its own bundler behind a Lua pricing device |
 | [`gc-cost-curve.ts`](#gc-cost-curvets) | Does the cost of a message grow with the number of slots |
 | [`gc-restore-fidelity.ts`](#gc-restore-fidelityts) | Is state identical after a restart of the node |
-| [`opreg-wedge-repro.ts`](#opreg-wedge-reprots) | Can an image continue a process whose trie another image wrote |
+| [`opreg-wedge-repro.ts`](#opreg-wedge-reprots) | Can an image continue a process that another image built |
 
 | Lua file | Used by | Content |
 | --- | --- | --- |
-| `p4-pricing.lua` | `p4-lua-pricing.ts` | A minimal pricing device. The probe inserts the allowed address at run time |
 | `timestamp-probe.lua` | `run-timestamp-probe.ts` | A `compute` that reports every time field of the request |
 
 ## Facts that hold for every probe
@@ -100,10 +86,9 @@ Rules:
 | With `accept: application/json` the node wraps a scalar in a commitment envelope | Read a scalar without that header |
 | Without an `accept` header some routes answer with the Hyperbuddy page and HTTP 200 | Send `accept: application/json` where a JSON answer is expected, and assert that the answer is JSON |
 | `<pid>~process@1.0/slot` answers with the Hyperbuddy page | The slot number is at `slot/current` |
-| HTTP 400 has many sources: the allow-list, the gate, a malformed message | Identify a refusal by its message, not by its status |
+| HTTP 400 has many sources: the allow-list, a malformed message | Identify a refusal by its message, not by its status |
 | A handler that throws is reverted, and the push still answers 200 | Read the output of the slot to see the error |
 | A snapshot of a process is taken at most once per `process_snapshot_time`, 60 seconds by default | To test a restore, idle longer than that and send one more message |
-| `dev_p4` reports every failure of its pricing device as `Could not estimate price of request.` | Start the node with `HB_PRINT=lua_error,lua` to see the Lua error |
 | `HB_PRINT` output goes to the standard error of the container | Read both streams of the container log |
 | `config.flat` in the image sets `priv_key_location`, spelled with underscores. `HB_CONFIG=config.json` alone drops it | The node creates a new identity at every start. Pass `HB_CONFIG=config.flat,config.json` when a probe restarts a node |
 
@@ -281,273 +266,7 @@ Findings:
 - The native runtime uses `timestamp`. See
   [../../docs/runtime.md](../../docs/runtime.md#timestamps).
 
-## Spawn and seed
-
-### seed-on-spawn.ts
-
-Question: does the allow-list seed at spawn, or only when the first message is scheduled.
-
-```sh
-HB_URL=http://localhost:8734 CONTAINER=<name> bun run scripts/probe/seed-on-spawn.ts
-```
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `CONTAINER` | `hb-seedtest` | Container that receives the module |
-| `NONCE` | The current time | Value of the `nonce` tag of the spawn |
-
-`DEPLOYER_PRIVATE_KEY` is required. Needs the operator registry bundle and seed in `dist/`.
-
-Findings:
-
-- The allow-list seeds at slot 0, which is the spawn message, in the same compute as the state
-  seed.
-- A message after the spawn leaves `allowlistId` unchanged. No message is needed to build the
-  allow-list.
-- Slot 0 must have been computed once. One `now/` read does that.
-- Before that read, every `compute/` path answers 508: `allowlistId`, the trie lookup and the
-  read of the owner.
-- The first compute is a free read and not a signed message. `now` is a free route for a
-  process id on the route list of the node, so the read does not pass the gate.
-- The first compute of a seeded process takes seconds, because it loads the state seed. Later
-  gate reads are fast.
-
-## Allow-list and trie
-
-### allowlist-tier3.ts
-
-Question: does the trie-backed store of the allow-list work on a node. The offline tiers use a
-plain table, because `ao.resolve` exists on a node only.
-
-```sh
-HB_URL=http://localhost:8734 CONTAINER=<name> bun run scripts/probe/allowlist-tier3.ts
-```
-
-`CONTAINER` defaults to `hb-al3`. `DEPLOYER_PRIVATE_KEY` is required. Needs the operator
-registry bundle and seed in `dist/`.
-
-Findings:
-
-- `ao.resolve({ 'as', 'trie@1.0', id }, { path = 'set', ... })` persists from inside the
-  compute of a contract. The id that it returns carries over to the next slot.
-- The seed of the allow-list, several hundred addresses, is written in one slot.
-- The read of the gate, `compute/allowlistId/~trie@1.0/<address>`, returns what the contract
-  wrote, including the `B<count>` encoding of a block.
-- A stored count is an integer string.
-- A reference count survives a slot boundary. The contract reads the trie id from state in
-  every slot and does not create a new trie.
-- The owner of the process is on the allow-list.
-- A lookup of an unknown address answers 404. A hit and a miss take the same time.
-- The allow-list is keyed by the EIP-55 form of an address. The all-lowercase spelling of the
-  same address does not resolve. The node delivers committers in EIP-55 form, so the gate looks
-  up the stored spelling.
-
-See [../../docs/runtime.md](../../docs/runtime.md#allow-list).
-
-### trie-scale.ts
-
-Question: does a point lookup into a `~trie@1.0` stay cheap at the size of the operator set.
-
-```sh
-HB_URL=http://localhost:8734 N=8000 bun run scripts/probe/trie-scale.ts
-N=1000,8000,20000 bun run scripts/probe/trie-scale.ts
-```
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `N` | `1000,8000,20000` | Key counts, one run per count |
-| `BATCH` | `500` | Keys per insert batch while seeding |
-
-`DEPLOYER_PRIVATE_KEY` is required. Keys have the shape of an address: `0x` and 40 hex
-characters.
-
-| Column | Measures |
-| --- | --- |
-| `seed` | Time to build the whole trie |
-| `hit`, `miss` | A point lookup through the process |
-| `by-id` | A point lookup when the trie id is known |
-| `update` | A change of one key |
-| `composed` | A change of one key with the path `set/id` |
-
-Findings:
-
-- The cost of a point lookup does not grow with the number of keys. A lookup follows the
-  length of the key.
-- A hit and a miss cost the same.
-- A lookup by trie id is cheaper than a lookup through the process.
-- A `set` commits and writes the whole trie. The cost of changing one key grows with the size
-  of the trie.
-- Write every change of a slot in one `set`. One `set` per key multiplies the cost.
-- On a stock image the path `set/id` does not return the id of the new trie. It returns a
-  table.
-- `scripts/qualify-node.ts` gates on the ratio of the lookup time at the largest key count to
-  the time at the smallest. The ceiling is 2.0.
-
-### gate-reads.ts
-
-Question: what does it cost to answer "may this address write" from a computed view of an
-operator registry of realistic size.
-
-```sh
-HB_URL=http://localhost:8734 CONTAINER=<name> bun run scripts/probe/gate-reads.ts
-```
-
-`CONTAINER` defaults to `hb-gate`. `DEPLOYER_PRIVATE_KEY` is required. Needs the operator
-registry bundle and seed in `dist/`.
-
-Findings:
-
-- A computed view builds its whole result on every call. A point read into the view pays for
-  the whole view.
-- The gate therefore reads a stored index: the allow-list trie. A trie read does not load the
-  process.
-- Roles are keyed by action name, for example `Add-Verified-Hardware`. A read of a role named
-  `admin` answers 404 when no such role exists.
-- The mixed case of an EIP-55 address survives a path segment.
-
-The probe reads `compute/~lua@5.3a/<view>` and `compute/state/<key>`. Those paths resolve only
-for a module that keeps its state on the process message. The native contracts are read through
-`as/<view>`.
-
-## Write gate
-
-See [../../docs/write-gate.md](../../docs/write-gate.md) for the gate itself.
-
-### p4-lua-pricing.ts
-
-Question: can a Lua script serve as the pricing device of `p4@1.0`.
-
-```sh
-bun run scripts/probe/p4-lua-pricing.ts
-IMAGE=<ref> KEEP=1 bun run scripts/probe/p4-lua-pricing.ts
-```
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `IMAGE` | `ghcr.io/memetic-block/hyperbeam-docker:v0.9-FINAL-patched` | Image under test |
-| `KEEP` | Off | `1` leaves the container `hb-p4spike` running |
-| `HB_PRINT` | Unset | Passed to the node |
-
-The probe needs no key. It generates an allowed key and a refused key per run and starts its own
-node with `pricing-device: lua@5.3a` and `ledger-device: faff@1.0`.
-
-Findings:
-
-- A Lua script works as a pricing device.
-- `dev_p4` calls the function `estimate` with the hook message as `base` and
-  `{ path = 'estimate', request = <the signed request>, body = <messages> }` as `req`.
-- `'infinity'` refuses the request with HTTP 400. The ledger is not consulted.
-- The integer `0` admits the request for free. The ledger is not consulted.
-- Any other value is a price. `dev_p4` then asks the ledger for a balance.
-- A float `0.0` is a price, not an admission. With `faff@1.0` as the ledger the request then
-  answers 500, because that device exports no balance function. Return `math.tointeger(0)`.
-- A refusal happens at the request hook, before the scheduler assigns a slot. A refused write
-  takes no slot.
-- `faff@1.0` admits a request without signers. A Lua gate must refuse it explicitly.
-- The pricing device and the ledger device are declared on one hook message, and `dev_lua`
-  reads its script from the `module` key of that message. A Lua pricing device and a Lua ledger
-  device cannot use different scripts.
-- `p4@1.0` belongs on both hooks: `on/request` estimates and `on/response` charges.
-- A node that ignores its configuration file has no pricing device and admits everything.
-  Assert that the configuration took effect before trusting an admission.
-- A write to a process must carry the message envelope and the target. A bare item is rejected
-  as malformed with HTTP 400, the status that a refusal also has.
-- The first request through the device pays for the start of the Lua VM. Measure cost on a
-  warm device.
-- Derive an EVM address with keccak over the uncompressed public key. The last 20 bytes of the
-  public key are not the address.
-
-### p4-gate-e2e.ts
-
-Question: does the write gate decide correctly when it reads contract state, and what does a
-decision cost.
-
-```sh
-bun run scripts/probe/p4-gate-e2e.ts
-VERIFY=1 bun run scripts/probe/p4-gate-e2e.ts
-```
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `IMAGE` | `hyperbeam-luaenc:local` | Image under test. The default is an image built locally |
-| `VERIFY` | Off | `1` also runs `scripts/verify-access-policy.ts local` against the node of the probe |
-| `KEEP` | Off | `1` leaves the container `hb-gate-e2e` running |
-| `HB_PRINT` | Unset | Passed to the node |
-
-`DEPLOYER_PRIVATE_KEY` is required. Needs the three native bundles and seeds in `dist/`.
-
-The node starts without `p4`. The probe spawns and seeds the contracts, rewrites the
-configuration, and restarts the container on the same store.
-
-Findings:
-
-- The allow-list of the operator registry holds the owner, the role holders and the operators.
-  A write to it needs one read.
-- The allow-list of a reward contract holds the owner and the role holders. An operator is
-  admitted for a reward contract through the allow-list of the operator registry. That needs
-  two reads.
-- A refusal by the gate takes no slot and writes no state. A rejection by the contract takes
-  both.
-- Every decision of the gate pays for its reads of contract state. The refusal path is the
-  path that an attacker uses, so its cost is the one to measure.
-- A trie miss answers HTTP 404 with an HTML body. It is not an empty 200.
-- The gate refuses every unsigned request and does not tell a read from a write. The free
-  routes must name every read verb that a consumer uses: `now`, `compute`, `slot` and `as`. A
-  verb that is missing answers 400.
-- Free reads are granted per process id. A route pattern that matches any process id makes the
-  node a free read service for every process.
-- The root route `^/$` must be free, or the gate refuses the request that redirects to
-  Hyperbuddy.
-- The gate is referenced by module id and not inlined. Other source has another id.
-- The production hook chain has 6 hooks with `p4@1.0` last. Over HTTP the hooks are indexed
-  from 1, so `p4` is entry 6.
-- The `device` key of a rendered hook holds the name of the serializer. Identify the `p4` hook
-  by `pricing-device`.
-- After the gate is on, a spawn is refused for every signer that is not a deploy wallet.
-- Rewrite a bind-mounted configuration file in place. Replacing the file changes the inode, and
-  the mount keeps the old file.
-- A node without an edge must keep `p4` in front of `~bundler@1.0`. The free bundler route of
-  stage and live is safe only because their edge refuses that route.
-
-### gate-subject-replay.ts
-
-Question: does the gate refuse a bundler upload envelope that is replayed at a push path.
-
-```sh
-bun run scripts/probe/gate-subject-replay.ts
-GATE_SRC=<file.lua> bun run scripts/probe/gate-subject-replay.ts
-```
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `IMAGE` | An image digest in the script | Image under test |
-| `GATE_SRC` | `runtime/write-gate.lua` | Gate source to publish |
-| `KEEP` | Off | `1` leaves the container `hb-subject-replay` running |
-
-`DEPLOYER_PRIVATE_KEY` is required. The probe points `bundler-ans104` at a local listener on
-port 9099, sends one write, keeps the bytes that the node posted, and replays them over a raw
-socket at `/<pid>~process@1.0/push`.
-
-Findings:
-
-- The upload envelope of the node is unsigned httpsig with `bundler-subject: body`. The
-  signature is on the nested item. `hb_http:post` does not commit what it sends.
-- Whether a `committer` field can be trusted depends on the codec of the request:
-
-  | Codec | Signature verified |
-  | --- | --- |
-  | `ans104@1.0` | Always |
-  | `tx@1.0` | Always |
-  | `httpsig@1.0` | Only when `force_signed_requests` is set |
-  | Other | Always, by `hb_message:verify` |
-
-- A gate that takes a signer from a nested field of an unsigned httpsig request trusts a field
-  that nothing verified.
-- The gate refuses the replayed envelope with
-  `Node will not service this request under any circumstances.`, and no slot is taken.
-- The refusal message is the evidence. A gate that admits the replay also ends in HTTP 400,
-  because the request fails later in the push.
-- A request body built by hand does not test this. It fails to decode before it reaches `p4`.
+## Node allow-list
 
 ### stranger-write.ts
 
@@ -567,60 +286,6 @@ Findings:
   `push` is exempt.
 - A local node without an allow-list accepts a write from any wallet.
 - Test a browser wallet against a local node.
-
-## Cross-process reads
-
-### xproc-syntax.ts
-
-Question: which forms of `ao.resolve` read the state of another process from inside `compute`.
-
-```sh
-HB_URL=http://localhost:8734 bun run scripts/probe/xproc-syntax.ts
-```
-
-`DEPLOYER_PRIVATE_KEY` is required. Process B holds a marker. Process A reads it in five ways
-and records what each returns.
-
-| Form | Result |
-| --- | --- |
-| `ao.resolve({ 'as', 'process@1.0', pid }, 'now/state/marker')` | The value |
-| `ao.resolve(pid .. '~process@1.0/now/state/marker')` | The value |
-| `ao.resolve({ path = '/' .. pid .. '~process@1.0/now/state/marker' })` | The value |
-| `ao.resolve({ 'as', 'process@1.0', pid }, { path = 'now/state/marker' })` | The process message, not the value |
-
-Findings:
-
-- A process can read the state of another process during `compute`.
-- One form returns the process message without an error.
-- A malformed path raises an Erlang error that `pcall` does not catch. The error leaves
-  `compute`, and the process cannot compute any further slot.
-- Never build a resolve path from a value that was not validated.
-- Establish a path form on a throwaway process, or over HTTP, before a contract uses it.
-
-### xproc-gate.ts
-
-Question: does a cross-process read wait behind the backlog of its target.
-
-```sh
-HB_URL=http://localhost:8734 CONTAINER=<name> bun run scripts/probe/xproc-gate.ts
-```
-
-`CONTAINER` defaults to `hb-spike`. `DEPLOYER_PRIVATE_KEY` is required. Needs the operator
-registry bundle and seed in `dist/`. A gate process makes one cross-process read per message, so
-the time of a push minus the time of an empty push is the cost of the read.
-
-Findings:
-
-- `now/<path>` computes to the latest slot. A read through `now` waits until every queued
-  message of the target is computed.
-- `compute/<path>` does not wait. `dev_process` reads `slot` or `compute` from the request.
-  Without a slot it serves the latest known state and computes nothing.
-- A caller that reads through `now` inherits the backlog of the target. Writes queued on the
-  target slow every such reader.
-- The gate reads through `compute`.
-
-The probe reads `state/verified/<fingerprint>` of its target. That path resolves only for a
-module that keeps its state on the process message.
 
 ## Bundling
 
@@ -675,47 +340,6 @@ Findings:
   configuration, wait for new assignments.
 - The verdict follows the configured `bundler-ans104`. A node that points at an external
   uploader and is bundled by it behaves correctly.
-
-### gated-bundler-repro.ts
-
-Question: does the upload of the node reach its own bundler when the pricing device is Lua.
-
-```sh
-bun run scripts/probe/gated-bundler-repro.ts
-```
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `IMAGE` | An image digest in the script | Image under test |
-| `GATE_SRC` | `runtime/write-gate.lua` | Gate source to publish |
-| `HB_PRINT` | `lua_error` | Extra print topics. `bundler_short` is always added |
-| `VERBOSE` | Off | `1` prints the node events of each phase |
-| `KEEP` | Off | `1` leaves the container `hb-bundler-repro` running |
-
-`DEPLOYER_PRIVATE_KEY` is required. The probe runs the same write once with `faff@1.0` and once
-with `lua@5.3a` as the pricing device, with `bundler-ans104` on loopback. It passes when the
-upload reaches the bundler under both.
-
-Findings:
-
-- The node posts every scheduled message and every assignment to its configured bundler. With
-  a loopback bundler that is a request to itself, and the request runs the `on/request` hooks.
-- `dev_lua` must encode a request to hand it to a Lua pricing device. Stock `dev_lua` cannot
-  encode a cache link. A request that carries one answers 400
-  `Could not estimate price of request.`
-- The image needs the patch that teaches `dev_lua` to encode a link. The probe fails on an
-  image without it.
-- The scheduler discards the result of its upload and does not retry. After a refused upload
-  the slots keep advancing, and their assignments never reach Arweave.
-- The scheduler uploads inline, because `scheduling_mode` defaults to `sync`.
-- The upload envelope is unsigned. `faff@1.0` admits it, and the gate refuses an unsigned
-  request. That difference is real and is not the cause of a failed estimate.
-- Test a suspected cause by substitution. A gate that admits everything fails in the same way
-  on an image without the patch.
-- `bundler_short` events carry `queueing_item`. That event is the evidence that the bundler
-  accepted the upload.
-- A POST of `{}` to a push path answers 400 `Message is not valid.` under both pricing devices.
-  The request is rejected before `p4` is consulted.
 
 ## Image and upgrade
 
@@ -785,7 +409,7 @@ Findings:
 
 ### opreg-wedge-repro.ts
 
-Question: can an image continue a process whose allow-list trie another image wrote.
+Question: can an image continue a process that another image built.
 
 ```sh
 bun run scripts/probe/opreg-wedge-repro.ts
@@ -797,9 +421,8 @@ IMAGE=<candidate> bun run scripts/probe/opreg-wedge-repro.ts --history 3 --from-
 | --- | --- | --- |
 | `--seed <file>` | An empty seed | State dump to seed from |
 | `--raw-seed <file>` | None | A spawn payload that is already an envelope |
-| `--history <n>` | `0` | Batches of certificates to send before the test writes. Each batch uses new fingerprints and grows the trie |
+| `--history <n>` | `0` | Batches of certificates to send before the test writes. Each batch uses new fingerprints |
 | `--from-image <ref>` | None | Spawn and build history on this image, then restart on `IMAGE` with the same store |
-| `--gate` | Off | Restart the node with `p4` and the write gate, in the hook chain of stage and live |
 | `--expect-healthy` | Off | Exit 1 when the process stops computing. Without it, that outcome exits 0 |
 
 | Variable | Default | Meaning |
@@ -815,21 +438,13 @@ Findings:
 
 - A process that was spawned on an image computes on that image. That says nothing about a
   process that an earlier image wrote.
-- After an upgrade from `v0.9-FINAL` to a build that loads devices from the preloaded store,
-  the first message that grants an allow-list entry fails with
-  `Erlang error while running Lua: undef`. It fails on images without local patches as well.
-- Across that boundary a read of the trie succeeds, and a write that grants nothing succeeds.
-  Only a write that grants fails.
-- After the failure every compute attempts the failed slot again and fails. State stays at the
+- A test of an upgrade must build state on the old image, change the image on the same store,
+  and then write.
+- A wedged process attempts the failed slot again on every compute and fails. State stays at the
   last computed slot, and the scheduler keeps accepting messages.
 - `as/` keeps answering 200 with the last computed state. `now/` answers with the error.
-- `HB_PRINT=lua_error` prints nothing for this error.
-- The offline tiers cannot show the failure. They use a plain table in place of the trie.
-- A test of an upgrade must build trie state on the old image, change the image on the same
-  store, and then send a write that grants.
+- `HB_PRINT=lua_error` prints nothing for `Erlang error while running Lua: undef`.
 - A node that restarts needs a persistent wallet. With an ephemeral wallet the node has a new
   address after a restart, and the process points at the old one. Every write then fails.
-- `p4` must sit behind the hook chain of production. With `p4` alone the request is absent from
-  the hook message, and the gate sees no signer.
 - A state dump holds the state of the last computed slot. The payload of the spawn item holds
   the state that the process started from.

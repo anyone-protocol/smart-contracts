@@ -7,11 +7,8 @@
 // swallows the Erlang stacktrace — so the only way to learn more is to reproduce it somewhere we
 // can instrument.
 //
-// Neither offline tier can see this:
-//   - Tier-1 (Lua 5.3) and Tier-2 (real luerl) both PASS the failing payload, because
-//   - `native.allowlist.store` falls back to an in-memory table whenever `ao.resolve` is absent,
-//     which is always true offline. The real `~trie@1.0` write that
-//     `Admin-Submit-Operator-Certificates` performs on EVERY new cert is exercised by NO tier.
+// Neither offline tier can see this: Tier-1 (Lua 5.3) and Tier-2 (real luerl) both PASS the
+// failing payload, because neither runs a node store or crosses images.
 //
 // Runs entirely on the production image and costs no slots on any real node.
 //
@@ -49,12 +46,6 @@ const sh = (args: string[], ms = 120_000) =>
 const cfg = path.join(AO, 'dist', 'wedge-config.json')
 const seedArg = process.argv.indexOf('--seed')
 const seedFile = seedArg > -1 ? process.argv[seedArg + 1] : undefined
-// `--gate` reconfigures the node to match stage/live EXACTLY: p4 with the real write-gate as its
-// Lua pricing device. The gate is a SECOND luerl VM running on every chargeable request, and it
-// is the last structural difference between this harness and the wedged nodes. Applying it also
-// RESTARTS the node, which forces the process and its messages to be re-read from cache — where
-// a message body is a `+link` (`name => body+link` in the stage arg dump) rather than inline.
-const GATE = process.argv.includes('--gate')
 // `--raw-seed <file>` takes an ALREADY-ENVELOPED spawn payload — e.g. the real one fetched from
 // Arweave at the process id, which IS the spawn item. Faithful in a way a re-enveloped `as/dump`
 // is not: the dump is state as of the LAST COMPUTED slot, not what the process was spawned with.
@@ -62,8 +53,8 @@ const rawArg = process.argv.indexOf('--raw-seed')
 const rawSeedFile = rawArg > -1 ? process.argv[rawArg + 1] : undefined
 // Slots of realistic history to build BEFORE the wedging cert. The wedged processes had 38
 // (stage) and 8 (live) slots behind them; jumping straight to the end state tests nothing about
-// accumulated history. Each batch uses FRESH fingerprints so every one drives `ctx.allow` into
-// the real `~trie@1.0` — the write path no offline tier can reach.
+// accumulated history. Each batch uses FRESH fingerprints, so history grows the way the
+// controller's real traffic does.
 const histArg = process.argv.indexOf('--history')
 const HISTORY = histArg > -1 ? Number(process.argv[histArg + 1]) : 0
 // 🚨 THE VERSION CROSSING. stage/live wedged at exactly the boundary the real deploys crossed:
@@ -102,40 +93,16 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
   console.log(`  seed   ${seedFile ?? '(empty state)'}`)
 
   fs.mkdirSync(path.dirname(cfg), { recursive: true })
-  // No p4: the gate is NOT implicated (proven on stage — a gate refusal returns a different
-  // body), and leaving it out removes a variable.
-  const writeCfg = (pid?: string, gateModuleId?: string) => fs.writeFileSync(cfg, JSON.stringify({
+  const writeCfg = () => fs.writeFileSync(cfg, JSON.stringify({
     'scheduler-default-commitment-spec': 'ans104@1.0',
     'faff-allow-list': [deployerAddr],
-    ...(pid && gateModuleId ? {
-      // p4 must sit BEHIND the same device chain stage and live run. The preceding hooks shape
-      // the hook message the gate reads: with p4 alone, `req.request` is absent, the gate sees
-      // ZERO signers and deny-by-default refuses even a deploy wallet.
-      on: { request: [
-        { device: 'rate-limit@1.0' },
-        { device: 'auth-hook@1.0', path: 'request', when: { keys: ['authorization', '!'] },
-          'secret-provider': { device: 'http-auth@1.0', 'access-control': { device: 'http-auth@1.0' } } },
-        { device: 'name@1.0' },
-        { device: 'manifest@1.0' },
-        { device: 'blacklist@1.0' },
-        {
-          device: 'p4@1.0', 'pricing-device': 'lua@5.3a', 'ledger-device': 'faff@1.0',
-          module: gateModuleId, 'gated-processes': [pid], 'operator-registry': pid,
-          'deploy-wallets': [deployerAddr],
-        },
-      ] },
-      'p4-non-chargable-routes': [
-        { template: `^/${pid}~process@1.0/(now|compute|slot|as)` },
-        { template: '^/$' }, { template: '^/~meta@1.0' }, { template: '^/~hyperbuddy@1.0' },
-      ],
-    } : {}),
   }, null, 2))
   writeCfg()
 
-  // 🚨 A PERSISTENT node wallet is mandatory once `--gate` restarts the container.
+  // 🚨 A PERSISTENT node wallet is mandatory once `--from-image` restarts the container.
   // HB_ALLOW_EPHEMERAL_WALLET regenerates the operator key on every start, so after a restart
   // the node has a NEW address, the process it scheduled points at the old one, and every write
-  // fails in a way that looks like a gate decision and is not.
+  // fails in a way that looks like an access decision and is not.
   const walletFile = path.join(AO, 'dist', 'wedge-wallet.json')
   if (!fs.existsSync(walletFile)) {
     execFileSync('bun', ['-e',
@@ -218,26 +185,6 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
   // ran. Assert the real state is present before drawing any conclusion from a negative.
   const status = await (await fetch(`${HB}/${pid}~process@1.0/as/status`)).text()
   console.log(`  seeded status: ${status.replace(/\s+/g, ' ').slice(0, 160)}`)
-  const alSeeded = await fetch(`${HB}/${pid}~process@1.0/compute/allowlistId/~trie@1.0/${deployerAddr}`)
-  console.log(`  owner in allowlist trie: HTTP ${alSeeded.status}`)
-
-  if (GATE) {
-    // Publish the REAL gate artefact stage and live run, then restart onto a stage-shaped config.
-    sh(['cp', path.join(AO, 'runtime/write-gate.lua'), `${NAME}:/tmp/wg.lua`], 300_000)
-    sh(['exec', NAME, './bin/hb', 'eval',
-      `{ok,S}=file:read_file("/tmp/wg.lua"), M=hb_message:commit(#{ <<"data-protocol">> => <<"ao">>, ` +
-      `<<"variant">> => <<"ao.N.1">>, <<"type">> => <<"module">>, <<"content-type">> => <<"application/lua">>, ` +
-      `<<"name">> => <<"write-gate">>, <<"body">> => S }, #{ <<"priv-wallet">> => hb:wallet() }, <<"ans104@1.0">>), ` +
-      `{ok,_}=hb_cache:write(M,#{}), ok=file:write_file("/tmp/wg.id", hb_util:id(M)).`], 600_000)
-    const gateId = sh(['exec', NAME, 'cat', '/tmp/wg.id'], 60_000).trim()
-    writeCfg(pid, gateId)
-    const addrBefore = await (await fetch(`${HB}/~meta@1.0/info/address`)).text()
-    console.log(`\n  restarting onto stage-shaped config (p4 + write-gate ${gateId.slice(0, 12)}…)`)
-    sh(['restart', NAME], 120_000)
-    if (!await waitUp()) { console.log(sh(['logs', '--tail', '40', NAME])); process.exit(2) }
-    const addrAfter = await (await fetch(`${HB}/~meta@1.0/info/address`)).text()
-    console.log(`  node identity ${addrBefore.trim() === addrAfter.trim() ? 'PRESERVED' : '*** CHANGED — harness bug ***'} (${addrAfter.trim().slice(0, 12)}…)`)
-  }
 
   const before = await wedged(pid)
   console.log(`\n  after spawn: now/ HTTP ${before.code}, slot ${before.slot}` +
@@ -245,9 +192,9 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
   if (before.wedged) { console.log('\n  spawn itself wedged — the SEED is implicated, not the cert.'); process.exit(1) }
 
   // Build realistic slot history first. Fresh fingerprints each time, so every batch grows the
-  // allowlist trie exactly the way the controller's real traffic does.
+  // state the way the controller's real traffic does.
   if (HISTORY > 0) {
-    console.log(`\n  building ${HISTORY} slots of history (fresh fingerprints -> real trie writes)…`)
+    console.log(`\n  building ${HISTORY} slots of history (fresh fingerprints)…`)
     for (let i = 0; i < HISTORY; i++) {
       const batch = Array.from({ length: 8 }, (_, j) => ({
         a: new Wallet('0x' + (i * 8 + j + 3).toString(16).padStart(64, '0')).address,
@@ -291,7 +238,7 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
 
   const NOOP = [{ a: '0x58bd1A7Db94Ee1a00D4dC6Cb0333828f27e61662', f: '33ED9E79B1089D52865A126EE63A93FB1D2F0DB2' }]
   for (const [label, certs] of [
-    ['NO-OP   (already claimable, no trie write)', NOOP],
+    ['NO-OP   (already claimable)', NOOP],
     ['CONTROL (live slot 8)', CONTROL],
     ['WEDGE   (live slot 9)', WEDGE]] as const) {
     await sendMessage(config, {

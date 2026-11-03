@@ -482,11 +482,7 @@ do
   check('placement: state is at the root global', S().claimable[FP_A] == ALICE)
   check('placement: acl is at the ACL global', same({ roles = {} }, native.acl()))
 
-  -- Only the envelope, the results, and the allowlist trie id may ride on the message. The
-  -- allowlist is deliberate: the p4 write gate reads compute/allowlistId/~trie@1.0/<addr>
-  -- without executing contract code, so it cannot see a Lua global.
-  local allowed = { process = true, results = true, allowlistId = true,
-                    allowlistTable = true, allowlistSeeded = true }
+  local allowed = { process = true, results = true }
   local extra = nil
   for k in pairs(base) do if not allowed[k] then extra = k end end
   check('placement: only envelope keys on the message', extra == nil, tostring(extra))

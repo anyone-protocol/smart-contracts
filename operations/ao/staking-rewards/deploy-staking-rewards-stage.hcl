@@ -57,9 +57,8 @@ job "staking-rewards-stage" {
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
       MODULE_ID = "H33fd6uDoaO1ak2bjVilroXA-P0QFMYkzvZCoX25890"
 
-      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
-      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
-      # template gated-processes from.
+      # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
+      # previous value if that fails.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/stage/staking-rewards-address"
