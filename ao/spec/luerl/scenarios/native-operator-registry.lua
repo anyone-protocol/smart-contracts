@@ -348,6 +348,22 @@ do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
   check('acl: specific submit role', same({ [FP_A] = ALICE }, S().claimable) and outData(base) == 'OK')
 end
+do local base = newBase()
+  grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+  compute(base, assign('Update-Roles', OWNER,
+    json.encode({ Revoke = { [BOB] = { 'Admin-Submit-Operator-Certificates' } } })))
+  submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+  check('acl: revoke removes a granted role', has(outData(base), 'Permission Denied') and S().claimable[FP_A] == nil)
+end
+do local base = newBase(); grantRole(base, ALICE, { 'admin' })
+  compute(base, assign('Update-Roles', OWNER,
+    json.encode({ Grant = { [BOB] = { 'admin' } }, Revoke = { [ALICE] = 'admin' } })))
+  check('acl: failed update-roles errors', has(outData(base), 'error'))
+  submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+  check('acl: failed update-roles grants nothing', has(outData(base), 'Permission Denied'))
+  submitCerts(base, ALICE, { { f = FP_A, a = ALICE } })
+  check('acl: failed update-roles revokes nothing', outData(base) == 'OK')
+end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Remove-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))
@@ -402,6 +418,26 @@ do local base = newBase()
   submitCerts(base, OWNER, { { f = FP_B, a = BOB }, { f = 'BAD', a = CHARLS } })
   check('safety: cross-action atomicity keeps prior commit', S().claimable[FP_A] == ALICE)
   check('safety: cross-action atomicity reverts failed batch', S().claimable[FP_B] == nil)
+end
+do
+  local function resolve(c) return native.resolveCommitter({ commitments = commit(c) }) end
+  check('did:pkh: EVM committer resolves to its address', resolve('did:pkh:eip155:1:' .. ALICE) == ALICE)
+  local passThrough = true
+  for _, c in ipairs({
+    'did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV',
+    'did:pkh:eip155:1:' .. ALICE .. ':x',
+    'did:pkh:eip155:1:' .. ALICE .. 'a',
+    'did:pkh:eip155:1:' .. string.sub(ALICE, 1, 41),
+    'did:pkh:eip155:1:0x' .. string.rep('g', 40),
+  }) do
+    if resolve(c) ~= c then passThrough = false end
+  end
+  check('did:pkh: other and malformed committers pass through', passThrough)
+end
+do local base = newBase()
+  grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+  submitCerts(base, 'did:pkh:eip155:1:' .. BOB, { { f = FP_B, a = BOB } })
+  check('did:pkh: signer matches a role granted to its bare address', S().claimable[FP_B] == BOB)
 end
 
 -- Consumption + visibility views (asserted against state)
@@ -482,11 +518,7 @@ do
   check('placement: state is at the root global', S().claimable[FP_A] == ALICE)
   check('placement: acl is at the ACL global', same({ roles = {} }, native.acl()))
 
-  -- Only the envelope, the results, and the allowlist trie id may ride on the message. The
-  -- allowlist is deliberate: the p4 write gate reads compute/allowlistId/~trie@1.0/<addr>
-  -- without executing contract code, so it cannot see a Lua global.
-  local allowed = { process = true, results = true, allowlistId = true,
-                    allowlistTable = true, allowlistSeeded = true }
+  local allowed = { process = true, results = true }
   local extra = nil
   for k in pairs(base) do if not allowed[k] then extra = k end end
   check('placement: only envelope keys on the message', extra == nil, tostring(extra))

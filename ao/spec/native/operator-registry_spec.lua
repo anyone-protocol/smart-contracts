@@ -599,6 +599,25 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.are.equal('OK', outData(base))
     end)
 
+    it('Update-Roles Revoke removes a granted role', function()
+      grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+      compute(base, assign('Update-Roles', OWNER,
+        json.encode({ Revoke = { [BOB] = { 'Admin-Submit-Operator-Certificates' } } })))
+      submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      assert.is_nil(OperatorRegistry.claimable[FP_A])
+    end)
+
+    it('Update-Roles that fails part way changes no roles', function()
+      compute(base, assign('Update-Roles', OWNER,
+        json.encode({ Grant = { [BOB] = { 'admin' } }, Revoke = { [ALICE] = 'admin' } })))
+      assert.is_true(has(outData(base), 'error'))
+      submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      submitCerts(base, ALICE, { { f = FP_A, a = ALICE } })
+      assert.are.equal('OK', outData(base))
+    end)
+
     it('Removing Fingerprint Certificates — Allows Admin Role', function()
       setupClaimed(base, ALICE, FP_A)
       compute(base, assign('Remove-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))
@@ -783,14 +802,10 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.are.same({ roles = {} }, ACL)
     end)
 
-    it('only results and the allowlist id ride on base', function()
+    it('only the envelope and results ride on base', function()
       local base = newBase()
       addOperatorCert(base, ALICE, FP_A)
-      -- `allowlistId`/`allowlistTable` are deliberate: the p4 write gate reads
-      -- compute/allowlistId/~trie@1.0/<addr> without executing contract code, so it cannot
-      -- see a Lua global. Everything else here is HyperBEAM's own envelope.
-      local allowed = { process = true, results = true, allowlistId = true,
-                        allowlistTable = true, allowlistSeeded = true }
+      local allowed = { process = true, results = true }
       for k in pairs(base) do
         assert.is_true(allowed[k] == true, 'unexpected key on base: ' .. tostring(k))
       end
@@ -946,6 +961,46 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
         certs({ { f = FP_A, a = ALICE } }), nil, { ['from-process'] = OWNER }))
       assert.is_true(has(outData(base), 'Permission Denied'))
       assert.is_nil(OperatorRegistry.claimable[FP_A])
+    end)
+
+    it('resolves did:pkh committers to their account addresses', function()
+      local pkh = function(address) return 'did:pkh:eip155:1:' .. address end
+      native.reset()
+      local base = { process = { id = 'PID', commitments = commit(pkh(OWNER)) } }
+      submitCerts(base, pkh(OWNER), { { f = FP_A, a = ALICE } })
+      assert.are.equal(ALICE, OperatorRegistry.claimable[FP_A])
+      claim(base, pkh(ALICE), FP_A)
+      assert.are.equal(ALICE, OperatorRegistry.verified[FP_A])
+      submitCerts(base, pkh(BOB), { { f = FP_B, a = BOB } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      assert.is_nil(OperatorRegistry.claimable[FP_B])
+    end)
+
+    it('matches a did:pkh signer against a role granted to its bare address', function()
+      local base = newBase()
+      grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+      submitCerts(base, 'did:pkh:eip155:1:' .. BOB, { { f = FP_B, a = BOB } })
+      assert.are.equal(BOB, OperatorRegistry.claimable[FP_B])
+    end)
+
+    it('takes the account address only from EVM did:pkh committers and passes other committers through', function()
+      local function resolve(c) return native.resolveCommitter({ commitments = commit(c) }) end
+      assert.are.equal(ALICE, resolve('did:pkh:eip155:1:' .. ALICE))
+      assert.are.equal(ALICE, resolve('did:pkh:eip155:137:' .. ALICE))
+      assert.are.equal(ALICE, resolve(ALICE))
+      for _, c in ipairs({
+        'did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV',
+        'did:pkh:eip155:1:' .. ALICE .. ':x',
+        'did:pkh:eip155:1:' .. ALICE .. '\n',
+        'did:pkh:eip155:1:' .. ALICE .. 'a',
+        'did:pkh:eip155:1:' .. ALICE:sub(1, 41),
+        'did:pkh:eip155:1:0x' .. string.rep('g', 40),
+        'did:pkh:eip155:x:' .. ALICE,
+        'did:pkh:eip155::' .. ALICE,
+        'DID:PKH:eip155:1:' .. ALICE,
+      }) do
+        assert.are.equal(c, resolve(c))
+      end
     end)
 
     it('rejects an unknown action', function()

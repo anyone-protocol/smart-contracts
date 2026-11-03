@@ -26,7 +26,6 @@ return {
 | `state` | Initial state shape |
 | `actions` | Action name to handler, or to `{ roles, handler }` for a role-gated action |
 | `views` | View name to a pure function of state |
-| `writers` | Optional function `writers(state, { allow, block })`. Reports the addresses that state implies may write |
 
 `native.register(contract)` rejects at load time:
 
@@ -61,13 +60,9 @@ table count. Do not nest tables in a way that scales with data volume.
 
 ### What stays on the process message
 
-`allowlistId`, with its fallback `allowlistTable` and the `allowlistSeeded` flag. The write gate
-reads the allow-list without running contract code, so it cannot see a Lua global. See
-[write-gate.md](write-gate.md).
-
-Do not put state on the process message. State that travels through the message is re-decoded
-on every reload, which drops keys added to a string-valued map after the first slot and adds
-metadata keys to nested maps.
+Only HyperBEAM's own envelope and the slot's `results`. Do not put state on the process message.
+State that travels through the message is re-decoded on every reload, which drops keys added to
+a string-valued map after the first slot and adds metadata keys to nested maps.
 
 ## Identity and trust
 
@@ -110,8 +105,6 @@ Built-in actions, available on every contract:
 | `ctx.slot` | Slot of this message, or `nil` outside a scheduled message |
 | `ctx.state` | The state root |
 | `ctx.send(message)` | Queues a message to another process |
-| `ctx.allow(address)`, `ctx.disallow(address)` | Adds or removes one reason for the address to be on the allow-list |
-| `ctx.block(address)`, `ctx.unblock(address)` | Vetoes the address on the allow-list, or lifts the veto |
 
 A handler returns its output, and optionally a second value with extra keys for its output
 message, such as `content-type`.
@@ -152,7 +145,7 @@ stored or printed renders as `7.0`.
 
 `compute` runs the handler inside a protected call.
 
-1. The runtime snapshots the state root, the roles and the allow-list fields.
+1. The runtime snapshots the state root and the roles.
 2. The handler runs.
 3. On an error, the snapshot is restored, the outbox is discarded, and the slot's output is
    `error: <reason>`.
@@ -232,38 +225,6 @@ The output of a slot is readable at `compute&slot=<n>/results/output`.
 - Keys from a handler's second return value, such as `content-type`, apply to
   `results/output`.
 - `results/output/data` returns the same bytes without the declared content type.
-
-## Allow-list
-
-The allow-list records who may write to a contract. It is a trie addressed by id, with the id
-at `allowlistId` on the process message.
-
-| Rule | Reason |
-| --- | --- |
-| Values are reference counts | An address can be listed for several reasons at once: a role, a fingerprint, being the owner. Removing one reason must not remove the others |
-| Only real transitions count | Granting a role the address already holds does not increment |
-| One trie write per slot | A trie write commits the whole trie. Changes accumulate during the slot and are flushed once, after the handler succeeds |
-| The flush is part of the slot | A failed slot reverts the allow-list with the state |
-| A failed trie write does not fail the slot | The gate can lag the contract until the next write touches the address |
-
-Value format:
-
-| Value | Meaning |
-| --- | --- |
-| `<count>` | Allowed, with that many reasons |
-| `B<count>` | Blocked. The count is kept, so lifting the block restores it |
-| empty string | Not listed. The trie has no delete |
-
-A block is a veto and not a decrement. A blocked address can still hold several reasons, so
-decrementing would leave it allowed.
-
-On the first slot the runtime seeds the allow-list from the owner, every role holder, and the
-contract's `writers` function. A migrated contract is then writable at once by everyone its
-state entitles to write.
-
-`native.allowlist.apply(current, deltas, blocks)` is the pure reference count arithmetic.
-`native.allowlist.store` is the persistence layer. It needs `ao.resolve`, which exists on a
-node only, and falls back to a plain table elsewhere.
 
 ## Testing hooks
 

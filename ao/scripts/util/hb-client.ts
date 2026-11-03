@@ -7,8 +7,11 @@
 // Wire protocol (verified against v0.9-FINAL source + live node):
 // - Body is a raw signed ANS-104 DataItem; headers select the codec:
 //   `Content-Type: application/ans104` (+ `codec-device: ans104@1.0`).
+// - Spawns POST to `/~scheduler@1.0/schedule` (v0.11 answers `/push` with 404);
+//   messages POST to `/<pid>~process@1.0/push`.
 // - EVM signing: arbundles EthereumSigner (sig type 3). The node recovers the
-//   committer as the EIP-55 checksummed 0x address (faff allow-list form).
+//   committer as the EIP-55 checksummed 0x address; v0.11 hands it to Lua as
+//   `did:pkh:eip155:1:<address>`, which the runtime maps back to the address.
 // - Tag names MUST be unique + all-lowercase: dev_codec_ans104 skips its
 //   `original-tags` preservation for "normal" tags, guaranteeing the stored
 //   message re-encodes bit-exact for signature verification. Mixed-case or
@@ -71,7 +74,7 @@ export interface SpawnLuaOptions {
    * Force the process's FIRST COMPUTE and confirm it resolves before returning (default
    * true, one extra GET).
    *
-   * `/push` only SCHEDULES slot 0 — HyperBEAM computes lazily. A never-computed process
+   * A spawn only SCHEDULES slot 0; HyperBEAM computes lazily. A never-computed process
    * still answers 200 on most reads, it just has no state, so an unseeded or broken spawn
    * is indistinguishable from a healthy one until something much later reads the wrong
    * answer. `@permaweb/aoconnect` resolved `now` after a spawn for exactly this reason.
@@ -276,7 +279,7 @@ export async function spawnLuaProcess (
     tags = [...bundle.bundleTags, ...processTags]
     data = bundle.data
   }
-  const { id, res } = await postAns104(config, '/push', { tags, data })
+  const { id, res } = await postAns104(config, '/~scheduler@1.0/schedule', { tags, data })
   const pid = res.headers.get('process') ?? id
   if (opts.verify !== false) {
     await forceFirstCompute(config, pid, opts.verifyAttempts, opts.verifyDelayMs)

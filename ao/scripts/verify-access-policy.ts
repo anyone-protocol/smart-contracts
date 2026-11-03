@@ -91,9 +91,8 @@ const ENVS = {
       '0xc540958396d16533705B4903b990BFFB742Caeb2',
     ],
   },
-  // A LOCAL node standing in for a deployed one — so the gated posture can be verified BEFORE
-  // it reaches dev. Populated from env vars by scripts/probe/p4-gate-e2e.ts, which renders the
-  // same config shape the jobspec does. Only used when explicitly named on the command line.
+  // A LOCAL node standing in for a deployed one, populated from env vars. Only used when
+  // explicitly named on the command line.
   local: {
     host: process.env.LOCAL_HOST || 'localhost:8734',
     edgeLocked: false,   // no nginx in front of a local container; edge checks are skipped

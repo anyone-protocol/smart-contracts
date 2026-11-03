@@ -77,7 +77,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # luerl 1.3.0 is pinned on purpose — it is what HyperBEAM v0.9-FINAL vendors in its
+      # luerl 1.3.0 is pinned on purpose: it is what HyperBEAM v0.11 vendors in its
       # rebar.lock. Bumping it here would stop this tier from testing what the node runs.
       - name: Build the luerl runner image
         run: docker build -t anyone-luerl:1.3.0 spec/luerl/
@@ -116,15 +116,20 @@ jobs:
       - name: Build the luerl runner image
         run: docker build -t anyone-luerl:1.3.0 spec/luerl/
 
-      # v0.9-FINAL is what the cluster runs. The image is public (anonymous ghcr token works),
-      # so no registry secret is needed. --network host so the suite can reach 8734 directly;
-      # the ephemeral wallet is fine because nothing here is published to Arweave.
+      # The image is public (anonymous ghcr token works), so no registry secret is needed.
+      # --network host so the suite can reach 8734 directly. bundler-ans104 points at a closed
+      # local port, so nothing the suite schedules is uploaded to Arweave and the ephemeral
+      # wallet is fine.
       - name: Start a HyperBEAM node
         run: |
+          printf '%s\n' '{"scheduler-default-commitment-spec": "ans104@1.0", "bundler-ans104": "http://127.0.0.1:1"}' \
+            > "$RUNNER_TEMP/hb-config.json"
           docker run -d --name hb-e2e --network host \
             -e HB_ALLOW_EPHEMERAL_WALLET=true \
             -e HB_WALLET_PATH=/app/wallet.json \
-            ghcr.io/memetic-block/hyperbeam-docker:v0.9-FINAL
+            -e HB_CONFIG=config.json \
+            -v "$RUNNER_TEMP/hb-config.json":/app/_build/default/rel/hb/config.json:ro \
+            ghcr.io/memetic-block/hyperbeam-docker:v0.11@sha256:801a381b1ae24f235ed10c9c6a547dcf345d86b01dfcd998de3cf98119a24ea1
 
       - name: Wait for the node
         run: |

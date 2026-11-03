@@ -12,7 +12,7 @@
 # a copy someone pasted into a local .env.
 #
 # It also closes the loop on hard-coded module ids: the id is content-addressed, so with the
-# bytes in git and the id literal in the jobspec, the gate a node is running can be verified
+# bytes in git and the id literal in the jobspec, the module a process runs can be verified
 # against a specific commit.
 #
 # ─── EVERY FILE IS NAMED. Do not add a directory COPY. ──────────────────────────────────────
@@ -34,7 +34,7 @@
 # ─── Usage ──────────────────────────────────────────────────────────────────────────────────
 # There is no CMD: every use is a one-shot job that names its own entrypoint.
 #
-#   bun run scripts/publish-module.ts runtime/write-gate.lua     # needs BUNDLER + PUBLISH_KEY
+#   bun run scripts/publish-module.ts dist/operator-registry-native.lua   # needs BUNDLER + PUBLISH_KEY
 #   bun run scripts/deploy.ts operator-registry --seed live      # needs HB_URL + DEPLOYER_PRIVATE_KEY
 #
 # Build context is the REPO ROOT (docker build . --file Dockerfile-Mainnet), matching the
@@ -52,11 +52,9 @@ RUN bun install --frozen-lockfile
 COPY ao/tsconfig.json ./
 
 # ── runtime ─────────────────────────────────────────────────────────────────────────────────
-# native.lua is the contract runtime; write-gate.lua is the p4 pricing device. Both are read by
-# scripts/util/native-bundle.ts, which inlines them into the published module.
-# runtime/runtime.lua is the LEGACYNET shim and is deliberately not here.
+# native.lua is the contract runtime, read by scripts/util/native-bundle.ts, which inlines it
+# into the published module. runtime/runtime.lua is the LEGACYNET shim and is deliberately not here.
 COPY ao/runtime/native.lua      ./runtime/native.lua
-COPY ao/runtime/write-gate.lua  ./runtime/write-gate.lua
 COPY ao/runtime/vendor/json.lua ./runtime/vendor/json.lua
 
 # ── contract libraries ──────────────────────────────────────────────────────────────────────

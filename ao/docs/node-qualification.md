@@ -60,7 +60,6 @@ one is a reviewable diff instead of a quiet fixture edit.
 | metric | gate |
 |---|---|
 | `gc.growth` | hard ceiling 1.50x, plus a deliberately loose ±40% and 0.20 allowance against the baseline. The ceiling does the real work: the GC-patched image measures flat, the stock image grew about 5x (554 ms to 2,700 ms over 50 slots). The band is loose because the ratio is noisy — five runs of the *same* image measured 0.77, 0.85, 0.87, 1.03 and 1.08, a 1.4x spread. A ±20% band would have false-failed a 1.08 run against a 0.77 baseline. |
-| `trie.hitScaling` | hard ceiling 2.0x, plus ±30%. The write gate rests on a trie point lookup being O(key length): if it starts scaling with the operator set, every chargeable write pays for it. |
 | `verticals.passed`, `policy.passed` | may not fall below the baseline — a run that passes fewer checks has lost coverage. |
 | `*.failed` | ceiling 0. |
 | `toolchain.tier2Pin`, `identity.*`, `restore.identical`, `policy.perturb` | must hold. |
@@ -77,15 +76,14 @@ come from.
 | upstream commit | `466cf489e306…` | shallow checkout of `v0.9-FINAL` |
 | applied patches | `src/dev_lua.erl`, `src/hb_util.erl` | fingerprint `152e6bca…`; patch 0004 is **not** in this image |
 | luerl / erts | 1.3.0 / 15.2.7.12 | luerl matches `spec/run-tier2.sh`'s pin |
-| Tier-2 | 265 passed, 0 failed, 7 scenarios | |
-| config surface | 10 opt paths in force, 0 missing | includes the nested p4 write-gate entry |
+| Tier-2 | 248 passed, 0 failed, 6 scenarios | edited by hand, not re-recorded |
+| config surface | 5 opt paths in force, 0 missing | edited by hand; v0.11 also measures 5 |
 | verticals | 13 passed, 0 failed, 8 skipped | skips are all `--keep-artifacts` reuse |
 | golden | 0 diffs across 95 checks | |
 | `gc.growth` | ~1.0x | observed 0.77–1.08 across five runs on this same image |
-| `trie.hitScaling` | ~0.9x | observed 0.872–0.919; flat, as the gate design assumes |
 | `restore` | 10 passed, 0 failed | state byte-identical across a real restart |
 
-The absolute latencies (`gc.first10ms` ~220, `trie.hitMs` ~130) are recorded for context only. They
+The absolute latency (`gc.first10ms` ~220) is recorded for context only. They
 are roughly half what stage measures, because this is a local container with no network in the
 path — which is exactly why they cannot be allowed to gate anything.
 
@@ -102,7 +100,7 @@ path — which is exactly why they cannot be allowed to gate anything.
 | `smoke` | both | spawn, compute, write, an erroring message leaves state unchanged, the VM still computes afterwards |
 | `verticals` | both | `run-e2e.ts` — the full contract suite |
 | `golden` | both | `staking-view-golden.ts --check` |
-| `economics` | both | `gc-cost-curve` and `trie-scale`, reduced to gating ratios |
+| `economics` | both | `gc-cost-curve`, reduced to a gating ratio |
 | `restore` | image | `gc-restore-fidelity` — state byte-identical across a real restart |
 | `policy` | url | `verify-access-policy.ts <env>`, including its PERTURB self-test |
 
@@ -132,16 +130,15 @@ with an actionable message, not a note.
 — real production structure, placeholder values — and asserts every key reads back from
 `~meta@1.0/info`. This is the standing regression test for the trap `verify-access-policy` already
 documents: opts read via `hb_opts:get` must be lowercase-**hyphenated**, and a key the node does not
-recognise is not an error, it is silently not-found. For `faff-allow-list` that means an empty
-allow-list, which means a node that admits nobody. Values are placeholders because the question is
+recognise is not an error, it is silently not-found. Values are placeholders because the question is
 whether the image loads the *shape*; the real values are environment policy and stay in
 `verify-access-policy.ts`.
 
 ## `--url` mode does not write to a remote node by default
 
 `smoke`, `verticals`, `golden` and `economics` are not observers. Between them they spawn eight
-processes, drive real scoring rounds, send 50 writes to a roughly 1 MB seeded registry and seed a
-20,000-key trie. Against a container this process just created and will destroy, that is free.
+processes, drive real scoring rounds and send 50 writes to a roughly 1 MB seeded registry. Against a
+container this process just created and will destroy, that is free.
 Against stage or live it is permanent state on a production scheduler, at that node's expense.
 
 So a non-loopback `--url` skips those four phases with an explicit reason, and `--allow-remote-writes`
@@ -307,16 +304,15 @@ throwaway local container should be answering by actually doing it.
 ## Reading opts back is not `accept: application/json`
 
 Use `/~meta@1.0/info/<key>/serialize~json@1.0`. Under the `accept` header, list-valued opts come
-back as `+link` **pointers** whose hashes are not the content, so `faff-allow-list` and
-`p4-non-chargable-routes` read as `undefined` — and a perfectly healthy node looks like it silently
-dropped its entire access policy. That false positive is what this driver reported on its own first
+back as `+link` **pointers** whose hashes are not the content, so they read as `undefined` and a
+perfectly healthy node looks like it silently dropped them. That false positive is what this driver reported on its own first
 run. The shapes:
 
 * **scalars** exist only as keys of the top-level info message; `/info/<key>` on its own 500s
 * **lists** serialize as `{"1": "0xAbC…"}` for scalar entries and `{"1+link": "<hash>"}` for message
   entries, which have to be fetched per index
-* **`serialize~json@1.0` overwrites `device`** with its own name on everything it renders, so the
-  p4 entry in `on/request` cannot be found by `device` — it is identified by `pricing-device`
+* **`serialize~json@1.0` overwrites `device`** with its own name on everything it renders, so an
+  entry cannot be found by its `device`
 
 `verify-access-policy.ts` is the only other reader of this surface, and the two are kept in step.
 

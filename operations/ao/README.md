@@ -6,7 +6,7 @@ Nomad job specs for the AO contracts.
 
 | Job spec | Purpose | Image |
 | --- | --- | --- |
-| `publish-modules-<env>.hcl` | Publishes contract modules and the write gate to Arweave | mainnet |
+| `publish-modules-<env>.hcl` | Publishes contract modules to Arweave | mainnet |
 | `<contract>/deploy-<contract>-<env>.hcl` | Spawns a contract and records its process id | mainnet |
 | `publish-snapshot-<env>.hcl` | Captures and publishes a state snapshot of each contract, daily | mainnet |
 | `<contract>/controllers-*`, `init-clean-*`, `*-admin-*`, `eval-*`, `*-golive*`, `operator-registry-*-stage.hcl` | Jobs for the legacy contracts | legacy |
@@ -50,7 +50,6 @@ file. Edit `args` to name what to publish:
 
 | File | Module |
 | --- | --- |
-| `runtime/write-gate.lua` | Write gate |
 | `dist/operator-registry-native.lua` | Operator registry |
 | `dist/relay-rewards-native.lua` | Relay rewards |
 | `dist/staking-rewards-native.lua` | Staking rewards |
@@ -62,33 +61,26 @@ Rules:
 - Publish a module once, from one job, and pin that id in every environment. There is one job
   per environment because Vault scopes a secret to `kv/<namespace>/<job id>`.
 - Republish a module only when its bytes changed. A contract bundle includes
-  `runtime/native.lua`. The write gate does not.
+  `runtime/native.lua`.
 - The seed is not part of a module, so one published id serves every environment.
 - `--wait` blocks until the Arweave GraphQL index confirms the item. A 200 from the bundler is
   a queue receipt, and a gateway can serve an item from cache before it has settled.
 - `BUNDLER` has no default.
 - Pin the image to the commit that holds the source being published.
 
-Where an id is pinned:
-
-| Module | Pinned in |
-| --- | --- |
-| Write gate | The `module` key of the HyperBEAM job specs |
-| Contract | `MODULE_ID` in that contract's deploy job |
+A contract's module id is pinned as `MODULE_ID` in that contract's deploy job.
 
 The job name and namespace select the Vault path, so renaming a job changes the secret it can
 read.
 
 ### Publishing into a node's cache
 
-`ao/scripts/publish-modules.sh [dev|stage|live] [--gate-only]` publishes the modules into one
+`ao/scripts/publish-modules.sh [dev|stage|live]` publishes the modules into one
 node's own cache and prints the ids. Run it from `ao/` on a host with Nomad access, after
 building `dist/`.
 
 - A module published this way resolves on that node without Arweave. Its id exists on that node
   only.
-- `--gate-only` publishes the write gate alone.
-- The gate fails closed. Publish the gate module before a node configuration refers to it.
 
 ## Deploying a contract
 
@@ -113,7 +105,7 @@ What `deploy.ts` does:
    exists in one node's cache cannot be computed anywhere else.
 2. It spawns the process with the seed.
 3. It writes the process id to Consul, waits for the node to pick it up, and then verifies the
-   spawned state against the seed and checks the write gate.
+   spawned state against the seed.
 4. It restores the previous Consul value if verification fails.
 
 Rules:
