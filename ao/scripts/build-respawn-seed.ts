@@ -110,13 +110,15 @@ const asMap = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v)) 
 
   console.log(`\n=== verifying against ${IMAGE.slice(0, 60)}… ===`)
   const cfg = path.join(AO, 'dist', 'respawn-verify-config.json')
-  fs.writeFileSync(cfg, JSON.stringify({ 'faff-allow-list': ['0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A'] }))
+  fs.writeFileSync(cfg, JSON.stringify({
+    'scheduler-default-commitment-spec': 'ans104@1.0',
+    'bundler-ans104': 'http://127.0.0.1:1',
+  }))
   sh(['rm', '-f', NAME], 60_000)
-  // config.flat MUST stay in HB_CONFIG — it is the only thing setting priv_key_location, and
-  // without it the node mints a new identity per boot.
   sh(['run', '-d', '--name', NAME, '--network', 'host',
     '-v', `${cfg}:${RELDIR}/config.json:ro,Z`,
-    '-e', 'HB_CONFIG=config.flat,config.json', '-e', 'HB_ALLOW_EPHEMERAL_WALLET=true', IMAGE])
+    '-e', 'HB_CONFIG=config.json', '-e', 'HB_ALLOW_EPHEMERAL_WALLET=true',
+    '-e', 'HB_WALLET_PATH=/app/wallet.json', IMAGE])
   const HB = 'http://localhost:8734'
   let up = false
   for (let i = 0; i < 60 && !up; i++) {

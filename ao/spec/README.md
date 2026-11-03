@@ -22,7 +22,7 @@ at run time, so editing a spec needs no rebuild.
   cannot impersonate the Owner), atomicity (mid-handler failure reverts managed
   contract globals), unsigned rejection. Does **not** exercise luerl's quirks.
 - **Tier 2: containerized luerl** (`luerl/`, luerl **1.3.0** on OTP 27 — the exact
-  luerl HyperBEAM v0.9-FINAL vendors, from its `rebar.lock`). Runs our runtime +
+  luerl HyperBEAM v0.11 vendors, from its `rebar.lock`). Runs our runtime +
   contract through the actual device Lua VM via an escript that loads the modules
   into a luerl state and calls `compute(base, assignment)`. Catches integer
   semantics, the `string.gmatch` gap, and cross-message persistence — no node.
@@ -39,7 +39,7 @@ at run time, so editing a spec needs no rebuild.
   until the `bint`→native-int port — `require('.bint')(256)` HANGS under luerl
   (A10); that's exactly what the native-int swap fixes, and what unblocks running
   the reward math through this tier.
-- **Tier 3: live v0.9-FINAL node.** Only for shape-dependent `verify-live` items:
+- **Tier 3: live v0.11 node.** Only for shape-dependent `verify-live` items:
   exact commitment fields, tag shapes, patch@1.0 read path, real scheduled-slot
   persistence.
 

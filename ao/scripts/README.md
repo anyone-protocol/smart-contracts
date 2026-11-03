@@ -100,11 +100,18 @@ Rules:
 A local node for testing:
 
 ```sh
+printf '%s\n' '{"scheduler-default-commitment-spec": "ans104@1.0", "bundler-ans104": "http://127.0.0.1:1"}' \
+  > /tmp/hb-local-config.json
 podman run -d --name hb-local --network host \
   -e HB_ALLOW_EPHEMERAL_WALLET=true \
   -e HB_WALLET_PATH=/app/wallet.json \
-  ghcr.io/memetic-block/hyperbeam-docker:v0.9-FINAL
+  -e HB_CONFIG=config.json \
+  -v /tmp/hb-local-config.json:/app/_build/default/rel/hb/config.json:ro,Z \
+  ghcr.io/memetic-block/hyperbeam-docker:v0.11
 ```
+
+The config gives the scheduler the commitment spec that ANS-104 spawns need, and points the
+bundler at a closed port so nothing a test schedules is uploaded to Arweave.
 
 Scripts that start their own container use host networking on port 8734. Stop any other local
 node first, and run one such script at a time. `qualify-node.ts` uses port 8735 by default.
