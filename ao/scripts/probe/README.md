@@ -90,7 +90,7 @@ Rules:
 | A handler that throws is reverted, and the push still answers 200 | Read the output of the slot to see the error |
 | A snapshot of a process is taken at most once per `process_snapshot_time`, 60 seconds by default | To test a restore, idle longer than that and send one more message |
 | `HB_PRINT` output goes to the standard error of the container | Read both streams of the container log |
-| `config.flat` in the image sets `priv_key_location`, spelled with underscores. `HB_CONFIG=config.json` alone drops it | The node creates a new identity at every start. Pass `HB_CONFIG=config.flat,config.json` when a probe restarts a node |
+| Images before v0.11 set `priv_key_location`, spelled with underscores, in a baked `config.flat`. v0.11 ships no `config.flat` and takes the wallet from `HB_WALLET_PATH` | On older images, pass `HB_CONFIG=config.flat,config.json` when a probe restarts a node, or the node creates a new identity at every start. On v0.11, pass `HB_CONFIG=config.json` and `HB_WALLET_PATH`: a file listed in `HB_CONFIG` that does not exist stops the node from starting |
 
 ## Read path
 

@@ -129,7 +129,10 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
     try {
       sh(['run', '--rm', '--entrypoint', 'sh', image, '-c', `test -f ${RELDIR}/config.flat`], 120_000)
       return 'config.flat,config.json'
-    } catch { return 'config.json' }
+    } catch (e) {
+      if ((e as { status?: number }).status === 1) return 'config.json'
+      throw e
+    }
   }
   const start = (image: string) => sh(['run', '-d', '--name', NAME, '--network', 'host',
     '-v', `${cfg}:${RELDIR}/config.json:ro,Z`,

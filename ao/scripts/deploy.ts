@@ -539,10 +539,9 @@ const ao = createAoClient({
   }
 
 
-  // Verify it MATERIALIZED, rather than trusting a 200. `spawnProcess` already forced the
-  // lazy first compute (that is a spawn-level guarantee now, not a caller's job), so this is
-  // the SEED-LANDED confirmation: `status.initialized` separates a computed-but-empty process
-  // from a seeded one, which the counts cannot. Migrate-on-spawn happens on that first
+  // Verify it MATERIALIZED, rather than trusting a 200. `materialize()` drives the first
+  // compute, and `status.initialized` separates a computed-but-empty process from a seeded one,
+  // which the counts cannot. Migrate-on-spawn happens on that first
   // compute, so a broken seed surfaces here and nowhere earlier.
   console.log('\nverifying materialization …')
   let status: any

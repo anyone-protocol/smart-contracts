@@ -25,7 +25,7 @@ job "relay-rewards-live" {
 
     config {
       network_mode = "host"
-      # Earlier images do not accept `--previous-round`.
+      # Earlier images ignore `--previous-round`, so the first round pays from the seed's timestamp.
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
       entrypoint = ["bun"]
       command = "run"

@@ -614,7 +614,7 @@ Facts about the node configuration that the checks rely on:
 | Fact | Consequence |
 | --- | --- |
 | Option keys are lowercase with hyphens | A key spelled with underscores is not an error. It is not found, so the option keeps its default. An allow-list spelled that way is empty |
-| `priv_key_location` in `config.json` is stripped as private data | The node creates a new identity at every start. Keep the key location in `config.flat` |
+| `priv_key_location` in `config.json` is stripped as private data | The node creates a new identity at every start. Keep the key location in `config.flat` on images before v0.11. On v0.11, set `HB_WALLET_PATH` |
 | A list option renders scalar entries inline and message entries as `<n>+link` | Fetch a message entry by its index. Indexes are 1-based over HTTP |
 | A scalar option exists only as a key of the info message | `/~meta@1.0/info/<key>` answers 500 for a scalar |
 | The JSON rendering overwrites the `device` key of a hook | Identify the `p4` hook by its `pricing-device` key |
