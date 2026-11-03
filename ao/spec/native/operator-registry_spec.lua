@@ -961,6 +961,13 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.is_nil(OperatorRegistry.claimable[FP_B])
     end)
 
+    it('matches a did:pkh signer against a role granted to its bare address', function()
+      local base = newBase()
+      grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+      submitCerts(base, 'did:pkh:eip155:1:' .. BOB, { { f = FP_B, a = BOB } })
+      assert.are.equal(BOB, OperatorRegistry.claimable[FP_B])
+    end)
+
     it('takes the account address from any did:pkh namespace and passes other committers through', function()
       local sol = '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV'
       assert.are.equal(sol, native.resolveCommitter({
