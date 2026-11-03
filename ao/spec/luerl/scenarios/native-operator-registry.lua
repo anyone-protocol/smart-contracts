@@ -403,6 +403,26 @@ do local base = newBase()
   check('safety: cross-action atomicity keeps prior commit', S().claimable[FP_A] == ALICE)
   check('safety: cross-action atomicity reverts failed batch', S().claimable[FP_B] == nil)
 end
+do
+  local function resolve(c) return native.resolveCommitter({ commitments = commit(c) }) end
+  check('did:pkh: EVM committer resolves to its address', resolve('did:pkh:eip155:1:' .. ALICE) == ALICE)
+  local passThrough = true
+  for _, c in ipairs({
+    'did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV',
+    'did:pkh:eip155:1:' .. ALICE .. ':x',
+    'did:pkh:eip155:1:' .. ALICE .. 'a',
+    'did:pkh:eip155:1:' .. string.sub(ALICE, 1, 41),
+    'did:pkh:eip155:1:0x' .. string.rep('g', 40),
+  }) do
+    if resolve(c) ~= c then passThrough = false end
+  end
+  check('did:pkh: other and malformed committers pass through', passThrough)
+end
+do local base = newBase()
+  grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+  submitCerts(base, 'did:pkh:eip155:1:' .. BOB, { { f = FP_B, a = BOB } })
+  check('did:pkh: signer matches a role granted to its bare address', S().claimable[FP_B] == BOB)
+end
 
 -- Consumption + visibility views (asserted against state)
 do local base = newBase()

@@ -155,9 +155,11 @@ function native.setACL(v) ACL = v end
 -- is already canonical here (node → EIP-55 for EVM; base64url/base58 are single-form). Chain-
 -- specific validation is a CONTRACT concern (e.g. `.common.eip55` for Ethereum fields). See D26.
 
+local EVM_DID_PKH = '^did:pkh:eip155:%d+:(0x' .. string.rep('%x', 40) .. ')$'
+
 local function accountAddress(committer)
   if type(committer) ~= 'string' then return committer end
-  return committer:match('^did:pkh:[^:]+:[^:]+:(.+)$') or committer
+  return committer:match(EVM_DID_PKH) or committer
 end
 
 local function resolveCommitter(m)
