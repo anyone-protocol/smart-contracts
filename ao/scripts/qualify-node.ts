@@ -4,8 +4,8 @@
 // honest answer was that every piece of evidence existed and no procedure assembled them. Tier-2,
 // run-e2e, the golden, verify-access-policy and the 19 probes each answer part of it; nothing ran
 // them in order, and — the larger gap — nothing RECORDED what a good result looks like. The cost
-// numbers this migration actually cares about (per-message cost FLAT rather than growing, a trie
-// point-lookup that does not scale with the operator set) lived in docs and in people's heads, so
+// numbers this migration actually cares about (per-message cost FLAT rather than growing) lived in
+// docs and in people's heads, so
 // "did this version regress?" was not a mechanically answerable question. It is now:
 //
 //   bun run scripts/qualify-node.ts --image <ref> --record-baseline   # bless a version
@@ -52,11 +52,10 @@
 //               (spec/fixtures/node-qualify-policy.json — real structure, placeholder values) and
 //               asserts every key reads back from ~meta@1.0/info. This is the standing regression
 //               test for the trap verify-access-policy documents: opts read via hb_opts:get must
-//               be lowercase-HYPHENATED, and a key the node does not recognise is not an error —
-//               it is silently not-found, i.e. an EMPTY allow-list, i.e. a node that admits
-//               nobody. Values are placeholders because the question is whether the image loads
-//               the SHAPE; the real values are environment policy and belong to
-//               verify-access-policy.
+//               be lowercase-HYPHENATED, and a key the node does not recognize is not an error,
+//               it is silently not-found. Values are placeholders because the question is
+//               whether the image loads the SHAPE; the real values are environment policy and
+//               belong to verify-access-policy.
 //
 // Tier-1 is not driven from here: it is pure Lua and version-insensitive. Tier-2 IS, and is run
 // as its own phase — it executes in the pinned luerl container rather than the node, which only
@@ -176,9 +175,6 @@ interface Metric {
 //                  of 1.4x. A ±20% band would have false-failed a 1.08 run against a 0.77
 //                  baseline (threshold 1.074), so it is ±40% plus a 0.20 absolute allowance —
 //                  still comfortably inside the ceiling, so nothing is actually loosened.
-//   trie.hitScaling point-lookup latency at the LARGEST key count divided by the smallest. The
-//                  gate design rests on this being ~1: a radix lookup is O(key length). If it
-//                  starts scaling with the operator set, every chargeable write pays for it.
 const METRICS: Record<string, Metric> = {
   'toolchain.upstream':  { label: 'upstream commit', kind: 'identity' },
   'toolchain.patchSha':  { label: 'applied-patch fingerprint', kind: 'identity' },
@@ -224,9 +220,6 @@ const METRICS: Record<string, Metric> = {
   'gc.growth':           { label: 'per-message cost growth over 50 slots', kind: 'gate', worse: 'higher', tol: 0.40, floor: 0.20, ceiling: 1.50, unit: 'x' },
   'gc.first10ms':        { label: 'first-10 message avg', kind: 'record', unit: 'ms' },
   'gc.last10ms':         { label: 'last-10 message avg', kind: 'record', unit: 'ms' },
-  'trie.hitScaling':     { label: 'trie point-lookup scaling, max keys / min keys', kind: 'gate', worse: 'higher', tol: 0.30, floor: 0.25, ceiling: 2.0, unit: 'x' },
-  'trie.hitMs':          { label: 'trie point-lookup at the largest key count', kind: 'record', unit: 'ms' },
-  'trie.updateMs':       { label: 'trie single-key update at the largest key count', kind: 'record', unit: 'ms' },
 }
 
 const measured: Record<string, number | string | boolean> = {}
@@ -373,7 +366,7 @@ const MODE: 'image' | 'url' = IMAGE ? 'image' : 'url'
 // In --image mode the node is a container this process just created and will destroy, so writing to
 // it is free. In --url mode it is somebody's node, and several phases are not observers: `smoke`
 // spawns a process, `verticals` spawns seven and drives real rounds, `economics` sends 50 writes to
-// a ~1 MB seeded registry and seeds a 20,000-key trie. Pointed at stage or live that is real state
+// a ~1 MB seeded registry. Pointed at stage or live that is real state
 // on a production scheduler, permanently, at that node's expense.
 //
 // So a remote URL runs the read-only phases by default and refuses the rest unless the caller says
@@ -734,34 +727,13 @@ const PHASES: Phase[] = [
         }
         await walk(wanted, '')
 
-        // One depth probe with teeth. `on/request` is a list of MESSAGES, each behind a link, and
-        // the p4 entry is where the write gate's whole configuration lives. A shallow "the list is
-        // 6 long" check would pass even if every entry had lost its fields, so the p4 entry's own
-        // keys are asserted: this is the deepest nesting any environment actually configures.
-        const requests = await optList(base, 'on/request')
-        // Identified by `pricing-device`, NOT by `device`: the serialize~json device overwrites
-        // `device` with its own name on everything it renders, so every entry reads back as
-        // "json@1.0" and matching on it finds nothing. `pricing-device` is unique to the p4 entry.
-        const p4 = requests.find((r: any) => r && r['pricing-device'] !== undefined)
-        const p4Want = ['pricing-device', 'ledger-device', 'module', 'gated-processes', 'operator-registry', 'deploy-wallets']
-        if (!p4) missing.push('on/request[p4] (the write-gate entry is absent)')
-        else {
-          const gone = p4Want.filter(k => p4[k] === undefined && p4[`${k}+link`] === undefined)
-          if (gone.length) missing.push(`on/request[p4] lost ${gone.join(', ')}`)
-          // The pricing device is the gate. A node that silently reverted to stock faff pricing
-          // would keep every key above and still charge nothing.
-          else if (p4['pricing-device'] !== 'lua@5.3a') missing.push(`on/request[p4] pricing-device=${p4['pricing-device']}, want lua@5.3a`)
-          else present.push(`on/request[p4]{${p4Want.length}}`)
-        }
-
         metric('config.inForce', present.length)
         metric('config.missing', missing.length)
         if (missing.length) {
           throw new Error(`${missing.length} production opt(s) did NOT take effect on this image: ${missing.join(', ')}. ` +
-            `hb_opts:get canonicalises _ to -, and an unrecognised key is silently not-found rather than an error ` +
-            `— for faff-allow-list that means a node that admits nobody.`)
+            `hb_opts:get canonicalizes _ to -, and an unrecognized key is silently not-found rather than an error.`)
         }
-        return `${present.length} opt paths in force, including the nested p4 write-gate entry`
+        return `${present.length} opt paths in force`
       } finally {
         if (!KEEP) { try { engine(['rm', '-f', POLICY_CONTAINER]) } catch { /* best effort */ } }
       }
@@ -872,29 +844,16 @@ const PHASES: Phase[] = [
     },
   },
 
-  // ---------------------------------------------------------------- trie survives an upgrade
+  // ---------------------------------------------------------------- processes survive an upgrade
   //
   // 🚨 THE ONLY PHASE THAT TESTS AN UPGRADE RATHER THAN AN IMAGE. Every other phase boots the
   // candidate clean, so all of them pass an image that cannot continue the processes we are
-  // already running. That gap cost us operator-registry on stage AND live on 2026-08-28:
-  // v0.9-FINAL -> 14e9f68a moved devices out of compiled beams into the LMDB preloaded-store, and
-  // the first message afterwards that WROTE `~trie@1.0` failed with
-  // `Erlang error while running Lua: undef`, wedging the process permanently. Reproduced on
-  // UNPATCHED images, so it is upstream, not our patches.
-  //
-  // What makes it easy to miss, and why the check has to be shaped exactly like this:
-  //   - a READ of the trie succeeds across the boundary;
-  //   - a WRITE that grants nothing (`prev == addr`) also succeeds;
-  //   - only a write that actually grants fails. So the probe must build trie state on the OLD
-  //     image, cross, and then GRANT.
-  //   - `as/` keeps serving the last computed state with HTTP 200 throughout, so only `now/`
-  //     reveals it.
-  //
-  // Verified to discriminate: exit 1 on the known-bad v0.9-FINAL -> 14e9f68a crossing, exit 0 on
-  // a same-image control.
+  // already running. The probe builds state and history on the OLD image, restarts onto the
+  // candidate over the SAME store, then writes again. `as/` keeps serving the last computed state
+  // with HTTP 200 throughout, so only `now/` reveals a wedge.
   {
     id: 'trie-crossing',
-    label: 'existing processes survive the upgrade (trie write across images)',
+    label: 'existing processes survive the upgrade (continue across images)',
     modes: ['image'],
     needsNode: false,
     writes: false,
@@ -907,10 +866,10 @@ const PHASES: Phase[] = [
         { env: { IMAGE: IMAGE!, CONTAINER_ENGINE: ENGINE }, timeoutS: 1800, log: 'trie-crossing' })
       metric('trieCrossing.from', FROM_IMAGE!.slice(-16))
       if (r.code !== 0) {
-        throw new Error('a process whose trie was written by the deployed image CANNOT be ' +
-          `continued by this one — upgrading would wedge it permanently. ${logged('trie-crossing', r.out)}`)
+        throw new Error('a process built on the deployed image CANNOT be ' +
+          `continued by this one, so upgrading would wedge it permanently. ${logged('trie-crossing', r.out)}`)
       }
-      return 'granting write survives the crossing'
+      return 'writes continue across the crossing'
     },
   },
 
@@ -960,7 +919,7 @@ const PHASES: Phase[] = [
   // ---------------------------------------------------------------- economics
   {
     id: 'economics',
-    label: 'version-sensitive cost shape (gc curve + trie scaling)',
+    label: 'version-sensitive cost shape (gc curve)',
     modes: ['image', 'url'],
     writes: true,
     run: async (c) => {
@@ -975,23 +934,7 @@ const PHASES: Phase[] = [
       metric('gc.first10ms', Number(must(gc.out, /first-10 avg\s*:\s*(\d+)\s*ms/, 'the gc first-10 average')))
       metric('gc.last10ms', Number(must(gc.out, /last-10 avg\s*:\s*(\d+)\s*ms/, 'the gc last-10 average')))
 
-      const counts = QUICK ? '1000,4000' : '1000,8000,20000'
-      const trie = await run('bun', ['run', 'scripts/probe/trie-scale.ts'],
-        { env: { HB_URL: c.url, N: counts, DEPLOYER_PRIVATE_KEY: KEY }, timeoutS: 5400, log: 'economics-trie' })
-      if (trie.code !== 0) throw new Error(`trie-scale failed: ${logged('economics-trie', trie.out)}`)
-      // Rows look like:  " 20000   41231ms     38ms     31ms     29ms     412ms      501ms  ok:…"
-      const rows = [...trie.out.matchAll(/^\s*(\d+)\s+(\d+)ms\s+(\d+)ms\s+(\d+)ms\s+(\d+)ms\s+(\d+)ms/gm)]
-        .map(m => ({ n: Number(m[1]), hit: Number(m[3]), update: Number(m[5]) }))
-      if (rows.length < 2) throw new Error('trie-scale produced fewer than two key counts — cannot compute a scaling ratio')
-      rows.sort((a, b) => a.n - b.n)
-      const lo = rows[0], hi = rows[rows.length - 1]
-      // Guard the ratio's denominator: a sub-millisecond `lo` would make any `hi` look like a
-      // catastrophic regression. Floor at 1 ms, which is well below any measured value.
-      metric('trie.hitScaling', Number((hi.hit / Math.max(lo.hit, 1)).toFixed(3)))
-      metric('trie.hitMs', hi.hit)
-      metric('trie.updateMs', hi.update)
-
-      return `gc growth ${measured['gc.growth']}x  ·  trie ${lo.n}->${hi.n} keys: ${lo.hit}->${hi.hit} ms (${measured['trie.hitScaling']}x)`
+      return `gc growth ${measured['gc.growth']}x`
     },
   },
 
@@ -1108,7 +1051,7 @@ interface Cmp { key: string, base: any, now: any, kind: MetricKind, verdict: 'ok
 /** Which phase is expected to emit a metric, so a vanished one can be attributed. */
 const ownerOf = (key: string): string => {
   const p = key.split('.')[0]
-  if (p === 'gc' || p === 'trie') return 'economics'
+  if (p === 'gc') return 'economics'
   return p
 }
 

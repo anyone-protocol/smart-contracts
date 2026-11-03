@@ -65,22 +65,6 @@ Notes:
 - The `fingerprints` view takes its ids in the `ids` parameter.
 - A query with a malformed address returns an empty result.
 
-### Allow-list
-
-A fingerprint is one reason for its operator to be on the allow-list.
-
-| Event | Effect |
-| --- | --- |
-| A fingerprint is assigned to an operator | Grant |
-| A fingerprint is reassigned to another operator | Revoke for the previous holder, grant for the new one |
-| A fingerprint moves from claimable to verified | Revoke and grant for the same address |
-| A fingerprint is renounced or removed | Revoke for the holder, read before the entry is cleared |
-| An address is blocked | Block, which vetoes the address whatever else it holds |
-
-A claimable fingerprint counts as much as a verified one. An operator's first write is
-`Submit-Fingerprint-Certificate` against a claimable fingerprint, so the operator must already
-be allowed to write.
-
 ## Relay rewards
 
 State root: `RelayRewards`.

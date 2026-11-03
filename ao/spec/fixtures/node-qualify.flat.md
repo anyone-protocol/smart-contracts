@@ -18,10 +18,8 @@ now asserts no loaded opt key starts with `#`, so a reintroduced comment fails t
 
 Everything explanatory therefore lives here instead:
 
-* **Deliberately OPEN** — no faff allow-list, no p4, no rate limit. Those belong to the `config`
-  phase, which boots a separate container against `node-qualify-policy.json` and only asks whether
-  the opts read back. Mixing the two would mean every throwaway probe signer needs allow-listing,
-  and a forgotten entry would read as a contract failure rather than a config one.
+* **Deliberately OPEN**, with no rate limit. That belongs to the `config` phase, which boots a
+  separate container against `node-qualify-policy.json` and only asks whether the opts read back.
 * **`scheduler-default-commitment-spec`** is not a policy knob. With the stock `httpsig@1.0`
   default, an aoconnect-shaped ans104 spawn is rejected outright with `process_not_verified`, so a
   node without it cannot run any vertical at all. Same value `config.release.flat` ships and the

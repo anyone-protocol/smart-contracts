@@ -16,18 +16,15 @@
 # pin that single id in all three environments.
 #
 # ─── What gets pinned where ─────────────────────────────────────────────────────────────────
-#   write-gate         -> `module` in the hyperbeam jobspecs (infra-arweave)
 #   <contract>-native  -> MODULE_ID in that contract's deploy job
 #
-# Neither is a Consul key. A module id is content-addressed and already a permanent version sha,
-# so pinning it in git makes what is running reviewable, and removes the failure where a missing
-# key renders empty into a device that fails closed.
+# It is not a Consul key. A module id is content-addressed and already a permanent version sha,
+# so pinning it in git makes what is running reviewable.
 #
 # ─── Why publish at all ─────────────────────────────────────────────────────────────────────
 # The node-local route (`bin/hb eval`) produces an id that exists in ONE alloc's cache. A process
-# spawned against it can never compute a slot elsewhere, and a gate module a node cannot resolve
-# refuses every write, because it fails closed. deploy.ts refuses an unindexed id for exactly
-# this reason.
+# spawned against it can never compute a slot elsewhere. deploy.ts refuses an unindexed id for
+# exactly this reason.
 #
 # ⚠️ A bundler 200 is a QUEUE RECEIPT, not persistence, and the gateway's data endpoint serves
 # unsettled items from an optimistic cache — `curl arweave.net/<id>` will 200 for an item that
@@ -78,19 +75,8 @@ job "publish-modules-stage" {
         "${SCRIPT}",
 
         # Comment out anything you are not publishing this run.
-        # write-gate is UNCHANGED since it was published as Jo_Ur2HyzPjlhmt7OGZyfNyTrmwhmySWwo4Mo8bcyZw
-        # (it does not embed runtime/native.lua, so the runtime changes do not reach it).
-        # "runtime/write-gate.lua",
-        #
-        # STAKING ONLY this run. The change is confined to
-        # src/contracts/native/staking-rewards.lua (per-operator relay counts); runtime/native.lua
-        # did NOT move, so the other two bundles are byte-identical to what is already published
-        # and republishing them would only mint new ids for the same bytes.
-        #
-        # Verified rather than assumed: rebuilt both from this commit and compared sha256 against
-        # the published modules (kTf0r-R_… and 2vWsI194…) — identical.
-        # "dist/operator-registry-native.lua",
-        # "dist/relay-rewards-native.lua",
+        "dist/operator-registry-native.lua",
+        "dist/relay-rewards-native.lua",
         "dist/staking-rewards-native.lua",
 
         # Block until the GraphQL index confirms settlement, rather than reporting an id that

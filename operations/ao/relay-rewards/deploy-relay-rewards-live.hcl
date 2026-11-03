@@ -25,10 +25,7 @@ job "relay-rewards-live" {
 
     config {
       network_mode = "host"
-      # Pinned to 48c12f5. Keeps the hardened `assertModuleIsDurable` and adds both deploy-order
-      # fixes (2814394, 248aa91) plus `--previous-round`.
-      # 🚨 NO SAFE ROLLBACK. Every earlier image misses a deploy-order fix and deadlocks on a
-      # gated node, and none accepts `--previous-round` - so it would repay the 48-day round.
+      # Earlier images ignore `--previous-round`, so the first round pays from the seed's timestamp.
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
       entrypoint = ["bun"]
       command = "run"
@@ -71,9 +68,8 @@ job "relay-rewards-live" {
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
       MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
 
-      # deploy.ts writes the PID here itself, but only after the seed diff AND the write-gate
-      # checks pass — so an id the gate cannot read never reaches what the hyperbeam jobspecs
-      # template gated-processes from.
+      # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
+      # previous value if that fails.
       CONSUL_IP = "127.0.0.1"
       CONSUL_PORT = "8500"
       CONTRACT_CONSUL_KEY = "smart-contracts/live/relay-rewards-address"

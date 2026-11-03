@@ -23,7 +23,6 @@
 !ao/tsconfig.json
 
 !ao/runtime/native.lua
-!ao/runtime/write-gate.lua
 !ao/runtime/vendor/json.lua
 
 !ao/src/contracts/common/bigint.lua
