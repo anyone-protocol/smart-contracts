@@ -1,9 +1,0 @@
-{
-  "extensions": ["ts"],
-  "node-option": [
-    "import=tsx",
-    "experimental-specifier-resolution=node",
-    "experimental-wasm-memory64",
-    "trace-warnings"
-  ]
-}

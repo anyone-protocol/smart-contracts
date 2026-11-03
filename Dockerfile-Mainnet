@@ -2,9 +2,6 @@
 # staking-rewards contracts, the HyperBEAM runtime they execute in, and the tooling that
 # publishes and deploys them.
 #
-# Distinct from legacy/Dockerfile-AO, which builds the aos/genesis-wasm era contracts. The two
-# share a package.json and nothing else; none of that tree is copied here.
-#
 # ─── Why this image exists ──────────────────────────────────────────────────────────────────
 # So that publishing and deploying can run FROM THE CLUSTER instead of a workstation. A module
 # id is the SIGNED ans104 item id, so it is a function of the signing wallet as much as of the

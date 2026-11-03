@@ -1,8 +1,6 @@
 # Build context for Dockerfile-Mainnet ONLY.
 #
-# BuildKit reads <dockerfile>.dockerignore in preference to a root .dockerignore, so this scopes
-# the mainnet image without touching legacy/Dockerfile-AO's context. The legacy image is being
-# retired, not maintained; it should not get a vote in what the mainnet deploy surface contains.
+# BuildKit reads <dockerfile>.dockerignore in preference to a root .dockerignore.
 #
 # Deny everything, then admit exactly what the Dockerfile COPYs — the same list, in the same
 # order. Written this way round on purpose: a denylist only excludes what someone remembered,
