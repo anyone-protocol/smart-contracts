@@ -948,6 +948,46 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.is_nil(OperatorRegistry.claimable[FP_A])
     end)
 
+    it('resolves did:pkh committers to their account addresses', function()
+      local pkh = function(address) return 'did:pkh:eip155:1:' .. address end
+      native.reset()
+      local base = { process = { id = 'PID', commitments = commit(pkh(OWNER)) } }
+      submitCerts(base, pkh(OWNER), { { f = FP_A, a = ALICE } })
+      assert.are.equal(ALICE, OperatorRegistry.claimable[FP_A])
+      claim(base, pkh(ALICE), FP_A)
+      assert.are.equal(ALICE, OperatorRegistry.verified[FP_A])
+      submitCerts(base, pkh(BOB), { { f = FP_B, a = BOB } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      assert.is_nil(OperatorRegistry.claimable[FP_B])
+    end)
+
+    it('matches a did:pkh signer against a role granted to its bare address', function()
+      local base = newBase()
+      grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+      submitCerts(base, 'did:pkh:eip155:1:' .. BOB, { { f = FP_B, a = BOB } })
+      assert.are.equal(BOB, OperatorRegistry.claimable[FP_B])
+    end)
+
+    it('takes the account address only from EVM did:pkh committers and passes other committers through', function()
+      local function resolve(c) return native.resolveCommitter({ commitments = commit(c) }) end
+      assert.are.equal(ALICE, resolve('did:pkh:eip155:1:' .. ALICE))
+      assert.are.equal(ALICE, resolve('did:pkh:eip155:137:' .. ALICE))
+      assert.are.equal(ALICE, resolve(ALICE))
+      for _, c in ipairs({
+        'did:pkh:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV',
+        'did:pkh:eip155:1:' .. ALICE .. ':x',
+        'did:pkh:eip155:1:' .. ALICE .. '\n',
+        'did:pkh:eip155:1:' .. ALICE .. 'a',
+        'did:pkh:eip155:1:' .. ALICE:sub(1, 41),
+        'did:pkh:eip155:1:0x' .. string.rep('g', 40),
+        'did:pkh:eip155:x:' .. ALICE,
+        'did:pkh:eip155::' .. ALICE,
+        'DID:PKH:eip155:1:' .. ALICE,
+      }) do
+        assert.are.equal(c, resolve(c))
+      end
+    end)
+
     it('rejects an unknown action', function()
       local base = newBase()
       compute(base, assign('No-Such-Action', OWNER, ''))
