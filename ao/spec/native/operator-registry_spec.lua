@@ -599,6 +599,25 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.are.equal('OK', outData(base))
     end)
 
+    it('Update-Roles Revoke removes a granted role', function()
+      grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+      compute(base, assign('Update-Roles', OWNER,
+        json.encode({ Revoke = { [BOB] = { 'Admin-Submit-Operator-Certificates' } } })))
+      submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      assert.is_nil(OperatorRegistry.claimable[FP_A])
+    end)
+
+    it('Update-Roles that fails part way changes no roles', function()
+      compute(base, assign('Update-Roles', OWNER,
+        json.encode({ Grant = { [BOB] = { 'admin' } }, Revoke = { [ALICE] = 'admin' } })))
+      assert.is_true(has(outData(base), 'error'))
+      submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      submitCerts(base, ALICE, { { f = FP_A, a = ALICE } })
+      assert.are.equal('OK', outData(base))
+    end)
+
     it('Removing Fingerprint Certificates — Allows Admin Role', function()
       setupClaimed(base, ALICE, FP_A)
       compute(base, assign('Remove-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))

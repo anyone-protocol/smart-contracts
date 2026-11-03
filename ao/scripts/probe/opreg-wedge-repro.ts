@@ -95,6 +95,7 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
   fs.mkdirSync(path.dirname(cfg), { recursive: true })
   const writeCfg = () => fs.writeFileSync(cfg, JSON.stringify({
     'scheduler-default-commitment-spec': 'ans104@1.0',
+    'bundler-ans104': 'http://127.0.0.1:1',
     'faff-allow-list': [deployerAddr],
   }, null, 2))
   writeCfg()
@@ -123,16 +124,18 @@ async function wedged (pid: string): Promise<{ wedged: boolean, code: number, sl
     } else console.log(`  node identity PRESERVED at ${where} (${a.slice(0, 12)}…)`)
     return a
   }
+  // Older images set the wallet path in a baked config.flat; v0.11 ships none and takes HB_WALLET_PATH.
+  const hbConfig = (image: string) => {
+    try {
+      sh(['run', '--rm', '--entrypoint', 'sh', image, '-c', `test -f ${RELDIR}/config.flat`], 120_000)
+      return 'config.flat,config.json'
+    } catch { return 'config.json' }
+  }
   const start = (image: string) => sh(['run', '-d', '--name', NAME, '--network', 'host',
     '-v', `${cfg}:${RELDIR}/config.json:ro,Z`,
     '-v', `${walletFile}:/app/wallet.json:ro,Z`,
     '-v', `${STORE_VOL}:${STORE_PATH}:Z`,
-    // 🚨 `config.flat,config.json` — BOTH. config.flat is baked into the image and is the only
-    // thing that sets `priv_key_location: /app/wallet.json` (UNDERSCORES; the hyphenated spelling
-    // is silently ignored). Passing config.json alone drops it, the node mints a FRESH identity
-    // on every boot, and any restart or image swap then fails with
-    // `No location found for address` — which reads exactly like a compute wedge and is not one.
-    '-e', 'HB_CONFIG=config.flat,config.json', '-e', 'HB_WALLET_PATH=/app/wallet.json',
+    '-e', `HB_CONFIG=${hbConfig(image)}`, '-e', 'HB_WALLET_PATH=/app/wallet.json',
     '-e', 'HB_PRINT=lua_error,error,debug', image])
 
   sh(['rm', '-f', NAME], 60_000)

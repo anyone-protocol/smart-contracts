@@ -76,8 +76,8 @@ come from.
 | upstream commit | `466cf489e306…` | shallow checkout of `v0.9-FINAL` |
 | applied patches | `src/dev_lua.erl`, `src/hb_util.erl` | fingerprint `152e6bca…`; patch 0004 is **not** in this image |
 | luerl / erts | 1.3.0 / 15.2.7.12 | luerl matches `spec/run-tier2.sh`'s pin |
-| Tier-2 | 241 passed, 0 failed, 6 scenarios | |
-| config surface | 5 opt paths in force, 0 missing | |
+| Tier-2 | 245 passed, 0 failed, 6 scenarios | edited by hand, not re-recorded |
+| config surface | 5 opt paths in force, 0 missing | edited by hand; v0.11 also measures 5 |
 | verticals | 13 passed, 0 failed, 8 skipped | skips are all `--keep-artifacts` reuse |
 | golden | 0 diffs across 95 checks | |
 | `gc.growth` | ~1.0x | observed 0.77–1.08 across five runs on this same image |

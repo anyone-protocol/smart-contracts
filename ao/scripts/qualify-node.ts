@@ -52,11 +52,10 @@
 //               (spec/fixtures/node-qualify-policy.json — real structure, placeholder values) and
 //               asserts every key reads back from ~meta@1.0/info. This is the standing regression
 //               test for the trap verify-access-policy documents: opts read via hb_opts:get must
-//               be lowercase-HYPHENATED, and a key the node does not recognise is not an error —
-//               it is silently not-found, i.e. an EMPTY allow-list, i.e. a node that admits
-//               nobody. Values are placeholders because the question is whether the image loads
-//               the SHAPE; the real values are environment policy and belong to
-//               verify-access-policy.
+//               be lowercase-HYPHENATED, and a key the node does not recognize is not an error,
+//               it is silently not-found. Values are placeholders because the question is
+//               whether the image loads the SHAPE; the real values are environment policy and
+//               belong to verify-access-policy.
 //
 // Tier-1 is not driven from here: it is pure Lua and version-insensitive. Tier-2 IS, and is run
 // as its own phase — it executes in the pinned luerl container rather than the node, which only
@@ -732,7 +731,7 @@ const PHASES: Phase[] = [
         metric('config.missing', missing.length)
         if (missing.length) {
           throw new Error(`${missing.length} production opt(s) did NOT take effect on this image: ${missing.join(', ')}. ` +
-            `hb_opts:get canonicalises _ to -, and an unrecognised key is silently not-found rather than an error.`)
+            `hb_opts:get canonicalizes _ to -, and an unrecognized key is silently not-found rather than an error.`)
         }
         return `${present.length} opt paths in force`
       } finally {

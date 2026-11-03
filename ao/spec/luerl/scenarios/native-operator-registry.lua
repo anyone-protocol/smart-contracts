@@ -348,6 +348,22 @@ do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
   check('acl: specific submit role', same({ [FP_A] = ALICE }, S().claimable) and outData(base) == 'OK')
 end
+do local base = newBase()
+  grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+  compute(base, assign('Update-Roles', OWNER,
+    json.encode({ Revoke = { [BOB] = { 'Admin-Submit-Operator-Certificates' } } })))
+  submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+  check('acl: revoke removes a granted role', has(outData(base), 'Permission Denied') and S().claimable[FP_A] == nil)
+end
+do local base = newBase(); grantRole(base, ALICE, { 'admin' })
+  compute(base, assign('Update-Roles', OWNER,
+    json.encode({ Grant = { [BOB] = { 'admin' } }, Revoke = { [ALICE] = 'admin' } })))
+  check('acl: failed update-roles errors', has(outData(base), 'error'))
+  submitCerts(base, BOB, { { f = FP_A, a = ALICE } })
+  check('acl: failed update-roles grants nothing', has(outData(base), 'Permission Denied'))
+  submitCerts(base, ALICE, { { f = FP_A, a = ALICE } })
+  check('acl: failed update-roles revokes nothing', outData(base) == 'OK')
+end
 do local base = newBase(); grantRole(base, ALICE, { 'admin' })
   setupClaimed(base, ALICE, FP_A)
   compute(base, assign('Remove-Fingerprint-Certificate', ALICE, nil, { Fingerprint = FP_A }))

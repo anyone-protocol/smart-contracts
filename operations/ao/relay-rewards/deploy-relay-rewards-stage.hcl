@@ -25,9 +25,6 @@ job "relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      # ⚠️ REPIN REQUIRED, not optional. The previous pin predated BOTH deploy-order fixes
-      # (2814394 publish-PID-before-verify, 248aa91 defer the forced first compute), so a deploy
-      # from it deadlocks on a gated node - the opreg wedge of 2026-09-02.
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
       entrypoint = ["bun"]
       command = "run"

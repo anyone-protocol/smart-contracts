@@ -33,7 +33,7 @@
     "toolchain.luerl": "1.3.0",
     "toolchain.erts": "15.2.7.12",
     "toolchain.tier2Pin": true,
-    "tier2.passed": 241,
+    "tier2.passed": 245,
     "tier2.failed": 0,
     "tier2.scenarios": 6,
     "identity.luaDevice": true,

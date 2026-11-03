@@ -132,12 +132,14 @@ fetch only the line they need.
 
 **All reads described here are free and unauthenticated.** No wallet, no signature, no rate plan.
 
-**Writes are checked by the contracts.** Every write must be signed, and each contract refuses a
-write whose signer has no role or standing for that action, such as an operator acting on a
-fingerprint they do not hold.
+**Writes must be signed, and only some signers are accepted.** The public endpoint accepts
+operator actions only from operators registered in `operator-registry`, and team actions only
+from the team's signers. Each contract then checks the signer against the action, such as an
+operator acting on a fingerprint they do not hold. `Set-Delegate` and `Set-Share` have no
+role check of their own, so the endpoint's operator check is the only restriction on them.
 
 If you are writing rather than reading, you need a signed message from an address the process
-recognises, which for operators means being registered in `operator-registry`. Use the
+recognizes, which for operators means being registered in `operator-registry`. Use the
 `@anyone-protocol/ao-client` package rather than assembling messages by hand.
 
 ## Response notes

@@ -75,15 +75,8 @@ job "publish-modules-stage" {
         "${SCRIPT}",
 
         # Comment out anything you are not publishing this run.
-        # STAKING ONLY this run. The change is confined to
-        # src/contracts/native/staking-rewards.lua (per-operator relay counts); runtime/native.lua
-        # did NOT move, so the other two bundles are byte-identical to what is already published
-        # and republishing them would only mint new ids for the same bytes.
-        #
-        # Verified rather than assumed: rebuilt both from this commit and compared sha256 against
-        # the published modules (kTf0r-R_… and 2vWsI194…) — identical.
-        # "dist/operator-registry-native.lua",
-        # "dist/relay-rewards-native.lua",
+        "dist/operator-registry-native.lua",
+        "dist/relay-rewards-native.lua",
         "dist/staking-rewards-native.lua",
 
         # Block until the GraphQL index confirms settlement, rather than reporting an id that

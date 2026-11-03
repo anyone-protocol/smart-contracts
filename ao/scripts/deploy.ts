@@ -457,32 +457,12 @@ const ao = createAoClient({
       { name: 'app-name', value: 'anyone-protocol' },
       { name: 'name', value: `${contract}-${Date.now()}` },
     ],
-    // 🚨 DEFER the forced first compute. `spawnProcess` normally drives slot 0 by reading
-    // `now/at-slot`, and on a gated node that read is the SAME one the publish-then-verify
-    // ordering below exists to work around: unsigned, and free only for pids already in
-    // `p4-non-chargable-routes`. Leaving it on means the spawn fails before the Consul key is
-    // ever written — "spawned … but it never computed after 30 attempts (400: Node will not
-    // service this request)" — which is exactly what happened on stage 2026-08-31.
-    //
-    // Nothing is lost by deferring: `materialize()` below calls forceFirstCompute itself, and it
-    // runs after the route exists. Slot 0 is still driven before any view is read.
+    // materialize() below drives slot 0.
     verify: false,
   })
   console.log(`process id             ${processId}  (slot ${slot})`)
 
-  // ─── PUBLISH-THEN-VERIFY, and why the order had to invert ─────────────────────────────────
-  // This used to write the Consul key only after every check below, so an unreadable id could
-  // never reach `gated-processes`. The write gate made that ordering IMPOSSIBLE to satisfy:
-  // every check below is an UNSIGNED read, those are free only for pids listed in
-  // `p4-non-chargable-routes`, and that list is templated from the very key we were holding
-  // back. A freshly spawned pid therefore always 400s "Node will not service this request"
-  // (measured on stage 2026-08-31, and it is why the contracts could be deployed at all before
-  // the gate landed but not after).
-  //
-  // So: write the key, let the node re-render and restart onto it (the hyperbeam config.json
-  // template has no change_mode, so it takes Nomad's default of `restart`), wait for the route
-  // to actually appear, then verify. The safety the old ordering provided is preserved by
-  // REVERTING the key on any verification failure, so a bad id never outlives the run.
+  // Record the PID, then verify it, and restore the previous value if verification fails.
   const consulKey = process.env.CONTRACT_CONSUL_KEY
   const { CONSUL_IP, CONSUL_PORT, CONSUL_TOKEN } = process.env
   let consul: any = null
