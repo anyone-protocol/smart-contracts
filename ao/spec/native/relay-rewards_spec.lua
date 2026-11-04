@@ -55,8 +55,10 @@ describe('native relay-rewards — WASM-harness parity (Lua 5.3)', function()
   local CHARLS = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
   local FP_A, FP_B, FP_C = string.rep('A', 40), string.rep('B', 40), string.rep('C', 40)
 
+  local commitN = 0
   local function commit(committer)
-    return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
+    commitN = commitN + 1
+    return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
   end
   local function assign(action, committer, data, tags)
     local taglist = { { name = 'Action', value = action } }

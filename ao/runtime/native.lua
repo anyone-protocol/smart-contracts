@@ -433,7 +433,7 @@ native.RESERVED = {
 -- and would take down the process on the first slot. Rejected at register(), not at 3am.
 local RUNTIME_GLOBALS = {
   ACL = true, Owner = true, Send = true, ao = true, compute = true, native = true,
-  json = true, require = true, _G = true, arg = true,
+  json = true, require = true, _G = true, arg = true, ProcessedMessages = true,
 }
 
 native._contract = nil
@@ -476,6 +476,7 @@ end
 function native.reset()
   setStateRoot(nil)
   ACL = nil
+  ProcessedMessages = nil
 end
 
 --- Expose each view as a GLOBAL function `fn(base, req)` so the lua device can serve it at
@@ -546,6 +547,25 @@ end
 local function restoreState(snap)
   setStateRoot(snap.state)
   ACL = snap.acl
+end
+
+--- Records the ids of a message's signed commitments and returns the slot that first carried
+--- any of them, or nil for a new message. Kept outside the snapshot so a rejected message stays
+--- recorded.
+local function recordMessage(body, slot)
+  ProcessedMessages = ProcessedMessages or {}
+  local ids = {}
+  if type(body) == 'table' and type(body.commitments) == 'table' then
+    for id in pairs(body.commitments) do
+      if type(id) == 'string' then
+        local first = ProcessedMessages[id]
+        if first ~= nil then return first end
+        ids[#ids + 1] = id
+      end
+    end
+  end
+  for _, id in ipairs(ids) do ProcessedMessages[id] = slot end
+  return nil
 end
 
 --- Build a handler's output message.
@@ -714,6 +734,16 @@ function native.compute(base, req)
     end
     ACL.roles = ACL.roles or {}
   end)
+
+  local recok, first = pcall(recordMessage, req.body, toInt(req['slot']) or true)
+  if not recok or first ~= nil then
+    pcall(clearOutbox)
+    local reason = not recok and ('duplicate check failed: ' .. tostring(first))
+      or (type(first) == 'number' and ('duplicate message (slot ' .. first .. ')'))
+      or 'duplicate message'
+    pcall(writeResults, base, { data = 'error: ' .. reason })
+    return base
+  end
 
   local snapok, snapshot = pcall(snapshotState)
   if not snapok then

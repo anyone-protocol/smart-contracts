@@ -50,8 +50,10 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
   local FP_A, FP_B, FP_C = string.rep('A', 40), string.rep('B', 40), string.rep('C', 40)
   local FP_D, FP_E, FP_F = string.rep('D', 40), string.rep('E', 40), string.rep('F', 40)
 
+  local commitN = 0
   local function commit(committer)
-    return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
+    commitN = commitN + 1
+    return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
   end
   --- assign(action, committer, data, tags?, extra?) → device request `{ body = ... }`.
   local function assign(action, committer, data, tags, extra)
@@ -1015,6 +1017,60 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
       assert.is_true(has(outData(base), 'Invalid'))
       assert.are.equal(ALICE, OperatorRegistry.claimable[FP_A])  -- prior commit intact
       assert.is_nil(OperatorRegistry.claimable[FP_B])            -- failed batch fully reverted
+    end)
+  end)
+
+  describe('Replayed messages', function()
+    local function grant(addr, roles) return assign('Update-Roles', OWNER, json.encode({ Grant = { [addr] = roles } })) end
+    local function revoke(addr, roles) return assign('Update-Roles', OWNER, json.encode({ Revoke = { [addr] = roles } })) end
+
+    it('skips a message it has already processed', function()
+      local base = newBase()
+      local g = grant(BOB, { 'Admin-Submit-Operator-Certificates' })
+      g.slot = '4'
+      compute(base, g)
+      compute(base, revoke(BOB, { 'Admin-Submit-Operator-Certificates' }))
+      g.slot = '9'
+      compute(base, g)
+      assert.are.equal('error: duplicate message (slot 4)', outData(base))
+      assert.is_nil(ACL.roles['Admin-Submit-Operator-Certificates'][BOB])
+    end)
+
+    it('keeps a rejected message recorded', function()
+      local base = newBase()
+      local m = assign('Admin-Submit-Operator-Certificates', BOB, certs({ { f = FP_B, a = BOB } }))
+      compute(base, m)
+      assert.is_true(has(outData(base), 'Permission Denied'))
+      grantRole(base, BOB, { 'Admin-Submit-Operator-Certificates' })
+      compute(base, m)
+      assert.is_true(has(outData(base), 'duplicate message'))
+      assert.is_nil(OperatorRegistry.claimable[FP_B])
+    end)
+
+    it('skips a processed message that carries an extra signature', function()
+      local base = newBase()
+      local m = assign('Admin-Submit-Operator-Certificates', OWNER, certs({ { f = FP_A, a = ALICE } }))
+      compute(base, m)
+      claim(base, ALICE, FP_A)
+      assert.are.equal(ALICE, OperatorRegistry.verified[FP_A])
+      local rewrapped = { body = {} }
+      for k, v in pairs(m.body) do rewrapped.body[k] = v end
+      rewrapped.body.commitments = {}
+      for id, c in pairs(m.body.commitments) do rewrapped.body.commitments[id] = c end
+      for id, c in pairs(commit(BOB)) do rewrapped.body.commitments[id] = c end
+      compute(base, rewrapped)
+      assert.is_true(has(outData(base), 'duplicate message'))
+      assert.is_nil(OperatorRegistry.claimable[FP_A])
+      assert.are.equal(ALICE, OperatorRegistry.verified[FP_A])
+    end)
+
+    it('skips a replayed spawn message', function()
+      local base = newBase()
+      local spawn = { body = { commitments = base.process.commitments }, slot = '0' }
+      compute(base, spawn)
+      spawn.slot = '1'
+      compute(base, spawn)
+      assert.are.equal('error: duplicate message (slot 0)', outData(base))
     end)
   end)
 end)

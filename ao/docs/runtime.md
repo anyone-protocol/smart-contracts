@@ -80,6 +80,23 @@ a string-valued map after the first slot and adds metadata keys to nested maps.
 
 The owner is the committer of the spawn message. It is set once and never changes.
 
+## Repeated messages
+
+The scheduler gives a new slot to every message it receives, including a message it has already
+assigned. The runtime records the id of every signed commitment of each message it computes. A
+message that carries a recorded id is skipped: the handler does not run, and the slot's output is
+`error: duplicate message (slot <n>)`, where `<n>` is the slot that first carried it.
+
+- A message stays recorded when its handler fails, so a refused message cannot run later.
+- Adding a signature to a recorded message does not make it a new message.
+- Signing is deterministic, so two messages with the same signer, target, tags and data have the
+  same id. A client that sends the same content twice gives each send its own anchor, as
+  `scripts/util/hb-client.ts` does. A retry of one send keeps its anchor, so a retry that reaches
+  the process after the first attempt did is skipped.
+- The record lives in the `ProcessedMessages` global, outside the atomicity snapshot. It is not
+  part of `dump` or the migration seed. A message runs only on the process its signature names as
+  target, so a new process starts with an empty record.
+
 ## Roles
 
 `ACL.roles` maps a role name to a set of addresses. `owner` is an implicit role held by the
@@ -231,7 +248,7 @@ The output of a slot is readable at `compute&slot=<n>/results/output`.
 | Function | Use |
 | --- | --- |
 | `native.setStateRoot(value)`, `native.setACL(value)` | Seed state in a test. A spec cannot assign the globals itself, because busted runs each file in an environment that proxies `_G` |
-| `native.reset()` | Clears the state root and roles between cases. Never call it from module scope or from `compute` |
+| `native.reset()` | Clears the state root, roles and the record of processed messages between cases. Never call it from module scope or from `compute` |
 
 ## Device constraints
 

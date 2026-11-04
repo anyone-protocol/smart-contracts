@@ -7,7 +7,8 @@
 //
 //   MODULE_ID=<id> HB_URL=http://localhost:8734 bun run scripts/tier3-validate.ts
 //   (publish first: bun run scripts/publish-native-module.ts  → run the printed bin/hb eval)
-import { EthereumSigner } from '@dha-team/arbundles'
+import { createData, EthereumSigner } from '@dha-team/arbundles'
+import { randomBytes } from 'node:crypto'
 import { Wallet, getAddress } from 'ethers'
 import { fetchNodeAddress, spawnLuaProcess, sendMessage } from './util/hb-client'
 
@@ -220,6 +221,51 @@ const FP_BAD = 'nothex' + 'X'.repeat(34)
   const collide = await viewGet(vpid, 'fingerprints', `?fingerprints=${FP_A}`)
   check('  fingerprints?fingerprints= no longer shadows (as/ fixes the D26 footgun)',
     collide.ct.includes('application/json') && collide.json !== null)
+
+  // == G. replayed messages ====================================================
+  section('G. replays: a repeated message is skipped, a high-s twin is refused')
+  const item = async (target: string, data: string) => {
+    const d = createData(data, ownerSigner, { target, anchor: randomBytes(24).toString('base64url'), tags: [
+      { name: 'type', value: 'Message' }, { name: 'data-protocol', value: 'ao' },
+      { name: 'variant', value: 'ao.N.1' }, { name: 'require-codec', value: 'application/json' },
+      { name: 'action', value: 'Update-Roles' }] })
+    await d.sign(ownerSigner)
+    return Buffer.from(d.getRaw())
+  }
+  const push = async (target: string, bytes: Buffer) => {
+    const r = await fetch(`${P(target)}/push`, { method: 'POST',
+      headers: { 'content-type': 'application/ans104', 'codec-device': 'ans104@1.0' }, body: bytes })
+    const body = await r.text()
+    let slot = r.headers.get('slot')
+    if (slot === null) { try { slot = String(JSON.parse(body).slot) } catch { /* */ } }
+    return { status: r.status, slot }
+  }
+  const slotOutput = async (target: string, slot: string | null) =>
+    (await (await fetch(`${P(target)}/compute&slot=${slot}/results/output/data`)).text()).trim()
+  const highS = (bytes: Buffer) => {
+    const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141')
+    const out = Buffer.from(bytes)
+    const s = BigInt('0x' + out.subarray(34, 66).toString('hex'))
+    Buffer.from((n - s).toString(16).padStart(64, '0'), 'hex').copy(out, 34)
+    out[66] = out[66] === 27 ? 28 : out[66] === 28 ? 27 : out[66] ^ 1
+    return out
+  }
+  const adminOf = async (target: string) => (await viewGet(target, 'roles')).json?.admin?.[OP] ?? null
+  const grantOp = JSON.stringify({ Grant: { [OP]: ['admin'] } })
+
+  const grant = await item(pid, grantOp)
+  const first = await push(pid, grant)
+  eq('  grant → OK', await slotOutput(pid, first.slot), 'OK')
+  eq('  revoke → OK', await send(ownerSigner, pid, 'Update-Roles', {}, JSON.stringify({ Revoke: { [OP]: ['admin'] } })), 'OK')
+  const again = await push(pid, grant)
+  eq('  same grant again → skipped', await slotOutput(pid, again.slot), `error: duplicate message (slot ${first.slot})`)
+  eq('  revoked role stays revoked', await adminOf(pid), null)
+  const twin = await push(pid, highS(await item(pid, grantOp)))
+  check(`  high-s twin refused by the node (HTTP ${twin.status})`, twin.status >= 400)
+  await push(pid, await item(vpid, grantOp))
+  eq('  neither the twin nor a message signed for another process ran here', await adminOf(pid), null)
+  const fresh = await push(pid, await item(pid, grantOp))
+  eq('  same content with a new anchor → OK', await slotOutput(pid, fresh.slot), 'OK')
 
   // == summary =================================================================
   console.log(`\n${'='.repeat(60)}\nVERTICAL VALIDATION: ${pass} passed / ${fail} failed`)

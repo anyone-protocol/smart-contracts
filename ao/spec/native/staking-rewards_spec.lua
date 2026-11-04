@@ -51,8 +51,10 @@ describe('native staking-rewards — WASM-harness parity (Lua 5.3)', function()
   local BOB    = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
   local CHARLS = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
 
+  local commitN = 0
   local function commit(committer)
-    return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
+    commitN = commitN + 1
+    return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = committer } }
   end
   --- assign(action, committer, data, tags?, msgTimestamp?) → device request.
   --- NB: `timestamp` sits at ASSIGNMENT (req) level, not on req.body — that is where the scheduler

@@ -55,7 +55,11 @@ console.log(`building oracle for a ${K}-fingerprint round (real seeded keys)…`
 const oracleScen = `
 local json = require('json')
 local OWNER = '0x' .. string.rep('1', 40)
-local function commit(c) return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = c } } end
+local commitN = 0
+local function commit(c)
+  commitN = commitN + 1
+  return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = c } }
+end
 local base = { process = { id = 'PID', commitments = commit(OWNER) } }
 local sd = [==[${scoresJson}]==]
 compute(base, { body = { action = 'Add-Scores', commitments = commit(OWNER), tags = { { name='Action', value='Add-Scores' }, { name='Round-Timestamp', value='${T}' } }, data = sd } })
