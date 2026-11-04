@@ -43,10 +43,10 @@ WORKDIR /app
 
 # Dependencies first: a contract or script edit should not re-resolve the lockfile.
 # bun 1.3 or later is required: `bun.lock` is the text lockfile format, which bun 1.1 cannot parse.
-# Install scripts are skipped: the only native addon in the tree (bufferutil) is optional, unused
-# by these scripts, and needs a build toolchain the alpine image does not have.
+# Only `dependencies` are installed: they are what the scripts below import. Install scripts are
+# skipped; the scripts run without them.
 COPY ao/package.json ao/bun.lock ./
-RUN bun install --frozen-lockfile --ignore-scripts
+RUN bun install --frozen-lockfile --production --ignore-scripts
 
 COPY ao/tsconfig.json ./
 

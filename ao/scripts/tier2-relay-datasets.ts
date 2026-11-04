@@ -8,11 +8,11 @@
 // sequenced it, and we assert every Complete-Round returns a valid snapshot (Details present) = OK.
 //
 // Run: bun run scripts/tier2-relay-datasets.ts
-import { config as staging1Config } from '../test/spec/contracts/relay-rewards/staging1-config.js'
-import { scores as staging1Scores } from '../test/spec/contracts/relay-rewards/staging1-scores.js'
-import { scores as staging2Scores } from '../test/spec/contracts/relay-rewards/staging2-scores.js'
-import { test1Config } from '../test/spec/contracts/relay-rewards/test1-config.js'
-import { test1Scores } from '../test/spec/contracts/relay-rewards/test1-scores.js'
+import { config as staging1Config } from '../spec/fixtures/relay-datasets/staging1-config.js'
+import { scores as staging1Scores } from '../spec/fixtures/relay-datasets/staging1-scores.js'
+import { scores as staging2Scores } from '../spec/fixtures/relay-datasets/staging2-scores.js'
+import { test1Config } from '../spec/fixtures/relay-datasets/test1-config.js'
+import { test1Scores } from '../spec/fixtures/relay-datasets/test1-scores.js'
 import { luerl } from './util/luerl'
 import fs from 'fs'
 import path from 'path'

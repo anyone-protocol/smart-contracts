@@ -4,22 +4,16 @@ This repository contains the ATOR Protocol AO smart contracts, written in Lua.
 
 ## Install
 ```bash
-$ npm i
+$ bun install
 ```
 
 ## Test
-```bash
-$ npm run test
-```
-
-## Build
-```bash
-$ npm run build
-```
+See [spec/README.md](./spec/README.md) for the Tier-1 and Tier-2 suites and
+[scripts/README.md](./scripts/README.md) for the end-to-end suite.
 
 ## Deploy
 ```bash
-$ npm run deploy
+$ bun run deploy
 ```
 
 ## Reading the processes

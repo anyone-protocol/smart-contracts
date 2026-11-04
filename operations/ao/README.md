@@ -173,6 +173,3 @@ See [../../ao/docs/durability-and-recovery.md](../../ao/docs/durability-and-reco
 | Fork pull requests | Every job is skipped for a pull request from another repository |
 | Lua | Stock Lua 5.3 for the first tier, and the luerl version that HyperBEAM pins for the second |
 | End to end | Runs against a HyperBEAM container, and builds the luerl image in its own job because the image is local |
-
-The legacy mocha suite under `ao/test/` is not run in CI. It documents what the legacy suite
-asserted.
