@@ -9,10 +9,9 @@ Nomad job specs for the AO contracts.
 | `publish-modules-<env>.hcl` | Publishes contract modules to Arweave | mainnet |
 | `<contract>/deploy-<contract>-<env>.hcl` | Spawns a contract and records its process id | mainnet |
 | `publish-snapshot-<env>.hcl` | Captures and publishes a state snapshot of each contract, daily | mainnet |
-| `<contract>/controllers-*`, `init-clean-*`, `*-admin-*`, `eval-*`, `*-golive*`, `operator-registry-*-stage.hcl` | Jobs for the legacy contracts | legacy |
 
 The mainnet image is `ghcr.io/anyone-protocol/smart-contracts-ao-mainnet`, built from
-`Dockerfile-Mainnet`. The legacy image is `ghcr.io/anyone-protocol/smart-contracts-ao`.
+`Dockerfile-Mainnet`.
 
 ## Image
 
