@@ -166,11 +166,3 @@ jobs:
       - name: Stop the node
         if: always()
         run: docker rm -f hb-e2e || true
-
-# The legacy mocha suite (`bun run test`, test/spec/**) is deliberately NOT run here.
-# It drives the obsolete aos-WASM harness against the legacynet contracts, which now carry
-# luerl workarounds their specs were never updated for. It is retained in the repo purely
-# as a COVERAGE REFERENCE — when adding behaviour to a native contract, read those specs to
-# see what the legacy suite asserted — but it is not executed by CI and is not a gate.
-# A coverage comparison against it was done in D10 (legacy 262 assertions vs native 285;
-# the gaps it surfaced are closed), so it has already served that purpose once.

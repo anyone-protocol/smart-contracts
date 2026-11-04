@@ -13,8 +13,6 @@ bun run scripts/<name>.ts [arguments]
 | `scripts/` | The tools indexed in this document |
 | `scripts/util/` | Shared modules. See [Utilities](#utilities) |
 | `scripts/probe/` | Probes that each answer one question about node behavior. See [probe/README.md](probe/README.md) |
-| `scripts/legacy/` | Tools for the legacy contracts. See [Legacy scripts](#legacy-scripts) |
-| `scripts/test-keys/` | Public test keys for the legacy tools. Never add their addresses to a node's allow-list |
 
 Related documents:
 
@@ -40,7 +38,6 @@ Related documents:
 - [Smoke tests](#smoke-tests)
 - [State capture from the legacy network](#state-capture-from-the-legacy-network)
 - [Utilities](#utilities)
-- [Legacy scripts](#legacy-scripts)
 
 In the index tables, the Arguments column shows what follows `bun run scripts/<script>`. The
 Environment column lists the variables that the script reads, with the default in parentheses.
@@ -58,7 +55,7 @@ prints before its first write.
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `HB_URL` | Base URL of the HyperBEAM node | Per script. Required by `deploy.ts`, `run-e2e.ts`, `verify-migration.ts` and `verify-deployment.ts`. `http://localhost:8734` in most test scripts. `https://hb-dev.anyone.tech` in `dev-walkthrough.ts`, `faff-probe.ts` and `interact-probe.ts` |
+| `HB_URL` | Base URL of the HyperBEAM node | Per script. Required by `deploy.ts`, `run-e2e.ts`, `verify-migration.ts` and `verify-deployment.ts`. `http://localhost:8734` in most test scripts. `https://hb-dev.anyone.tech` in `dev-walkthrough.ts` |
 | `DEPLOYER_PRIVATE_KEY` | EVM private key in hex, with or without `0x`. Signs spawns and messages | Per script. See [Signing keys](#signing-keys) |
 | `MODULE_ID` | Id of a module that the node can resolve | None |
 | `CONTAINER_ENGINE` | `podman` or `docker`, for scripts that run a container | `podman` |
@@ -69,7 +66,7 @@ prints before its first write.
 
 | Behavior when `DEPLOYER_PRIVATE_KEY` is unset | Scripts |
 | --- | --- |
-| Stops with an error | `deploy.ts`, `dev-walkthrough.ts`, `dev-dashboard-fixture.ts`, `dev-staking-mirror.ts`, `tier3-deploy.ts`, `spawn-lua.ts`, `faff-probe.ts`, `interact-probe.ts`, `publish-view.ts` |
+| Stops with an error | `deploy.ts`, `dev-walkthrough.ts`, `dev-dashboard-fixture.ts`, `dev-staking-mirror.ts`, `tier3-deploy.ts` |
 | Signs with a development key that is committed in this repository | `staking-view-golden.ts`, the other `tier3-*.ts` scripts, `lua-smoke.ts`, `hyper-aos-smoke.ts`, `bint-luerl-conformance.ts` |
 | Skips the step that needs a signature | `verify-migration.ts` |
 
@@ -156,7 +153,6 @@ Rules:
 
 | File | Written by | Read by |
 | --- | --- | --- |
-| `<contract>.lua` | `bundle.ts` | Legacy deploy tools, the mocha suite |
 | `<contract>-deploy.lua` | `bundle-deploy.ts` | Tools for the older runtime |
 | `<contract>-native.lua` | `build-native-bundle.ts`, `deploy.ts` | Module publishing, inline spawns |
 | `<contract>-seed.envelope.json` | The seed builders, `build-respawn-seed.ts` | Every seeded spawn |
@@ -176,7 +172,6 @@ and `run-e2e.ts` rebuild the seed files of a contract. Each rebuild overwrites
 
 | Script | Purpose | Arguments | Environment |
 | --- | --- | --- | --- |
-| `bundle.ts` | Bundles each legacy contract in `src/contracts/` into `dist/<contract>.lua`. `bun run build` runs it | None | None |
 | `lua-bundler.ts` | Module. `bundle(entryPath)` inlines the local modules that a Lua entry file requires. A module that is not found locally is left for the host to provide | Not run directly | None |
 | `bundle-deploy.ts` | Bundles one legacy contract with the older runtime (`runtime/runtime.lua`) into one file that defines `compute`. Writes `dist/<contract>-deploy.lua` | `<contract> <StateGlobal>`, for example `operator-registry OperatorRegistry` | `STAGE_DIR` (`/tmp`): where the staging directory is created |
 | `build-native-bundle.ts` | Builds the pure-source module of a native contract: `dist/<contract>-native.lua` | `<contract>`: `operator-registry`, `relay-rewards` or `staking-rewards` | None |
@@ -309,7 +304,6 @@ Rules:
 | `publish-module.ts` | Publishes Lua modules to Arweave through a bundler and waits for settlement. See [publish-module.ts](#publish-modulets) | `<file.lua> [...] [options]` | `BUNDLER` (required), `PUBLISH_KEY` (required), `GATEWAY` (`https://arweave.net`) |
 | `publish-modules.sh` | Publishes the contract modules into the cache of one node. See [publish-modules.sh](#publish-modulessh) | `[env]` | Needs the `nomad` command and access to the cluster |
 | `publish-native-module.ts` | Writes the operator registry bundle and prints the commands that commit it into the cache of a local container named `hb-tier3` | `[outfile]` (`dist/operator-registry-native.lua`) | None |
-| `publish-view.ts` | Uploads `src/views/<VIEW_NAME>.lua` through Turbo | None | `VIEW_NAME` (required), `VIEW_VERSION` (`dev`), `DEPLOYER_PRIVATE_KEY` (required), `USE_CONSOLE_LOGGER` |
 
 The commands that `publish-native-module.ts` prints also call `hb_client:upload`. From
 `bin/hb eval` that call targets the bundler that is compiled into the node, whatever the node
@@ -992,10 +986,7 @@ Rules for `dev-walkthrough.ts`:
 | Script | Purpose | Arguments | Environment |
 | --- | --- | --- | --- |
 | `lua-smoke.ts` | Spawns a minimal Lua process with the native client, sends one message and reads `now/count` | None | `HB_URL` (`http://localhost:8734`), `DEPLOYER_PRIVATE_KEY` |
-| `spawn-lua.ts` | The same through `aoconnect`, with every node response printed | None | `HB_URL` (`http://localhost:18741`), `DEPLOYER_PRIVATE_KEY` (required) |
 | `hyper-aos-smoke.ts` | Spawns a hyper-aos process, evaluates Lua as the owner and reads the result | None | `HB_URL` (`http://localhost:8734`), `SIGNER` (`arweave` or `ethereum`, default `arweave`), `MODULE_FILE`, `MODULE_ID`, `AR_KEYFILE`, `DEPLOYER_PRIVATE_KEY` |
-| `faff-probe.ts` | Sends a spawn signed by an allow-listed wallet and one signed by a random wallet, and prints the raw answers of the node | None | `HB_URL` (`https://hb-dev.anyone.tech`), `MODULE`, `DEPLOYER_PRIVATE_KEY` (required) |
-| `interact-probe.ts` | Spawns a process, evaluates a handler, sends a message and reads the result through `aoconnect` | None | `HB_URL` (`https://hb-dev.anyone.tech`), `MODULE`, `DEPLOYER_PRIVATE_KEY` (required) |
 
 Notes:
 
@@ -1003,8 +994,6 @@ Notes:
   workstation. Set both.
 - Stock hyper-aos recognizes `rsa-pss-sha512` committers only. With `SIGNER=ethereum` the owner
   is not trusted.
-- `aoconnect` hides the response of the node. `faff-probe.ts`, `interact-probe.ts` and
-  `spawn-lua.ts` wrap `fetch` to print it.
 - `MODULE` defaults to a module id in the script.
 
 ## State capture from the legacy network
@@ -1101,39 +1090,3 @@ Rules:
   embedded seed is decoded on every read.
 - `seedEnvelopeFor` returns `undefined` when no seed was built. A spawn without a seed is a
   valid fresh deploy, so check for a missing seed where a seed is expected.
-
-## Legacy scripts
-
-Tools in `scripts/legacy/` for the legacy contracts on the older network stack. They use
-`aoconnect` and send `aos` messages. The native contracts do not use them.
-
-| Script | Action | Environment |
-| --- | --- | --- |
-| `deploy.ts` | Spawns an `aos` process, evaluates `dist/<contract>.lua`, optionally sends `Init`, and writes the process id to Consul | `CONTRACT_NAME` (required), `DEPLOYER_PRIVATE_KEY`, `SCHEDULER_UNIT_ADDRESS`, `MESSAGING_UNIT_ADDRESS`, `AOS_MODULE_ID`, `CALL_INIT_HANDLER`, `INIT_DATA_PATH`, `IS_MIGRATION_DEPLOYMENT`, `MIGRATION_SOURCE_PROCESS_ID`, `INIT_DELAY_MS` (`30000`), `USE_PROCESS_ID`, `PHASE`, `CONSUL_IP`, `CONSUL_PORT`, `CONSUL_TOKEN`, `CONTRACT_CONSUL_KEY`, `USE_CONSOLE_LOGGER` |
-| `spawn.ts` | Spawns a process on a HyperBEAM node with the `genesis-wasm` device and evaluates `dist/<PROCESS_NAME>.lua` | `DEPLOYER_PRIVATE_KEY`, `HB_URL`, `SCHEDULER`, `MODULE`, `PROCESS_NAME` (`default`) |
-| `send-aos-message.ts` | Module. `sendAosMessage`, `sendAosDryRun`, `createEthereumDataItemSigner` | `CU_URL` |
-| `init-clean.ts` | Sends `Init` with the data in `INIT_CLEAN_DATA` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `INIT_CLEAN_DATA` |
-| `dryrun-view-state.ts` | Dry run of `View-State` | `PROCESS_ID` |
-| `dryrun-view-roles.ts` | Dry run of `View-Roles`. `--convert` prints the roles as a grant list | `PROCESS_ID` |
-| `acl/update-roles.ts` | Sends `Update-Roles` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `UPDATE_ROLES_DATA` |
-| `operator-registry/add-verified-hardware.ts` | Sends `Add-Verified-Hardware` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `FINGERPRINTS` |
-| `operator-registry/add-worker-acl.ts` | Placeholder without an action | `ETH_PRIVATE_KEY`, `PROCESS_ID` |
-| `operator-registry/eval.ts` | Sends `Eval` with code from a variable or a file | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `EVAL_CODE`, `EVAL_CODE_PATH` |
-| `operator-registry/get-state-patch.ts` | Reads `View-State` and writes Lua code that sets the same state | `PROCESS_ID`, `PHASE` (`dev`), `PATCH_NAME` |
-| `relay-rewards/update-configuration.ts` | Sends `Update-Configuration` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `UPDATE_CONFIG_DATA` |
-| `staking-rewards/update-configuration.ts` | Sends `Update-Configuration` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `UPDATE_CONFIG_DATA` |
-| `staking-rewards/toggle-share-feature.ts` | Sends `Toggle-Feature-Shares` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `FEATURE_SHARES_ENABLED` |
-| `staking-rewards/update-shares-configuration.ts` | Sends `Update-Shares-Configuration` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `UPDATE_SHARES_CONFIG_DATA` |
-| `staking-snapshots/add-staking-snapshot.ts` | Sends `Add-Staking-Snapshot` with the data of a file | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `SNAPSHOT_DATA_PATH` |
-| `staking-snapshots/set-history-size.ts` | Sends `Set-History-Size` | `ETH_PRIVATE_KEY`, `PROCESS_ID`, `HISTORY_SIZE` |
-
-Rules:
-
-- Do not use these tools for a native contract. Use `deploy.ts` in `scripts/`.
-- `deploy.ts` and `spawn.ts` in this directory have defaults for the key, the module and the
-  node. The default key is a public test key and the default node of `spawn.ts` is operated by
-  a third party. Set every variable.
-- Several files import modules by paths that do not exist in this directory:
-  `send-aos-message.ts`, `spawn.ts`, `dryrun-view-state.ts` and `dryrun-view-roles.ts`. The
-  other files import `send-aos-message.ts`. Correct the import paths before running a legacy
-  script.

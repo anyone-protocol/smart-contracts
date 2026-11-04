@@ -73,8 +73,8 @@ Two consequences that bite in the harness:
   (`newBase()` already does).
 
 Pilot = **operator-registry** (`../src/contracts/native/operator-registry.lua`). The specs
-have **full behavioral parity** with the legacynet WASM harness
-(`../test/spec/contracts/operator-registry.spec.ts`) plus D8 runtime-safety cases. Run from
+have **full behavioral parity** with the former legacynet WASM harness plus D8 runtime-safety
+cases. Run from
 `smart-contracts/ao/` (use an absolute `-v` source path if your shell's `$PWD` is elsewhere):
 
 ```sh

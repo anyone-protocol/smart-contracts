@@ -22,9 +22,7 @@
       "~/*": [ "./*" ],
     },
     "types": [
-      "node",
-      "@types/mocha",
-      "@types/chai"
+      "node"
     ]
   },
   "exclude": [

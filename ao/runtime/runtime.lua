@@ -423,8 +423,8 @@ end
 -- expect, then loads the contract ONCE so its handlers populate the list.
 --
 -- TODO(port): decide bundling — runtime as the process module that requires the
--- contract, vs contract entry that requires the runtime. Current bundler
--- (scripts/bundle.ts) treats each contract as the entry, so likely: prepend the
+-- contract, vs contract entry that requires the runtime. The legacy bundler
+-- treated each contract as the entry, so likely: prepend the
 -- runtime, expose globals (Handlers, Send, ao, Owner), let the contract register.
 function runtime.install()
   runtime.Handlers = runtime.Handlers or newHandlers()

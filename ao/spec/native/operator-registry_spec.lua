@@ -1,5 +1,4 @@
---- Tier-1 busted spec — FULL PARITY with the legacynet WASM harness
---- (test/spec/contracts/operator-registry.spec.ts), re-expressed for the D26 native
+--- Tier-1 busted spec: FULL PARITY with the former legacynet WASM harness, re-expressed for the D26 native
 --- shape on the native runtime, driven under Lua 5.3 (luerl's language level).
 ---
 --- Every active behavior the WASM harness covered is here; the assertions are native:

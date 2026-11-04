@@ -24,7 +24,7 @@
 --- to every balance by hash. Moving the data out of state does not cost verifiability.
 ---
 --- Spawn it inline (no module publish needed):
----   scripts/spawn-lua.ts, or any harness that passes this file as `luaSource`.
+---   any harness that passes this file as `luaSource`.
 ---
 --- VERIFIED 2026-07-29 against a local v0.9-FINAL node by spawning this file verbatim:
 ---   seed 1000 holders -> balanceId vez2gvZ_JcwLilkmYBExvLqy1PTd_RMHU4yqF5i6ygE

@@ -1,7 +1,6 @@
 --- Tier-1 busted spec — native staking-rewards (D26 shape) on the native runtime, under Lua 5.3.
 ---
---- FULL PARITY with the legacynet WASM harness (test/spec/contracts/staking-rewards/*.spec.ts,
---- 108 it() across 13 files), re-expressed native:
+--- FULL PARITY with the former legacynet WASM harness (108 it() across 13 files), re-expressed native:
 ---   · state read from `StakingRewards`; a write's reply is the compute output ('OK', or the rewarded
 ---     JSON for Claim-Rewards); reads are `native.view(...)`; an assert failure surfaces as
 ---     `output.data = 'error: <msg>'` and reverts state atomically.

@@ -1,7 +1,6 @@
 --- Tier-1 busted spec — native relay-rewards (D26 shape) on the native runtime, under Lua 5.3.
 ---
---- FULL PARITY with the legacynet WASM harness (test/spec/contracts/relay-rewards/*.spec.ts),
---- re-expressed native:
+--- FULL PARITY with the former legacynet WASM harness, re-expressed native:
 ---   · state read from `RelayRewards` (single source of truth) — not patch@1.0 tags
 ---   · a WRITE's reply is the compute output ('OK'; Complete-Round returns the JSON snapshot;
 ---     Claim-Rewards returns the claimed value) — not a `*-Response` message
