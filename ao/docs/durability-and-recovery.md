@@ -20,18 +20,18 @@ A snapshot without assignments gives a state with no verifiable history after it
 
 ## What a published message actually contains
 
-A message on Arweave carries only:
+A message on Arweave carries these tags:
 
 ```
 type = Message | data-protocol = ao | variant = ao.N.1
 require-codec = application/json | action = <handler> | round-timestamp = <ms>
 ```
 
-No `process`, no `target`, no `slot`. Those are **not** required for HyperBEAM to validate a
-message: the routing target is the URL path (`/<pid>~process@1.0/push`), and item validation is
-self-contained ANS-104 signature verification. Binding a message to a process and a slot is the
-assignment's entire job, which is why losing assignments loses everything - the messages remain
-on chain but become unattributable.
+The process a message is for is its ANS-104 `target` field, which the signature covers. On v0.11
+the scheduler assigns a message to the process its target names, whatever path it is posted to.
+A message carries no slot: binding a message to a slot is the assignment's job, which is why
+losing assignments loses the history - the messages remain on chain, but nothing says where in
+the sequence each one ran.
 
 ## The pre-fix gap
 
@@ -194,7 +194,9 @@ bun run scripts/recover-from-arweave.ts <process-id> --out recovery/ --seed
 Produces:
 
 - `state.json` - verified state at the snapshot slot
-- `messages/` - every message body from that slot to the head, slot-ordered
+- `messages/` - the data of every message after that slot up to the head, slot-ordered. The
+  state already includes the snapshot slot's own message. The files hold each message's data
+  only: a replay needs the signed messages, which the tool does not rebuild yet.
 - `recovery.json` - provenance and an explicit `provablyComplete` verdict
 
 It exits non-zero if the history is not provably complete, rather than emitting a bundle that
@@ -203,7 +205,9 @@ looks whole.
 To bring a contract back up from that output, respawn it with `state.json` as the seed (a seed
 requires a module-id spawn - it rides the spawn message) and replay `messages/` in slot order.
 The respawned contract has a **new process id**; recovering the original id in place needs the
-node-side ingestion described above, which does not exist yet.
+node-side ingestion described above, which does not exist yet. Such a restore would also need the
+runtime's record of processed messages, which the dump does not carry: without it, every message
+before the snapshot could run again (see [runtime.md](runtime.md#repeated-messages)).
 
 ## Operational notes
 
