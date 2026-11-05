@@ -28,10 +28,7 @@ job "relay-rewards-stage" {
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
       entrypoint = ["bun"]
       command = "run"
-      # --previous-round 0 makes the FIRST round pay nothing: the pot is
-      # TokensPerSecond * (roundTimestamp - PreviousRound.Timestamp), and the dump carries
-      # legacynet's 2026-07-03 date, which is what paid a 48-day round at the cutover.
-      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "stage", "--previous-round", "0"]
+      args = ["scripts/deploy.ts", "relay-rewards", "--seed", "current", "--envelope", "seeds/stage-relay-rewards.envelope.json"]
       logging {
         type = "loki"
         config {
@@ -45,10 +42,6 @@ job "relay-rewards-stage" {
 
     consul {}
 
-    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
-    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
-    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
-    # rides the spawn message, selected by `--seed` above.
     env {
       # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is

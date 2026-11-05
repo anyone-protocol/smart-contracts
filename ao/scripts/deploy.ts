@@ -51,6 +51,7 @@
 //                             i.e. the state the process holds NOW. Use this to replace a live
 //                             process; `--seed live` would roll it back to the July dump.
 //                none → empty declared state (a fresh process, not a migration)
+//   --envelope <file>  with --seed current: read the envelope from this file, e.g. seeds/stage-<contract>.envelope.json
 //   --publish    publish durably via BUNDLER (needs PUBLISH_KEY); prints the MODULE_ID
 //   --publish-cmd  print the node-host eval for a NODE-LOCAL id (fast, NOT cold-start safe)
 //   --allow-unpublished-module  spawn against a module that is not on Arweave (test only)
@@ -100,6 +101,11 @@ const seed = opt('seed')
 if (!seed || !['live', 'stage', 'none', 'current'].includes(seed)) {
   console.error('--seed is required and must be one of: live, stage, none, current')
   console.error('  (there is no default: "which state does this process start from" is not a question to guess at)')
+  process.exit(2)
+}
+const envelopeOpt = opt('envelope')
+if (envelopeOpt && seed !== 'current') {
+  console.error('--envelope applies to --seed current only')
   process.exit(2)
 }
 const dryRun = flag('dry-run')
@@ -172,19 +178,20 @@ if (seed === 'current') {
   // A RESPAWN. The envelope must already exist and must have been captured from the running
   // node — regenerating it here from the 2026-07-09 dump is precisely the mistake this guards
   // against (live held 3,288 claimable on 2026-08-31 against the dump's 2,940).
-  if (!fs.existsSync(envelopePath)) {
-    console.error(`--seed current needs ${path.relative(AO, envelopePath)}, built by:`)
+  const source = envelopeOpt ? path.resolve(AO, envelopeOpt) : envelopePath
+  if (!fs.existsSync(source)) {
+    console.error(`--seed current needs ${path.relative(AO, source)}, built by:`)
     console.error('  bun run scripts/build-respawn-seed.ts <env> --verify --image <ref>')
     process.exit(1)
   }
-  seedEnvelope = fs.readFileSync(envelopePath, 'utf8')
+  seedEnvelope = fs.readFileSync(source, 'utf8')
   const parsed = JSON.parse(seedEnvelope)
   const roles = Object.keys(parsed?.acl?.roles ?? {})
   if (roles.length === 0) {
     console.error('REFUSING: envelope carries no ACL roles — the controllers could not write to it.')
     process.exit(1)
   }
-  console.log(`seed envelope          ${(seedEnvelope.length / 1024).toFixed(1)}KB (RESPAWN, roles: ${roles.join(', ')})`)
+  console.log(`seed envelope          ${path.relative(AO, source)} ${(seedEnvelope.length / 1024).toFixed(1)}KB (RESPAWN, roles: ${roles.join(', ')})`)
 } else if (seed !== 'none') {
   // Reuse the seed builders verbatim rather than reimplementing the transform — they
   // are what the Tier-3 validations were run against, and they assert their own
@@ -609,6 +616,32 @@ const ao = createAoClient({
       console.error('\nseeded state does not match the builder output.')
       await abort('seeded state does not match the builder output')
     }
+  }
+
+  if (seed === 'current') {
+    const want = JSON.parse(seedEnvelope!)
+    const empty = (v: unknown) => (Array.isArray(v) && v.length === 0) ||
+      (!!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0)
+    const differences = (got: any, exp: any, at: string, out: string[] = []): string[] => {
+      if (empty(got) && empty(exp)) return out
+      if (got && exp && typeof got === 'object' && typeof exp === 'object' && Array.isArray(got) === Array.isArray(exp)) {
+        for (const k of new Set([...Object.keys(got), ...Object.keys(exp)])) {
+          if (!(k in got)) out.push(`${at}/${k} missing`)
+          else if (!(k in exp)) out.push(`${at}/${k} not in the envelope`)
+          else differences(got[k], exp[k], `${at}/${k}`, out)
+        }
+      } else if (got !== exp) out.push(`${at}: ${JSON.stringify(got)?.slice(0, 80)} != ${JSON.stringify(exp)?.slice(0, 80)}`)
+      return out
+    }
+    const found = [
+      ...differences(await ao.readView(processId, 'dump'), want.state, 'state'),
+      ...differences(await ao.readView(processId, 'roles'), want.acl.roles, 'roles'),
+    ]
+    if (found.length) {
+      for (const d of found.slice(0, 20)) console.error(`  ${d}`)
+      await abort(`spawned state differs from the envelope in ${found.length} place(s)`)
+    }
+    console.log('  ok   dump and roles match the envelope')
   }
 
   const env = seed === 'none' ? '<env>' : seed

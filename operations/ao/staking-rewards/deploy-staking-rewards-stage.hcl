@@ -29,7 +29,7 @@ job "staking-rewards-stage" {
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
       entrypoint = ["bun"]
       command = "run"
-      args = ["scripts/deploy.ts", "staking-rewards", "--seed", "stage"]
+      args = ["scripts/deploy.ts", "staking-rewards", "--seed", "current", "--envelope", "seeds/stage-staking-rewards.envelope.json"]
       logging {
         type = "loki"
         config {
@@ -43,10 +43,6 @@ job "staking-rewards-stage" {
 
     consul {}
 
-    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
-    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
-    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
-    # rides the spawn message, selected by `--seed` above.
     env {
       # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is

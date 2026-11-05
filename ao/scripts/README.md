@@ -326,7 +326,8 @@ HB_URL=<url> DEPLOYER_PRIVATE_KEY=<hex> MODULE_ID=<id> \
 | Option | Meaning |
 | --- | --- |
 | `--seed live`, `--seed stage` | Build the seed from the state dump of that environment and send it with the spawn |
-| `--seed current` | Send the envelope that `build-respawn-seed.ts` wrote |
+| `--seed current` | Send the envelope that `build-respawn-seed.ts` wrote, or the one `--envelope` names |
+| `--envelope <file>` | With `--seed current`, read the envelope from this file, for example `seeds/stage-relay-rewards.envelope.json` |
 | `--seed none` | Send no seed. The process starts from the declared empty state |
 | `--previous-round <value>` | Passed to the seed builder. Read by `build-relay-seed.ts` only. See [Seed builders](#seed-builders) |
 | `--publish` | Publish the module through `publish-module.ts`, write `dist/<contract>-publish.json`, and exit |
@@ -358,7 +359,8 @@ Steps of the spawn phase:
    the node serves `slot/current` for it. The node restarts on the change, so connection errors
    during the wait are expected.
 6. Force the first compute and wait until `status.initialized` is true.
-7. Compare the counts of the `status` view with the expected seed.
+7. Compare the counts of the `status` view with the expected seed. With `--seed current`, compare
+   the `dump` and `roles` views with the envelope.
 8. On any failure after step 5, restore the previous value of the Consul key and exit 1.
 
 Rules:
