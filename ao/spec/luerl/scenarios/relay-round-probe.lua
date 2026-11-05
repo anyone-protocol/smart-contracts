@@ -11,7 +11,11 @@ local BB = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
 local FP1, FP2, FP3 = string.rep('1', 40), string.rep('2', 40), string.rep('3', 40)
 local T = 1783067641960   -- seeded PreviousRound.Timestamp (1783064041960) + 3600000 → Period 3600
 
-local function commit(c) return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = c } } end
+local commitN = 0
+local function commit(c)
+  commitN = commitN + 1
+  return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = c } }
+end
 local function assign(a, d, tags)
   local tl = { { name = 'Action', value = a } }
   if tags then for k, v in pairs(tags) do tl[#tl + 1] = { name = k, value = v } end end

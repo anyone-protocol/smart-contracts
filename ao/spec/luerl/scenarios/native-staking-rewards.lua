@@ -25,7 +25,11 @@ local CHARLS = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
 local T1 = 1783064040855
 local T2 = T1 + 10000
 
-local function commit(c) return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = c } } end
+local commitN = 0
+local function commit(c)
+  commitN = commitN + 1
+  return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = c } }
+end
 local function assign(a, d, tagKVs, msgTs)
   local tags = { { name = 'Action', value = a } }
   if tagKVs then for k, v in pairs(tagKVs) do tags[#tags + 1] = { name = k, value = v } end end

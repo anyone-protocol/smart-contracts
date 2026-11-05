@@ -20,6 +20,9 @@
 //   secp256k1 signing is deterministic, so identical spawn content from the
 //   same wallet yields the SAME pid — pass a unique tag (e.g. `name`) to
 //   spawn distinct processes.
+// - Each message gets a random anchor. The runtime skips a message id it has
+//   already processed, so without one, two sends of identical content would
+//   be one message.
 // - `variant` must be `ao.N.1`: `ao.TN.1` flips dev_process's default
 //   execution-device to genesis-wasm@1.0 (dev_process.erl:134-139).
 // - Native lua module: encoded as a nested `module` map (content-type +
@@ -38,7 +41,7 @@
 //   Passing `module` = 43-char id of a module already readable by the node
 //   also works (flat tag).
 import { createData, deepHash, serializeTags, Signer } from '@dha-team/arbundles'
-import { createHash } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 
 export interface HbConfig {
   /** Node base URL, e.g. https://hb-dev.anyone.tech */
@@ -202,12 +205,13 @@ const assertLowercaseUnique = (tags: Tag[]) => {
 async function postAns104 (
   config: HbConfig,
   path: string,
-  opts: { tags: Tag[], data: string | Uint8Array, target?: string }
+  opts: { tags: Tag[], data: string | Uint8Array, target?: string, anchor?: string }
 ) {
   assertLowercaseUnique(opts.tags)
   const item = createData(opts.data, config.signer, {
     tags: opts.tags,
     ...(opts.target ? { target: opts.target } : {}),
+    ...(opts.anchor ? { anchor: opts.anchor } : {}),
   })
   await item.sign(config.signer)
   const res = await fetch(`${config.url}${path}`, {
@@ -328,7 +332,7 @@ export async function sendMessage (
   const { id, res, body } = await postAns104(
     config,
     `/${opts.pid}~process@1.0/push`,
-    { tags, data: opts.data ?? '', target: opts.pid }
+    { tags, data: opts.data ?? '', target: opts.pid, anchor: randomBytes(24).toString('base64url') }
   )
   let slot = res.headers.get('slot')
   if (slot === null) {

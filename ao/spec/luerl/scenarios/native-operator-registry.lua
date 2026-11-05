@@ -27,7 +27,11 @@ local CHARLS = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
 local FP_A, FP_B, FP_C = string.rep('A', 40), string.rep('B', 40), string.rep('C', 40)
 local FP_D, FP_E, FP_F = string.rep('D', 40), string.rep('E', 40), string.rep('F', 40)
 
-local function commit(c) return { c1 = { ['commitment-device'] = 'ans104@1.0', committer = c } } end
+local commitN = 0
+local function commit(c)
+  commitN = commitN + 1
+  return { ['c' .. commitN] = { ['commitment-device'] = 'ans104@1.0', committer = c } }
+end
 local function assign(action, committer, data, tags, extra)
   local taglist = { { name = 'Action', value = action } }
   if tags then for k, v in pairs(tags) do taglist[#taglist + 1] = { name = k, value = v } end end
@@ -543,6 +547,25 @@ do
   local cold = view({}, 'status')
   check('lazy init: status answers instead of erroring', cold.counts.claimable == 0)
   check('lazy init: status reports NOT initialized', cold.initialized == false)
+end
+
+-- Replayed messages
+do local base = newBase()
+  local g = assign('Update-Roles', OWNER, json.encode({ Grant = { [BOB] = { 'Admin-Submit-Operator-Certificates' } } }))
+  g.slot = '4'
+  compute(base, g)
+  compute(base, assign('Update-Roles', OWNER, json.encode({ Revoke = { [BOB] = { 'Admin-Submit-Operator-Certificates' } } })))
+  g.slot = '9'
+  compute(base, g)
+  check('replay: skipped with its first slot', outData(base) == 'error: duplicate message (slot 4)')
+  check('replay: revoked role stays revoked', native.acl().roles['Admin-Submit-Operator-Certificates'][BOB] == nil)
+  local m = assign('Admin-Submit-Operator-Certificates', CHARLS, certs({ { f = FP_C, a = CHARLS } }))
+  compute(base, m)
+  check('replay: first attempt denied', has(outData(base), 'Permission Denied'))
+  grantRole(base, CHARLS, { 'Admin-Submit-Operator-Certificates' })
+  compute(base, m)
+  check('replay: rejected message stays recorded', has(outData(base), 'duplicate message'))
+  check('replay: rejected message never applied', S().claimable[FP_C] == nil)
 end
 
 -- View-name collision guard (register) — a view named for a reserved HB base key is silently
