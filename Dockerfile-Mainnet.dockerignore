@@ -57,3 +57,7 @@
 !ao/state-dumps/2026-07-09/stage-relay-rewards.roles.json
 !ao/state-dumps/2026-07-09/stage-staking-rewards.state.json
 !ao/state-dumps/2026-07-09/stage-staking-rewards.roles.json
+
+!ao/seeds/stage-operator-registry.envelope.json
+!ao/seeds/stage-relay-rewards.envelope.json
+!ao/seeds/stage-staking-rewards.envelope.json

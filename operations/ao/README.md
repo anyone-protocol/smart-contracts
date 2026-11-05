@@ -91,7 +91,8 @@ The job runs `scripts/deploy.ts <contract> --seed <source>`.
 
 | Setting | Meaning |
 | --- | --- |
-| `--seed <live\|stage\|current\|none>` | Selects the seed sent on the spawn message. `live` and `stage` build it from that environment's state dump. `current` uses an envelope built by `build-respawn-seed.ts` |
+| `--seed <live\|stage\|current\|none>` | Selects the seed sent on the spawn message. `live` and `stage` build it from that environment's state dump. `current` sends a prepared envelope |
+| `--envelope <file>` | The envelope `--seed current` sends. The image carries `seeds/<env>-<contract>.envelope.json` |
 | `--previous-round <keep\|now\|0\|ms>` | Relay rewards only. Sets the timestamp the first round is measured from. See below |
 | `MODULE_ID` | Id of the published module |
 | `CONTRACT_CONSUL_KEY` | Consul key that receives the new process id |
