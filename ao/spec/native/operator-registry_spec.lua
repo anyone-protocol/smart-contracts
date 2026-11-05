@@ -860,6 +860,13 @@ describe('native operator-registry — full WASM-harness parity (Lua 5.3)', func
         end)
       end
     end)
+    it('rejects a view named after a runtime global (compute/ACL/ProcessedMessages)', function()
+      for _, bad in ipairs({ 'compute', 'ACL', 'ProcessedMessages', 'ao' }) do
+        assert.has_error(function()
+          native.register(reg({ [bad] = function(s) return s end }))
+        end)
+      end
+    end)
     it('accepts non-colliding view names (status/operator)', function()
       assert.has_no.errors(function()
         native.register(reg({ status = function(s) return s end,

@@ -31,7 +31,7 @@ return {
 
 - a `root` that names a global the runtime owns, such as `compute`,
 - a view name listed in `native.RESERVED`, or one the runtime serves itself,
-- a view named after the state root.
+- a view named after the state root or after a global the runtime owns.
 
 `native.RESERVED` lists the process message keys that a view name would collide with. `as/<name>`
 resolves the name against the process message first, so a view that shares a name with a message
@@ -89,13 +89,14 @@ message that carries a recorded id is skipped: the handler does not run, and the
 
 - A message stays recorded when its handler fails, so a refused message cannot run later.
 - Adding a signature to a recorded message does not make it a new message.
-- Signing is deterministic, so two messages with the same signer, target, tags and data have the
-  same id. A client that sends the same content twice gives each send its own anchor, as
-  `scripts/util/hb-client.ts` does. A retry of one send keeps its anchor, so a retry that reaches
-  the process after the first attempt did is skipped.
+- Signing with secp256k1 is deterministic, so two messages with the same signer, target, tags
+  and data have the same id. A client that sends the same content twice gives each send its own
+  anchor, as `scripts/util/hb-client.ts` does. A retry of one send keeps its anchor, so a retry
+  that reaches the process after the first attempt did is skipped.
 - The record lives in the `ProcessedMessages` global, outside the atomicity snapshot. It is not
-  part of `dump` or the migration seed. A message runs only on the process its signature names as
-  target, so a new process starts with an empty record.
+  part of `dump` or the migration seed. A message with a signed target runs only on that process,
+  so a new process starts with an empty record. A message without a target is scheduled on the
+  process named in the request path; the project's clients always set one.
 
 ## Roles
 
@@ -167,8 +168,9 @@ stored or printed renders as `7.0`.
 3. On an error, the snapshot is restored, the outbox is discarded, and the slot's output is
    `error: <reason>`.
 
-A failed slot leaves no change. An error that escapes `compute` would stop the process from
-computing any further slot, so nothing in `compute` runs outside a protected call.
+A failed slot leaves no change, except that its message stays in the processed-message record
+(see [Repeated messages](#repeated-messages)). An error that escapes `compute` would stop the
+process from computing any further slot, so nothing in `compute` runs outside a protected call.
 
 ## Migration seed
 

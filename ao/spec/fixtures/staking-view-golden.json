@@ -4553,7 +4553,7 @@
       "setSharesEnabled": false,
       "sharesEnabled": true,
       "tokensPerSecond": "57870370370370370",
-      "version": "0.1.0-native"
+      "version": "0.2.0-native"
     }
   },
   "before": {
@@ -14490,7 +14490,7 @@
       "setSharesEnabled": false,
       "sharesEnabled": true,
       "tokensPerSecond": "57870370370370370",
-      "version": "0.1.0-native"
+      "version": "0.2.0-native"
     }
   },
   "meta": {

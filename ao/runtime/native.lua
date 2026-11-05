@@ -48,7 +48,7 @@
 --- Every ACL check, the owner gate, and the eval gate depend on it. `from-process` is
 --- NEVER identity (the A11 forgery).
 
-local native = { _version = '0.1.0-native' }
+local native = { _version = '0.2.0-native' }
 
 -- ===========================================================================
 -- Section U — utilities
@@ -458,6 +458,8 @@ function native.register(contract)
         .. "(shadowed on the read path) — rename the view")
       assert(name ~= 'roles' and name ~= 'version' and name ~= 'dump',
         "register: view name '" .. name .. "' is a runtime-owned view — rename the view")
+      assert(not RUNTIME_GLOBALS[name],
+        "register: view name '" .. name .. "' is a runtime-owned global, rename the view")
       -- installViews writes `_G[name]`, so a view named after the root would REPLACE the
       -- state with a function on register.
       assert(name ~= contract.root,
@@ -735,13 +737,15 @@ function native.compute(base, req)
     ACL.roles = ACL.roles or {}
   end)
 
-  local recok, first = pcall(recordMessage, req.body, toInt(req['slot']) or true)
+  local recok, first = pcall(function()
+    return recordMessage(req.body, toInt(req['slot']) or true)
+  end)
   if not recok or first ~= nil then
     pcall(clearOutbox)
     local reason = not recok and ('duplicate check failed: ' .. tostring(first))
       or (type(first) == 'number' and ('duplicate message (slot ' .. first .. ')'))
       or 'duplicate message'
-    pcall(writeResults, base, { data = 'error: ' .. reason })
+    base.results = { outbox = {}, output = { data = 'error: ' .. reason } }
     return base
   end
 
