@@ -7,7 +7,7 @@
     "url": "git+https://github.com/anyone-protocol/smart-contracts"
   },
   "dependencies": {
-    "@anyone-protocol/ao-client": "github:anyone-protocol/ao-client#v0.1.4",
+    "@anyone-protocol/ao-client": "github:anyone-protocol/ao-client#v0.1.5",
     "@dha-team/arbundles": "^1.0.3",
     "arweave": "^1.15.7",
     "axios": "^1.21.0",
