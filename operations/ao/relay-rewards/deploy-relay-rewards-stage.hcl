@@ -71,7 +71,7 @@ job "relay-rewards-stage" {
       env         = true
       data = <<-EOH
       {{- with secret "kv/stage-protocol/relay-rewards-stage" }}
-      DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REWARDS_OWNER_KEY}}"
       CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{- end }}
       {{- range service "hyperbeam-stage-node" }}
