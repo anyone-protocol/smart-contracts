@@ -3,8 +3,8 @@
  *
  * This is the half that makes publishing mean something. Given only a process id and a
  * gateway, it finds the newest anchored snapshot, verifies it, then walks the published
- * assignment chain forward from the snapshot's slot, fetching every message body after it.
- * The result is a recovery bundle: a verified state, plus every message needed to bring that
+ * assignment chain forward from the snapshot's slot, fetching every message body. The
+ * result is a recovery bundle: a verified state, plus every message needed to bring that
  * state to the head, in provable order.
  *
  * What it does NOT do, and why
@@ -102,7 +102,7 @@ async function allAssignments (pid: string) {
     for (const e of edges) {
       const t = tagMap(e.node.tags)
       const slot = parseInt(t['slot'], 10)
-      if (Number.isFinite(slot)) out.set(slot, { id: e.node.id, base: t['base-hashpath'] ?? '', body: t['body+link'] ?? t['body link'] ?? '' })
+      if (Number.isFinite(slot)) out.set(slot, { id: e.node.id, base: t['base-hashpath'] ?? '', body: t['body link'] ?? '' })
     }
     if (!d?.transactions?.pageInfo?.hasNextPage || !edges.length) break
     after = edges[edges.length - 1].cursor
@@ -157,20 +157,19 @@ async function main () {
   else if (brokeAt >= 0) console.log(`  BROKEN LINK at slot ${brokeAt} - history is NOT provably complete`)
   else console.log(`  contiguous and hash-linked (${Math.max(0, slots.length - 1)} links)`)
 
-  // The snapshot state already includes its own slot, so replay starts after it.
-  const replay = slots.filter(s => s > fromSlot)
+  // Fetch the message bodies the assignments point at.
   mkdirSync(join(OUT, 'messages'), { recursive: true })
   let fetched = 0, missing: number[] = []
-  for (const s of replay) {
+  for (const s of slots) {
     const body = asn.get(s)!.body
     if (!body) { missing.push(s); continue }
     const r = await fetch(`${GATEWAY}/raw/${body}`, { signal: AbortSignal.timeout(60_000) })
     if (!r.ok) { missing.push(s); continue }
     writeFileSync(join(OUT, 'messages', `${String(s).padStart(10, '0')}-${body}.bin`), Buffer.from(await r.arrayBuffer()))
     fetched++
-    if (fetched % 25 === 0) process.stdout.write(`\r  messages ${fetched}/${replay.length}   `)
+    if (fetched % 25 === 0) process.stdout.write(`\r  messages ${fetched}/${slots.length}   `)
   }
-  console.log(`\r  messages ${fetched}/${replay.length} fetched${missing.length ? `, ${missing.length} MISSING (slots ${missing.slice(0, 5).join(',')}${missing.length > 5 ? '…' : ''})` : ''}`)
+  console.log(`\r  messages ${fetched}/${slots.length} fetched${missing.length ? `, ${missing.length} MISSING (slots ${missing.slice(0, 5).join(',')}${missing.length > 5 ? '…' : ''})` : ''}`)
 
   writeFileSync(join(OUT, 'state.json'), raw)
   if (SEED) writeFileSync(join(OUT, 'seed.json'), raw)
@@ -185,7 +184,7 @@ async function main () {
 
   console.log(`\nwrote ${OUT}/`)
   console.log(`  state.json      verified state at slot ${fromSlot}`)
-  console.log(`  messages/       ${fetched} message bodies after slot ${fromSlot}, slot-ordered`)
+  console.log(`  messages/       ${fetched} message bodies, slot-ordered`)
   console.log(`  recovery.json   provenance and completeness report`)
   console.log(`\nhistory from slot ${fromSlot} is ${complete ? 'PROVABLY COMPLETE' : 'NOT provably complete - see recovery.json'}`)
   if (!complete) process.exit(1)

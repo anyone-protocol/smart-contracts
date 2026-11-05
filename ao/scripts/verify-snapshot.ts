@@ -170,7 +170,7 @@ async function verify (tagsIn: Record<string, string>, gz: Buffer, source: strin
   const bodies = await Promise.all(sample.map(async s => {
     const d = await gql(`{ transactions(ids:["${asn.get(s)!.id}"]) { edges { node { tags{name value} } } } }`)
     const t = tagMap(d?.transactions?.edges?.[0]?.node?.tags ?? [])
-    const body = t['body+link'] ?? t['body link']
+    const body = t['body link']
     if (!body) return false
     const r = await fetch(`${GATEWAY}/raw/${body}`, { signal: AbortSignal.timeout(60_000) })
     return r.ok
