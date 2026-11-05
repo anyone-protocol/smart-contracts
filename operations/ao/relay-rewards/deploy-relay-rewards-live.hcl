@@ -80,7 +80,7 @@ job "relay-rewards-live" {
       env         = true
       data = <<-EOH
       {{- with secret "kv/live-protocol/relay-rewards-live" }}
-      DEPLOYER_PRIVATE_KEY="{{.Data.data.ETH_ADMIN_KEY}}"
+      DEPLOYER_PRIVATE_KEY="{{.Data.data.RELAY_REWARDS_OWNER_KEY}}"
       CONSUL_TOKEN="{{.Data.data.CONSUL_TOKEN}}"
       {{- end }}
       {{- range service "hyperbeam-live-node" }}
