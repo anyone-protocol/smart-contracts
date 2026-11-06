@@ -84,7 +84,8 @@ the dependency D22 exists to remove.
 ### Capturing
 
 ```bash
-bun run scripts/snapshot-state.ts live --out snapshots/live
+PROCESS_IDS=<id>,<id>,<id> SNAPSHOT_HOST=<node host:port> \
+  bun run scripts/snapshot-state.ts live --out snapshots/live
 ```
 
 There is no way to pin a view read to a slot, and **both plausible spellings fail silently**

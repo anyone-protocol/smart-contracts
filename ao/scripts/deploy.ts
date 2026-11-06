@@ -489,13 +489,16 @@ const ao = createAoClient({
   // x-consul-token header, and `undefined` is rejected as an invalid header value.
   const tok = CONSUL_TOKEN ? { token: CONSUL_TOKEN } : {}
   const consulGet = async (): Promise<string | null> => {
-    try {
-      const r: any = await consul.kv.get({ key: consulKey!, ...tok })
-      return r?.Value ?? null
-    } catch { return null }
+    const r: any = await consul.kv.get({ key: consulKey!, ...tok })
+    return r?.Value ?? null
   }
-  const consulSet = async (value: string) =>
-    !!(await consul.kv.set({ key: consulKey!, value, ...tok }))
+  const consulSet = async (value: string, key = consulKey!) =>
+    !!(await consul.kv.set({ key, value, ...tok }))
+  /** `a/b/<contract>-address` keeps the ids it held under `a/b/history/<contract>/<time>`. */
+  const historyKey = (key: string) => {
+    const dir = key.slice(0, key.lastIndexOf('/') + 1)
+    return `${dir}history/${key.slice(dir.length).replace(/-address$/, '')}/${new Date().toISOString()}`
+  }
 
   /** Wait for the node to re-render its route list and answer for this pid again. The node
    *  RESTARTS on the key change, so connection errors here are expected and not failures. */
@@ -529,9 +532,22 @@ const ao = createAoClient({
   }
 
   if (consulKey) {
-    previousPid = await consulGet()
+    try { previousPid = await consulGet() } catch (e) {
+      console.error(`\nFAILED to read ${consulKey}: ${(e as Error).message}. Nothing was changed; the`)
+      console.error(`spawned pid is orphaned and can be ignored: ${processId}`)
+      process.exit(1)
+    }
     console.log(`\nconsul ${consulKey}`)
     console.log(`  previous             ${previousPid ?? '(unset)'}`)
+    if (previousPid) {
+      const backup = historyKey(consulKey)
+      if (!await consulSet(previousPid, backup).catch(() => false)) {
+        console.error(`\nFAILED to back up ${previousPid} to ${backup}. Nothing was changed; the`)
+        console.error(`spawned pid is orphaned and can be ignored: ${processId}`)
+        process.exit(1)
+      }
+      console.log(`  backed up to         ${backup}`)
+    }
     if (!await consulSet(processId)) {
       console.error(`\nFAILED to write ${consulKey}. Nothing was changed; the spawned pid is`)
       console.error(`orphaned and can be ignored: ${processId}`)

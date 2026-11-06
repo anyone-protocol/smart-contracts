@@ -104,8 +104,10 @@ What `deploy.ts` does:
    least 50 confirmations deep, and its bytes match the bundle the image builds. A module that
    exists in one node's cache cannot be computed anywhere else.
 2. It spawns the process with the seed.
-3. It writes the process id to Consul, waits for the node to pick it up, and then verifies the
-   spawned state against the seed.
+3. It copies the process id the Consul key holds to
+   `smart-contracts/<env>/history/<contract>/<time>`, writes the new process id to the key, waits
+   for the node to pick it up, and then verifies the spawned state against the seed. It stops
+   before the key changes when that copy fails.
 4. It restores the previous Consul value if verification fails.
 
 Rules:
@@ -138,7 +140,8 @@ bun run scripts/snapshot-state.ts <env> --out /tmp/snap && \
 | Property | Detail |
 | --- | --- |
 | Separate job | It does not share the node's lifecycle, so changing it does not restart the node |
-| Reads | `slot/current` and `as/dump`, both free routes. The job never writes to a process |
+| Reads | `slot/current` and `as/dump` from the node in-cluster, addressed as `SNAPSHOT_HOST`. The job never writes to a process |
+| Processes | `PROCESS_IDS`, rendered from the Consul keys `smart-contracts/<env>/<contract>-address` |
 | Upload | Through the node's `~bundler@1.0`, addressed in-cluster as `BUNDLER` |
 | Payment | The node's wallet pays for the bundle. Keep that wallet funded |
 | Signing | `PUBLISH_JWK` signs the data item and needs no balance. It is a key of its own, separate from the node's key |
@@ -150,8 +153,10 @@ bun run scripts/snapshot-state.ts <env> --out /tmp/snap && \
 - A snapshot anchors history from its own slot forward.
 - The two commands are chained with `&&`, so a failed capture never reaches the publisher.
 - The JWK is stored in Vault as base64 and decoded into a file. `PUBLISH_JWK` holds the path.
-- `BUNDLER` and the JWK are rendered in `template` blocks, and the job declares `consul {}` so
-  the service lookup can render.
+- `BUNDLER`, `SNAPSHOT_HOST`, `PROCESS_IDS` and the JWK are rendered in `template` blocks, and
+  the job declares `consul {}` so the service and key lookups can render.
+- Every id in `PROCESS_IDS` must be a process the node serves. An id it cannot read fails the
+  run, and nothing is published.
 
 Verify a published snapshot:
 
