@@ -25,8 +25,7 @@ job "staking-rewards-stage" {
 
     config {
       network_mode = "host"
-      # TODO: pin the commit that built this image before running.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:0e1566bf8bb0cf4627e7f9ca2aee6456b5540384@sha256:c1bf2ff575f5a2901f34383c02b61418dbd9f47abc6b50cee1746d51c416c4f0"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:e6ba945a9bdac3b4db3869bb67dd0fe5855e332f@sha256:4e767164d492a8405b7cd1a7bc0ae202a06523a9d553dea1d86699e52d02cc4a"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "staking-rewards", "--seed", "current", "--envelope", "seeds/stage-staking-rewards.envelope.json"]
@@ -48,10 +47,10 @@ job "staking-rewards-stage" {
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
       # rendered in the template block below instead.
 
-      # TODO: the durable module id, from publishing this contract's module.
+      # The durable module id, published from this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "H33fd6uDoaO1ak2bjVilroXA-P0QFMYkzvZCoX25890"
+      MODULE_ID = "Z82lDUHzS-N6cniXdJ2CZlVWfMsKZHjrIBgMCCWmTtc"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.
