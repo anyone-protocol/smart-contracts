@@ -63,11 +63,10 @@ job "publish-modules-stage" {
     config {
       network_mode = "host"
 
-      # Pinned to 8e02154 — the commit carrying the per-operator relay counts (`Network`) in
-      # staking-rewards. Actions -> "Build & Publish AO Mainnet Contracts Image" -> Run workflow ->
-      # pick the branch; it tags by commit SHA. The bytes signed below come from this image, so
-      # this line is what makes a published id traceable to a commit.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:8e021544396f707fdffb2db53c8f96dc1e2d8236@sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0"
+      # Actions -> "Build & Publish AO Mainnet Contracts Image" -> Run workflow -> pick the
+      # branch; it tags by commit SHA. The bytes signed below come from this image, so this line
+      # is what makes a published id traceable to a commit.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:e6ba945a9bdac3b4db3869bb67dd0fe5855e332f@sha256:4e767164d492a8405b7cd1a7bc0ae202a06523a9d553dea1d86699e52d02cc4a"
 
       entrypoint = ["bun"]
       command = "run"

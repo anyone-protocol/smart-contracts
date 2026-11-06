@@ -83,12 +83,8 @@ job "publish-snapshot-stage" {
     config {
       network_mode = "host"
 
-      # Pinned to 695e7ba. Carries the fix for the run-killing refusal: one unanchored snapshot
-      # used to abort the whole run, so live published on only 3 of 13 runs and stage 9 of 15.
-      # Now unanchored items are skipped and everything anchored publishes.
       # Tag and digest must move together: the tag names the commit, the digest is what runs.
-      # Digest verified against the tag on ghcr 2026-09-16.
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:695e7baf520f13d48fee47f0c2b839d3f760818c@sha256:86a60d8c216e2fd9d334ddfb504660e312d6c32db5b206dd7a0d0e8c48698a3e"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:e6ba945a9bdac3b4db3869bb67dd0fe5855e332f@sha256:4e767164d492a8405b7cd1a7bc0ae202a06523a9d553dea1d86699e52d02cc4a"
 
       # Chained with && so a failed capture never reaches the publisher. NOT wrapped in
       # ( set -e; ... ): POSIX ignores -e for a list being tested, and a subshell inherits that
