@@ -25,7 +25,7 @@ job "relay-rewards-stage" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:e6ba945a9bdac3b4db3869bb67dd0fe5855e332f@sha256:4e767164d492a8405b7cd1a7bc0ae202a06523a9d553dea1d86699e52d02cc4a"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "relay-rewards", "--seed", "current", "--envelope", "seeds/stage-relay-rewards.envelope.json"]
@@ -47,10 +47,10 @@ job "relay-rewards-stage" {
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
       # rendered in the template block below instead.
 
-      # The durable module id, published from this contract's module and reused by live.
+      # The durable module id, published from this contract's module.
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
+      MODULE_ID = "08nsTbOQAcrz1_RCPrs5Ns-P0W513UOwQlivi-XF8wU"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.
