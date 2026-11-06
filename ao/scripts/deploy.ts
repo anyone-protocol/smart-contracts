@@ -319,7 +319,7 @@ const MIN_CONFIRMATIONS = 50
  *
  * So check what actually matters, cheapest-and-most-decisive last:
  *   1. indexed at all
- *   2. it is bundled, and the CONTAINING BUNDLE tx is in a block  (the real L1 object)
+ *   2. it is in a block: its CONTAINING BUNDLE's when the gateway names one, else its own
  *   3. that block has confirmation depth
  *   4. the bytes are retrievable AND sha256-match the bundle we are about to spawn against
  *
@@ -362,39 +362,39 @@ async function assertModuleIsDurable (id: string, localBundle: string) {
     process.exit(1)
   }
 
-  // 1 + 2 — indexed, and which bundle contains it
+  // 1 + 2: indexed, and the block that holds it. A gateway can report a bundled item with an
+  // empty `bundledIn` and the bundle's block on the item itself, so that block counts too.
   const d = await gql(`{ transaction(id: "${id}") { bundledIn { id } block { height } } }`)
   const tx = d?.transaction
   if (!tx) fail(`module ${id} is not indexed on Arweave.`)
 
-  const bundleId = tx.bundledIn?.id
-  if (!bundleId) {
-    // A direct L1 tx is fine; it just has no containing bundle to check.
-    console.log(`module durability      indexed, not bundled (direct L1 tx)`)
-  } else {
-    const b = await gql(`{ transaction(id: "${bundleId}") { block { height } } }`)
-    const bundleHeight = b?.transaction?.block?.height
-    if (!bundleHeight) {
-      fail(
-        `module ${id} is indexed but its containing bundle is NOT mined.`,
-        `bundle ${bundleId} has no block — the item is catalogued, not seeded.`,
-        'This is precisely the case a bare index lookup reports as durable.')
-    }
-    // 3 — confirmation depth
-    const info = await fetch('https://arweave.net/info', { signal: AbortSignal.timeout(30_000) })
-      .then(r => r.ok ? r.json() as any : null).catch(() => null)
-    const head = info?.height
-    const confirmations = head ? head - bundleHeight : null
-    if (confirmations !== null && confirmations < MIN_CONFIRMATIONS) {
-      fail(
-        `module ${id} is only ${confirmations} confirmations deep.`,
-        `bundle ${bundleId} mined at ${bundleHeight}, chain head ${head}.`,
-        `Want at least ${MIN_CONFIRMATIONS}. Wait and re-run.`)
-    }
-    console.log(
-      `module durability      bundle ${bundleId.slice(0, 12)}… @ ${bundleHeight}` +
-      (confirmations !== null ? ` (${confirmations} confirmations)` : ''))
+  const bundleId: string = tx.bundledIn?.id || ''
+  const where = bundleId ? `bundle ${bundleId}` : 'the item'
+  const height: number | undefined = bundleId
+    ? (await gql(`{ transaction(id: "${bundleId}") { block { height } } }`))?.transaction?.block?.height
+    : tx.block?.height
+  if (!height) {
+    fail(
+      `module ${id} is indexed but ${bundleId ? 'its containing bundle is' : 'is'} NOT mined.`,
+      `${where} has no block, so the item is catalogued, not seeded.`,
+      'This is precisely the case a bare index lookup reports as durable.')
   }
+
+  // 3: confirmation depth
+  const info = await fetch('https://arweave.net/info', { signal: AbortSignal.timeout(30_000) })
+    .then(r => r.ok ? r.json() as any : null).catch(() => null)
+  const head: number | undefined = info?.height
+  if (!head) fail(`the chain head is unknown (arweave.net/info failed), so the depth of ${id} cannot be checked.`)
+  const confirmations = head! - height!
+  if (confirmations < MIN_CONFIRMATIONS) {
+    fail(
+      `module ${id} is only ${confirmations} confirmations deep.`,
+      `${where} mined at ${height}, chain head ${head}.`,
+      `Want at least ${MIN_CONFIRMATIONS}. Wait and re-run.`)
+  }
+  console.log(
+    `module durability      ${bundleId ? `bundle ${bundleId.slice(0, 12)}…` : 'item'} @ ${height}` +
+    ` (${confirmations} confirmations)`)
 
   // 4 — the bytes exist AND are the ones we built. The decisive check.
   const raw = await fetch(`https://arweave.net/raw/${id}`, { signal: AbortSignal.timeout(60_000) })
