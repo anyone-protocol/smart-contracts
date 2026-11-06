@@ -38,7 +38,8 @@
  * `tag process=<pid>, type=state-snapshot` is exactly the query recovery needs.
  *
  * Usage:
- *   bun run scripts/snapshot-state.ts <dev|stage|live> [--out DIR] [--contract NAME]
+ *   PROCESS_IDS=<id>,<id>,<id> SNAPSHOT_HOST=<host:port> \
+ *     bun run scripts/snapshot-state.ts <dev|stage|live> [--out DIR] [--contract NAME]
  */
 import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
@@ -56,8 +57,7 @@ const ENVS: Record<string, { host: string }> = {
  * SNAPSHOT_HOST overrides where we read WITHOUT changing the env label the snapshot is
  * tagged with. That is what lets the periodic snapshot job resolve the node from Consul
  * (`hyperbeam-<env>-node`) and read it directly while still tagging the artifact `env=live`.
- * Reading that address skips nginx, the edge and Traefik entirely; p4 still applies, but
- * `slot/current` and `as/dump` are both on the non-chargable routes.
+ * The public hostname is the gateway, which serves neither `slot/current` nor `as/dump`.
  */
 const HOST_OVERRIDE = process.env.SNAPSHOT_HOST
 
@@ -99,33 +99,11 @@ const text = async (path: string, opts: { ms?: number, json?: boolean } = {}) =>
   return { status: res.status, body: await res.text() }
 }
 
-/** Read a numbered opt container off ~meta@1.0/info, following `+link` entries. */
-async function listOf (key: string): Promise<any[]> {
-  const r = await text(`/~meta@1.0/info/${key}?accept=application/json&accept-bundle`, { json: true })
-  if (r.status !== 200) return []
-  let container: any
-  try { container = JSON.parse(r.body) } catch { return [] }
-  if (!container || typeof container !== 'object') return []
-  const nums = Object.keys(container)
-    .filter(k => /^\d+(\+link)?$/.test(k))
-    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
-  return Promise.all(nums.map(async k => {
-    if (!k.endsWith('+link')) return container[k]
-    const sub = await text(`/~meta@1.0/info/${key}/${parseInt(k, 10)}?accept=application/json&accept-bundle`, { json: true })
-    try { return JSON.parse(sub.body) } catch { return undefined }
-  }))
-}
-
-/**
- * Discover the contract ids from the node itself rather than hard-coding them, so
- * this tracks respawns the same way the jobspec's Consul templating does.
- */
-async function discoverProcesses (): Promise<string[]> {
-  const routes = (await listOf('p4-non-chargable-routes')).map((r: any) => r?.template)
-  const ids = routes
-    .filter((t: any) => typeof t === 'string')
-    .map((t: string) => t.replace(/^\^\//, '').replace(/~process@1\.0\/\((?:[a-z|]+)\)$/, ''))
-    .filter((t: string) => /^[A-Za-z0-9_-]{43}$/.test(t))
+/** The contract ids, comma-separated in PROCESS_IDS. The jobspec renders them from Consul. */
+function processIds (): string[] {
+  const ids = (process.env.PROCESS_IDS || '').split(',').map(s => s.trim()).filter(Boolean)
+  const bad = ids.filter(id => !/^[A-Za-z0-9_-]{43}$/.test(id))
+  if (bad.length) throw new Error(`PROCESS_IDS holds malformed ids: ${bad.join(', ')}`)
   return [...new Set(ids)]
 }
 
@@ -208,9 +186,9 @@ async function main () {
   const nodeAddr = (await text('/~meta@1.0/info/address', { ms: 30_000 })).body.trim()
   console.log(`env=${env} host=${HOST} node=${nodeAddr}`)
 
-  const pids = await discoverProcesses()
-  if (!pids.length) throw new Error('discovered no process ids from p4-non-chargable-routes')
-  console.log(`discovered ${pids.length} process id(s)\n`)
+  const pids = processIds()
+  if (!pids.length) throw new Error('PROCESS_IDS is not set')
+  console.log(`${pids.length} process id(s)\n`)
 
   mkdirSync(OUT, { recursive: true })
   const manifest: any[] = []

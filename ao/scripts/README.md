@@ -355,9 +355,10 @@ Steps of the spawn phase:
 3. Check the module: indexed on Arweave, its bundle mined, at least 50 confirmations deep, and
    the bytes at `https://arweave.net/raw/<id>` equal to the local bundle by SHA-256.
 4. Spawn, with the forced first compute deferred.
-5. With `CONTRACT_CONSUL_KEY`: write the process id to Consul and wait up to 300 seconds until
-   the node serves `slot/current` for it. The node restarts on the change, so connection errors
-   during the wait are expected.
+5. With `CONTRACT_CONSUL_KEY`: copy the value the key holds to `<dir>/history/<contract>/<time>`,
+   write the process id to the key and wait up to 300 seconds until the node serves
+   `slot/current` for it. The node restarts on the change, so connection errors during the wait
+   are expected.
 6. Force the first compute and wait until `status.initialized` is true.
 7. Compare the counts of the `status` view with the expected seed. With `--seed current`, compare
    the `dump` and `roles` views with the envelope.
@@ -386,6 +387,8 @@ Rules:
 - When `SCHEDULER` is not the address of the node, the node does not adopt the process.
 - When verification fails and the key had no previous value, the key names a process that was
   not verified. Clear it by hand.
+- A failed read of the key, or a failed copy to `history/`, stops the run before the key changes.
+  `CONSUL_TOKEN` needs write access to the `history/` prefix beside the key.
 - Without `CONTRACT_CONSUL_KEY` the script prints the `consul kv put` command. Record the
   process id by hand.
 - `--publish --dry-run` still posts the module to the bundler. It only skips the wait for
@@ -877,8 +880,8 @@ describes the snapshot format, the periodic job, the outcomes and the failure me
 
 Rules:
 
-- The contract ids are read from the `p4-non-chargable-routes` of the node. A contract is
-  identified by the shape of its state.
+- The contract ids are read from `PROCESS_IDS`, comma-separated. A contract is identified by
+  the shape of its state.
 - A view read cannot be pinned to a slot. `compute&slot=<n>/as/dump` evaluates the view against
   the result message of that slot and returns an empty state. `as/dump?slot=<n>` ignores the
   parameter. Neither form reports an error.

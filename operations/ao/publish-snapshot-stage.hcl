@@ -123,8 +123,9 @@ job "publish-snapshot-stage" {
     # job fails at upload with "BUNDLER (or SNAPSHOT_HOST) is not set".
     consul {}
 
-    # SNAPSHOT_HOST and PUBLISH_JWK are here, not in the env block: an env block does not run
-    # through consul-template, so neither a service lookup nor a Vault read works there.
+    # SNAPSHOT_HOST, PROCESS_IDS and PUBLISH_JWK are here, not in the env block: an env block does
+    # not run through consul-template, so neither a service lookup nor a Consul or Vault read
+    # works there.
     #
     # ⚠️ The JWK is STORED BASE64 in Vault as PUBLISH_JWK_BASE64 and decoded into a FILE below,
     # never into an env var: a JWK is JSON full of double quotes, so a raw env render ends the
@@ -135,18 +136,17 @@ job "publish-snapshot-stage" {
     # node's own key - the node's identity stays in its own Vault path and never signs a payload
     # - so a snapshot stays attributable to the publisher rather than to the scheduler.
     #
-    # BUNDLER is set explicitly and SNAPSHOT_HOST deliberately is NOT. `~bundler@1.0` is refused
-    # at the edge, so the upload must go in-cluster - but snapshot-state.ts in the PINNED image
-    # forces https:// on any non-127 host, so setting SNAPSHOT_HOST makes its reads fail the TLS
-    # handshake against the node's plain-HTTP port. Unset, it reads the public edge (free, p4
-    # non-chargable). Re-add it once an image carrying the scheme fix is built.
+    # Reads and the upload both go to the node in-cluster. PROCESS_IDS comes from the same
+    # Consul keys the deploy jobs write.
     template {
       destination = "secrets/keys.env"
       env         = true
       data = <<-EOH
       {{- range service "hyperbeam-stage-node" }}
       BUNDLER="http://{{ .Address }}:{{ .Port }}"
+      SNAPSHOT_HOST="{{ .Address }}:{{ .Port }}"
       {{- end }}
+      PROCESS_IDS="{{ key "smart-contracts/stage/operator-registry-address" }},{{ key "smart-contracts/stage/relay-rewards-address" }},{{ key "smart-contracts/stage/staking-rewards-address" }}"
       EOH
     }
 
