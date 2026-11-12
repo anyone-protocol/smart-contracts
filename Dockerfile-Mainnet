@@ -118,6 +118,9 @@ COPY ao/state-dumps/2026-07-09/stage-staking-rewards.roles.json    ./state-dumps
 COPY ao/seeds/stage-operator-registry.envelope.json  ./seeds/stage-operator-registry.envelope.json
 COPY ao/seeds/stage-relay-rewards.envelope.json      ./seeds/stage-relay-rewards.envelope.json
 COPY ao/seeds/stage-staking-rewards.envelope.json    ./seeds/stage-staking-rewards.envelope.json
+COPY ao/seeds/live-operator-registry.envelope.json   ./seeds/live-operator-registry.envelope.json
+COPY ao/seeds/live-relay-rewards.envelope.json       ./seeds/live-relay-rewards.envelope.json
+COPY ao/seeds/live-staking-rewards.envelope.json     ./seeds/live-staking-rewards.envelope.json
 
 # `deploy.ts` rebuilds the module bundle and the migration seed into dist/ on every run, so that
 # one directory has to be writable. Everything else stays root-owned and read-only to the

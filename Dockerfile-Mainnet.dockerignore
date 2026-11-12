@@ -61,3 +61,6 @@
 !ao/seeds/stage-operator-registry.envelope.json
 !ao/seeds/stage-relay-rewards.envelope.json
 !ao/seeds/stage-staking-rewards.envelope.json
+!ao/seeds/live-operator-registry.envelope.json
+!ao/seeds/live-relay-rewards.envelope.json
+!ao/seeds/live-staking-rewards.envelope.json

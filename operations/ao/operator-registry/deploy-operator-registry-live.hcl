@@ -29,7 +29,7 @@ job "operator-registry-live" {
 
       entrypoint = ["bun"]
       command = "run"
-      args = ["scripts/deploy.ts", "operator-registry", "--seed", "live"]
+      args = ["scripts/deploy.ts", "operator-registry", "--seed", "current", "--envelope", "seeds/live-operator-registry.envelope.json"]
 
       logging {
         type = "loki"
@@ -46,8 +46,8 @@ job "operator-registry-live" {
 
     # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
     # vars are gone with the runtime they configured. There is no CU, and migration is no longer
-    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
-    # rides the spawn message, selected by `--seed` above.
+    # a read from a live source process: the seed rides the spawn message, selected by `--seed`
+    # above.
     env {
       # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
