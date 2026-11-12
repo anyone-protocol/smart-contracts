@@ -29,6 +29,9 @@ job "relay-rewards-live" {
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48c12f5fa2c4da5854aebf68734cbe7dc4860ede@sha256:f2f4f96521a79472dd04b3c18b677f1857af27319d95950eb747ec5d03a3a9ab"
       entrypoint = ["bun"]
       command = "run"
+      # `--previous-round 0` made the first round pay nothing when the seed was built from a
+      # dump (`--seed live`). It has no effect with `--seed current`.
+      # args = ["scripts/deploy.ts", "relay-rewards", "--seed", "live", "--previous-round", "0"]
       args = ["scripts/deploy.ts", "relay-rewards", "--seed", "current", "--envelope", "seeds/live-relay-rewards.envelope.json"]
       logging {
         type = "loki"
