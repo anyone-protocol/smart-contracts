@@ -62,7 +62,7 @@ job "relay-rewards-live" {
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "08nsTbOQAcrz1_RCPrs5Ns-P0W513UOwQlivi-XF8wU"
+      MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.
