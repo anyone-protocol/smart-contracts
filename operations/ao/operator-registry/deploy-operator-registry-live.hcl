@@ -44,6 +44,10 @@ job "operator-registry-live" {
 
     consul {}
 
+    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
+    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
+    # a read from a live source process: the seed rides the spawn message, selected by `--seed`
+    # above.
     env {
       # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
