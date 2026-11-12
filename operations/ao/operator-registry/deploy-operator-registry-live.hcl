@@ -25,7 +25,7 @@ job "operator-registry-live" {
 
     config {
       network_mode = "host"
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:32b9f2382e1f84c0f0ee65b4ff54c4dd4cef9264@sha256:7b2fa8568643f25575658a88998589ee75d1b046378219fc4ad7964409b8e508"
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:be0e5465cd8ad5a20bceb812633cc7f7a998ff99@sha256:93e3e30c11e51b8061c395fed4481f342af4fd36e9104f5075c700aa025bd32c"
 
       entrypoint = ["bun"]
       command = "run"

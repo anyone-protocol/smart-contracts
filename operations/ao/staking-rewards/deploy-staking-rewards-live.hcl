@@ -25,13 +25,10 @@ job "staking-rewards-live" {
 
     config {
       network_mode = "host"
-      # Pinned to 48d4cb5 (2026-08-20). Carries the HARDENED `assertModuleIsDurable`: a module id
-      # must be indexed, its containing bundle mined, >=50 confirmations deep, and its bytes must
-      # sha256-MATCH the bundle this image builds. Safe to repin because 8e02154..48d4cb5 changed
-      # ZERO Lua — only TypeScript tooling, docs and jobspecs — so this image builds byte-identical
-      # bundles to the one that published the modules below, and the new check still passes.
-      # Rollback: 8e02154 @sha256:0998cdc00a8d965bb7c1f2ffeafb83fa477d9f8c5d725c3e6f58a3bb76fdb7a0
-      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48d4cb5a2dd59498489441d3f15294ecd2f53658@sha256:893fdecab1a7dc78642598cf962bb4ba22407a181a5b5048195af4749af53d4a"
+      # 48d4cb5 (2026-08-20) added the HARDENED `assertModuleIsDurable`: a module id must be
+      # indexed, its containing bundle mined, >=50 confirmations deep, and its bytes must
+      # sha256-MATCH the bundle this image builds. Every later image carries it.
+      image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:be0e5465cd8ad5a20bceb812633cc7f7a998ff99@sha256:93e3e30c11e51b8061c395fed4481f342af4fd36e9104f5075c700aa025bd32c"
       entrypoint = ["bun"]
       command = "run"
       args = ["scripts/deploy.ts", "staking-rewards", "--seed", "current", "--envelope", "seeds/live-staking-rewards.envelope.json"]
