@@ -58,7 +58,7 @@ job "operator-registry-live" {
       #
       # A module id is the id of the SIGNED item, so publishing identical bytes under the live
       # key would mint a different id for the same module. Reusing gains two things: live runs
-      # bytes that have been settling rounds on stage since 2026-08-11, and the id is directly
+      # bytes that are already settling rounds on stage, and the id is directly
       # comparable across environments. The signer holds no authority over a published module,
       # so nothing is given up by it being the stage key.
       #
