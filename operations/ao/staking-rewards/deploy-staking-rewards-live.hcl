@@ -62,7 +62,7 @@ job "staking-rewards-live" {
       #
       # A module id is the id of the SIGNED item, so publishing identical bytes under the live
       # key would mint a different id for the same module. Reusing gains two things: live runs
-      # bytes that have been settling rounds on stage since 2026-08-11, and the id is directly
+      # bytes that are already settling rounds on stage, and the id is directly
       # comparable across environments. The signer holds no authority over a published module,
       # so nothing is given up by it being the stage key.
       #
@@ -70,7 +70,7 @@ job "staking-rewards-live" {
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "H33fd6uDoaO1ak2bjVilroXA-P0QFMYkzvZCoX25890"
+      MODULE_ID = "Z82lDUHzS-N6cniXdJ2CZlVWfMsKZHjrIBgMCCWmTtc"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.

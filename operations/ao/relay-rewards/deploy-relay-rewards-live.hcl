@@ -60,13 +60,13 @@ job "relay-rewards-live" {
       #
       # A module id is the id of the SIGNED item, so publishing identical bytes under the live
       # key would mint a different id for the same module. Reusing gains two things: live runs
-      # bytes that have been settling rounds on stage since 2026-08-11, and the id is directly
+      # bytes that are already settling rounds on stage, and the id is directly
       # comparable across environments. The signer holds no authority over a published module,
       # so nothing is given up by it being the stage key.
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "kTf0r-R_MxizLz3_9S0zSM7G8nGURL9qF-Hplnl8-Eo"
+      MODULE_ID = "08nsTbOQAcrz1_RCPrs5Ns-P0W513UOwQlivi-XF8wU"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.
