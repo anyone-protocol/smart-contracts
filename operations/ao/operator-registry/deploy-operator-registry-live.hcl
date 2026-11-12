@@ -64,7 +64,7 @@ job "operator-registry-live" {
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "2vWsI194X4gmK66fhWQdRsBnQJIoG8nFBqnSazW_cgA"
+      MODULE_ID = "ERlyEXrEBxKjmcNXZUmeVvIGn2C4sMhq5lYM4csIvAU"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.

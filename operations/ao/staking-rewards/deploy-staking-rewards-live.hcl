@@ -70,7 +70,7 @@ job "staking-rewards-live" {
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "H33fd6uDoaO1ak2bjVilroXA-P0QFMYkzvZCoX25890"
+      MODULE_ID = "Z82lDUHzS-N6cniXdJ2CZlVWfMsKZHjrIBgMCCWmTtc"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.
