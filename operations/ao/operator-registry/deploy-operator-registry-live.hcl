@@ -29,7 +29,7 @@ job "operator-registry-live" {
 
       entrypoint = ["bun"]
       command = "run"
-      args = ["scripts/deploy.ts", "operator-registry", "--seed", "live"]
+      args = ["scripts/deploy.ts", "operator-registry", "--seed", "current", "--envelope", "seeds/live-operator-registry.envelope.json"]
 
       logging {
         type = "loki"
@@ -44,10 +44,6 @@ job "operator-registry-live" {
 
     consul {}
 
-    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
-    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
-    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
-    # rides the spawn message, selected by `--seed` above.
     env {
       # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
@@ -64,7 +60,7 @@ job "operator-registry-live" {
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "2vWsI194X4gmK66fhWQdRsBnQJIoG8nFBqnSazW_cgA"
+      MODULE_ID = "ERlyEXrEBxKjmcNXZUmeVvIGn2C4sMhq5lYM4csIvAU"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.

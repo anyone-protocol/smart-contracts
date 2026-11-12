@@ -34,7 +34,7 @@ job "staking-rewards-live" {
       image = "ghcr.io/anyone-protocol/smart-contracts-ao-mainnet:48d4cb5a2dd59498489441d3f15294ecd2f53658@sha256:893fdecab1a7dc78642598cf962bb4ba22407a181a5b5048195af4749af53d4a"
       entrypoint = ["bun"]
       command = "run"
-      args = ["scripts/deploy.ts", "staking-rewards", "--seed", "live"]
+      args = ["scripts/deploy.ts", "staking-rewards", "--seed", "current", "--envelope", "seeds/live-staking-rewards.envelope.json"]
       logging {
         type = "loki"
         config {
@@ -48,10 +48,6 @@ job "staking-rewards-live" {
 
     consul {}
 
-    # The legacy PHASE / CU_URL / CONTRACT_NAME / IS_MIGRATION_DEPLOYMENT / CALL_INIT_HANDLER
-    # vars are gone with the runtime they configured. There is no CU, and migration is no longer
-    # a read from a live source process: the seed is built from the 2026-07-09 legacynet dump and
-    # rides the spawn message, selected by `--seed` above.
     env {
       # HB_URL is NOT here: an `env` block does not run through consul-template, so a service
       # lookup written here would reach the process as a literal `{{ range ... }}` string. It is
@@ -70,7 +66,7 @@ job "staking-rewards-live" {
       #
       # deploy.ts refuses an id that is not indexed on Arweave: a node-local id lives in one
       # alloc's cache, and a process spawned against it can never compute a slot anywhere else.
-      MODULE_ID = "H33fd6uDoaO1ak2bjVilroXA-P0QFMYkzvZCoX25890"
+      MODULE_ID = "Z82lDUHzS-N6cniXdJ2CZlVWfMsKZHjrIBgMCCWmTtc"
 
       # deploy.ts writes the PID here itself, then verifies the seeded state and restores the
       # previous value if that fails.
